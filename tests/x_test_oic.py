@@ -9,26 +9,26 @@ from collections import Counter
 import pytest
 from jwkest.jws import alg2keytype
 from jwkest.jwt import JWT
-from oic.oic import scope2claims
 
-from oiccli.exception import OtherError
 from requests import Response
 
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oiccli.exception import OtherError
 from oiccli.grant import Grant
 from oiccli.grant import Token
-from oiccli.oic import DEF_SIGN_ALG
-from oiccli.oic import Client
-from oicmsg.oic import SCOPE2CLAIMS
 from oicmsg.oic import AccessTokenRequest
 from oicmsg.oic import AccessTokenResponse
 from oicmsg.oic import AuthorizationRequest
 from oicmsg.oic import AuthorizationResponse
 from oicmsg.oic import Claims
 from oicmsg.oic import ClaimsRequest
+from oiccli.oic import Client
+from oiccli.oic import DEF_SIGN_ALG
 from oicmsg.oic import IdToken
 from oicmsg.oic import OpenIDRequest
 from oicmsg.oic import OpenIDSchema
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oicmsg.oic import SCOPE2CLAIMS
+from oicmsg.oic import scope2claims
 from oicmsg.key_bundle import KeyBundle
 from oicmsg.key_jar import KeyJar
 from oicmsg.key_bundle import rsa_load
@@ -60,6 +60,51 @@ def _eq(l1, l2):
     return set(l1) == set(l2)
 
 
+class HTTPResponse(object):
+    def __init__(self, text='', status_code=200, headers=None):
+        self.text = text
+        self.status_code = status_code
+        self.headers = headers or {}
+
+
+class MockOP(object):
+    def __init__(self, baseurl='http://example.com/'):
+        self.baseurl = baseurl
+
+    def __call__(self, url, method, **kwargs):
+        if url.startswith(self.baseurl):
+            path = url[len(self.baseurl):]
+        else:
+            path = url
+
+        if '?' in path:
+            what, req = path.split('?', 1)
+            meth = getattr(self, what)
+            return meth(req)
+        else:
+            meth = getattr(self, path)
+            return meth(kwargs['data'])
+
+    def discovery(self):
+        pass
+
+    def register(self, request):
+        pass
+
+    def authorization(self, request, **kwargs):
+        areq = AuthorizationRequest().from_urlencoded(request)
+        aresp = AuthorizationResponse()
+        resp = HTTPResponse('OK')
+        return resp
+
+    def token(self, request, **kwargs):
+        pass
+
+    def userinfo(self, request, **kwargs):
+        pass
+
+
+
 # ----------------- CLIENT --------------------
 
 
@@ -67,7 +112,8 @@ class TestClient(object):
     @pytest.fixture(autouse=True)
     def create_client(self):
         self.redirect_uri = "http://example.com/redirect"
-        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD)
+        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD,
+                             httplib=MockOP())
         self.client.redirect_uris = [self.redirect_uri]
         self.client.authorization_endpoint = "http://example.com/authorization"
         self.client.token_endpoint = "http://example.com/token"

@@ -1,11 +1,11 @@
 import logging
-
-import six.moves.http_cookiejar as cookielib
+from six import string_types
+from future.backports.http.cookiejar import Cookie
 from future.backports.http.cookiejar import http2time
+
 from oiccli import sanitize
 from oiccli.exception import TimeFormatError
 from oicmsg.exception import UnSupported
-from six import string_types
 
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ def set_cookie(cookiejar, kaka):
                 except (TypeError, AttributeError):
                     pass
 
-            new_cookie = cookielib.Cookie(**std_attr)
+            new_cookie = Cookie(**std_attr)
 
             cookiejar.set_cookie(new_cookie)
 

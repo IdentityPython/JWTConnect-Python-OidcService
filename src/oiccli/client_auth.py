@@ -7,7 +7,8 @@ from jwkest import MissingKey
 from jwkest import as_bytes
 from jwkest.jws import alg2keytype
 
-from oiccli import rndstr, sanitize
+from oiccli import rndstr
+from oiccli import sanitize
 from oiccli.oauth2 import DEF_SIGN_ALG
 from oiccli.oic import JWT_BEARER
 from oicmsg.exception import FailedAuthentication
@@ -59,7 +60,7 @@ class ClientAuthnMethod(object):
         """ Add authentication information to a request
         :return:
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def verify(self, **kwargs):
         """
@@ -67,7 +68,7 @@ class ClientAuthnMethod(object):
         :param kwargs:
         :return:
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class ClientSecretBasic(ClientAuthnMethod):
@@ -124,12 +125,17 @@ class ClientSecretBasic(ClientAuthnMethod):
                     cis['client_id'] = self.cli.client_id
                 except AttributeError:
                     pass
-        elif (("client_id" not in cis.c_param.keys()) or
-                cis.c_param["client_id"][VREQUIRED]) is False:
+        else:
             try:
-                del cis["client_id"]
+                _req = cis.c_param["client_id"][VREQUIRED]
             except KeyError:
-                pass
+                _req = False
+
+            if not _req:
+                try:
+                    del cis["client_id"]
+                except KeyError:
+                    pass
 
         return http_args
 
@@ -453,9 +459,6 @@ class PrivateKeyJWT(JWSAuthnMethod):
     def get_signing_key(self, algorithm):
         return self.cli.keyjar.get_signing_key(alg2keytype(algorithm), "",
                                                alg=algorithm)
-
-
-# from oic.utils.authn.client_saml import SAML2_BEARER_ASSERTION_TYPE
 
 
 CLIENT_AUTHN_METHOD = {

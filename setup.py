@@ -67,7 +67,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
-        "pyjwkest>=1.3.6",
+        'oicmsg',
         "future",
         "six",
     ],

@@ -9,18 +9,18 @@ import logging
 import os
 import time
 
-from jwkest import as_unicode
-from jwkest import safe_str_cmp
 from six import PY2
 from six import binary_type
 from six import text_type
 
+from jwkest import as_unicode
+from jwkest import safe_str_cmp
+
 from oiccli import rndstr
-from oiccli.exception import ImproperlyConfigured
-from oiccli.exception import UnsupportedMethod
-from oicmsg import time_util
 from oiccli.aes import AEAD
 from oiccli.aes import AESError
+from oiccli.exception import ImproperlyConfigured
+from oicmsg import time_util
 
 __author__ = 'rohe0002'
 

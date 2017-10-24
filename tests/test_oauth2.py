@@ -1,274 +1,135 @@
-# pylint: disable=missing-docstring,no-self-use
-
-import base64
 import os
-
 import pytest
-from jwkest import as_bytes
-from jwkest import b64e
-from jwkest.jwk import SYMKey
+import time
+
+import sys
 from jwkest.jwk import rsa_load
-from jwkest.jws import JWS
-from jwkest.jwt import JWT
-
-from oiccli.oauth2 import Client
-from oiccli.grant import Grant
-from oiccli.oic import JWT_BEARER
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oiccli.grant import Grant, Token
+from oiccli.oauth2 import Client, DEF_SIGN_ALG
 from oicmsg.key_bundle import KeyBundle
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.oauth2 import AuthorizationResponse
-from oicmsg.oauth2 import ResourceRequest
-from oiccli.client_auth import BearerBody
-from oiccli.client_auth import BearerHeader
-from oiccli.client_auth import ClientSecretBasic
-from oiccli.client_auth import ClientSecretJWT
-from oiccli.client_auth import ClientSecretPost
-from oiccli.client_auth import PrivateKeyJWT
-from oiccli.client_auth import valid_client_info
+from oicmsg.oauth2 import Message, AuthorizationRequest, AccessTokenRequest, \
+    RefreshAccessTokenRequest, AccessTokenResponse, ResourceRequest
+from oicmsg.oic import IdToken
+from oicmsg.time_util import utc_time_sans_frac
 
-BASE_PATH = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, '.')
+from MockOP import MockOP
 
-CLIENT_CONF = {'client_id': 'A', 'config': {'issuer': 'https://example.com/as'}}
+BASE_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "data/keys"))
 
+_key = rsa_load(os.path.join(BASE_PATH, "rsa.key"))
+KC_RSA = KeyBundle({"key": _key, "kty": "RSA", "use": "sig"})
 
-def _eq(l1, l2):
-    return set(l1) == set(l2)
-
-
-@pytest.fixture
-def client():
-    cli = Client(**CLIENT_CONF)
-    cli.client_secret = "boarding pass"
-    return cli
+CLIENT_ID = "client_1"
+IDTOKEN = IdToken(iss="http://oic.example.org/", sub="sub",
+                  aud=CLIENT_ID, exp=utc_time_sans_frac() + 86400,
+                  nonce="N0nce",
+                  iat=time.time())
 
 
-class TestClientSecretBasic(object):
-    def test_construct(self, client):
-        cis = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
+class TestClient(object):
+    @pytest.fixture(autouse=True)
+    def create_client(self):
+        self.redirect_uri = "http://example.com/redirect"
+        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD,
+                             httplib=MockOP())
+        self.client.redirect_uris = [self.redirect_uri]
+        self.client.authorization_endpoint = "http://example.com/authorization"
+        self.client.token_endpoint = "http://example.com/token"
+        self.client.userinfo_endpoint = "http://example.com/userinfo"
+        self.client.check_session_endpoint = "https://example.com/check_session"
+        self.client.client_secret = "abcdefghijklmnop"
+        self.client.keyjar[""] = KC_RSA
+        self.client.behaviour = {
+            "request_object_signing_alg": DEF_SIGN_ALG["openid_request_object"]}
 
-        csb = ClientSecretBasic(client)
-        http_args = csb.construct(cis)
+    def test_construct_Message(self):
+        msg = self.client.construct_Message(request_args={'foo': 'bar'})
+        assert isinstance(msg, Message)
+        assert list(msg.keys()) == ['foo']
+        assert msg['foo'] == 'bar'
 
-        assert http_args == {"headers": {"Authorization": "Basic {}".format(
-            base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
-                "utf-8"))}}
+    def test_construct_AuthorizationRequest(self):
+        req_args = {'state': 'ABCDE'}
+        msg = self.client.construct_AuthorizationRequest(request_args=req_args)
+        assert isinstance(msg, AuthorizationRequest)
+        assert msg['client_id'] == 'client_1'
+        assert msg['redirect_uri'] == 'http://example.com/redirect'
 
-    def test_does_not_remove_padding(self):
-        cis = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
+    def test_construct_AccessTokenRequest(self):
+        # Bind access code to state
+        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
 
-        csb = ClientSecretBasic(None)
-        http_args = csb.construct(cis, user="ab", password="c")
+        req_args = {}
+        msg = self.client.construct_AccessTokenRequest(request_args=req_args,
+                                                       state='ABCDE')
+        assert isinstance(msg, AccessTokenRequest)
+        assert msg.to_dict() == {'client_id': 'client_1',
+                                 'client_secret': 'abcdefghijklmnop',
+                                 'code': 'CODE',
+                                 'grant_type': 'authorization_code',
+                                 'redirect_uri': 'http://example.com/redirect',
+                                 'state': 'ABCDE'}
 
-        assert http_args["headers"]["Authorization"].endswith("==")
+    def test_construct_RefreshAccessTokenRequest(self):
+        # Bind access code to state
+        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
 
+        # Bind token to state
+        resp = AccessTokenResponse(refresh_token="refresh_with_me",
+                                   access_token="access")
+        self.client.grant["ABCDE"].tokens.append(Token(resp))
 
-class TestBearerHeader(object):
-    def test_construct(self, client):
-        request_args = {"access_token": "Sesame"}
-        bh = BearerHeader(client)
-        http_args = bh.construct(request_args=request_args)
+        req_args = {}
+        msg = self.client.construct_RefreshAccessTokenRequest(
+            request_args=req_args, state='ABCDE')
+        assert isinstance(msg, RefreshAccessTokenRequest)
+        assert msg.to_dict() == {'client_id': 'client_1',
+                                 'client_secret': 'abcdefghijklmnop',
+                                 'grant_type': 'refresh_token',
+                                 'refresh_token': 'refresh_with_me'}
 
-        assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
+    def test_construct_ResourceRequest(self):
+        # Bind access code to state
+        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
 
-    def test_construct_with_http_args(self, client):
-        request_args = {"access_token": "Sesame"}
-        bh = BearerHeader(client)
-        http_args = bh.construct(request_args=request_args,
-                                 http_args={"foo": "bar"})
+        # Bind token to state
+        resp = AccessTokenResponse(refresh_token="refresh_with_me",
+                                   access_token="access")
+        self.client.grant["ABCDE"].tokens.append(Token(resp))
 
-        assert _eq(http_args.keys(), ["foo", "headers"])
-        assert http_args["headers"] == {"Authorization": "Bearer Sesame"}
+        req_args = {}
+        msg = self.client.construct_ResourceRequest(
+            request_args=req_args, state='ABCDE')
+        assert isinstance(msg, ResourceRequest)
+        assert msg.to_dict() == {'access_token': 'access'}
 
-    def test_construct_with_headers(self, client):
-        request_args = {"access_token": "Sesame"}
+    def test_request_info_authorization_request(self):
+        req_args = {'state': 'ABCDE', 'response_type':'code'}
+        _info = self.client.request_info(
+            AuthorizationRequest, 'GET', request_args=req_args)
 
-        bh = BearerHeader(client)
-        http_args = bh.construct(request_args=request_args,
-                                 http_args={"headers": {"x-foo": "bar"}})
+        assert _info['uri']
+        base, req = _info['uri'].split('?')
+        ar = AuthorizationRequest().from_urlencoded(req)
+        assert base == 'http://example.com/authorization'
+        assert _info['body'] is None
+        assert _info['h_args'] == {}
+        assert isinstance(_info['cis'], AuthorizationRequest)
+        assert ar == _info['cis']
 
-        assert _eq(http_args.keys(), ["headers"])
-        assert _eq(http_args["headers"].keys(), ["Authorization", "x-foo"])
-        assert http_args["headers"]["Authorization"] == "Bearer Sesame"
-
-    def test_construct_with_resource_request(self, client):
-        bh = BearerHeader(client)
-        cis = ResourceRequest(access_token="Sesame")
-
-        http_args = bh.construct(cis)
-
-        assert "access_token" not in cis
-        assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
-
-    def test_construct_with_token(self, client):
-        resp1 = AuthorizationResponse(code="auth_grant", state="state")
-        client.parse_response(AuthorizationResponse, resp1.to_urlencoded(),
-                              "urlencoded")
-        resp2 = AccessTokenResponse(access_token="token1",
-                                    token_type="Bearer", expires_in=0,
-                                    state="state")
-        client.parse_response(AccessTokenResponse, resp2.to_urlencoded(),
-                              "urlencoded")
-
-        http_args = BearerHeader(client).construct(ResourceRequest(),
-                                                   state="state")
-        assert http_args == {"headers": {"Authorization": "Bearer token1"}}
-
-
-class TestBearerBody(object):
-    def test_construct_with_request_args(self, client):
-        request_args = {"access_token": "Sesame"}
-        cis = ResourceRequest()
-        http_args = BearerBody(client).construct(cis, request_args)
-
-        assert cis["access_token"] == "Sesame"
-        assert http_args is None
-
-    def test_construct_with_state(self, client):
-        resp = AuthorizationResponse(code="code", state="state")
-        grant = Grant()
-        grant.add_code(resp)
-        atr = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
-                                  token_type="example",
-                                  refresh_token="tGzv3JOkF0XG5Qx2TlKWIA",
-                                  example_parameter="example_value",
-                                  scope=["inner", "outer"])
-        grant.add_token(atr)
-        client.grant["state"] = grant
-
-        cis = ResourceRequest()
-        http_args = BearerBody(client).construct(cis, {}, state="state",
-                                                 scope="inner")
-        assert cis["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
-        assert http_args is None
-
-    def test_construct_with_request(self, client):
-        resp1 = AuthorizationResponse(code="auth_grant", state="state")
-        client.parse_response(AuthorizationResponse, resp1.to_urlencoded(),
-                              "urlencoded")
-        resp2 = AccessTokenResponse(access_token="token1",
-                                    token_type="Bearer", expires_in=0,
-                                    state="state")
-        client.parse_response(AccessTokenResponse, resp2.to_urlencoded(),
-                              "urlencoded")
-
-        cis = ResourceRequest()
-        BearerBody(client).construct(cis, state="state")
-
-        assert "access_token" in cis
-        assert cis["access_token"] == "token1"
-
-
-class TestClientSecretPost(object):
-    def test_construct(self, client):
-        cis = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
-        csp = ClientSecretPost(client)
-        http_args = csp.construct(cis)
-
-        assert cis["client_id"] == "A"
-        assert cis["client_secret"] == "boarding pass"
-        assert http_args is None
-
-        cis = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
-        http_args = csp.construct(cis, {},
-                                  http_args={"client_secret": "another"})
-        assert cis["client_id"] == "A"
-        assert cis["client_secret"] == "another"
-        assert http_args == {}
-
-
-class TestPrivateKeyJWT(object):
-    def test_construct(self, client):
-        _key = rsa_load(
-            os.path.join(BASE_PATH, "data/keys/rsa.key"))
-        kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
-                            {"key": _key, "kty": "RSA", "use": "sig"}])
-        client.keyjar[""] = kc_rsa
-        client.token_endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
-                                'token_endpoint': "https://example.com/token"}
-        cis = AccessTokenRequest()
-        pkj = PrivateKeyJWT(client)
-        http_args = pkj.construct(cis, algorithm="RS256",
-                                  authn_endpoint='token')
-        assert http_args == {}
-        cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
-        assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'RS256'}
-        assert jso['aud'] == [client.provider_info['token_endpoint']]
-
-
-class TestClientSecretJWT_TE(object):
-    def test_client_secret_jwt(self, client):
-        client.token_endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
-                                'token_endpoint': "https://example.com/token"}
-
-        csj = ClientSecretJWT(client)
-        cis = AccessTokenRequest()
-
-        csj.construct(cis, algorithm="HS256",
-                      authn_endpoint='token')
-        assert cis["client_assertion_type"] == JWT_BEARER
-        assert "client_assertion" in cis
-        cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
-        assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'HS256'}
-
-        _rj = JWS()
-        info = _rj.verify_compact(
-            cas, [SYMKey(k=b64e(as_bytes(client.client_secret)))])
-
-        assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [client.provider_info['token_endpoint']]
-
-
-class TestClientSecretJWT_UI(object):
-    def test_client_secret_jwt(self, client):
-        client.token_endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
-                                'token_endpoint': "https://example.com/token"}
-
-        csj = ClientSecretJWT(client)
-        cis = AccessTokenRequest()
-
-        csj.construct(cis, algorithm="HS256",
-                      authn_endpoint='userinfo')
-        assert cis["client_assertion_type"] == JWT_BEARER
-        assert "client_assertion" in cis
-        cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
-        assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'HS256'}
-
-        _rj = JWS()
-        info = _rj.verify_compact(
-            cas, [SYMKey(k=b64e(as_bytes(client.client_secret)))])
-
-        assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [client.provider_info['issuer']]
-
-
-class TestValidClientInfo(object):
-    def test_valid_client_info(self):
-        _now = 123456  # At some time
-        # Expiration time missing or 0, client_secret never expires
-        assert valid_client_info({}, _now)
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret': 'secret'}, _now)
-        assert valid_client_info({'client_secret_expires_at': 0}, _now)
-        # Expired secret
-        assert valid_client_info({'client_secret_expires_at': 1},
-                                 _now) is not True
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret_expires_at': 123455},
-            _now) is not True
-        # Valid secret
-        assert valid_client_info({'client_secret_expires_at': 123460}, _now)
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret_expires_at': 123460}, _now)
+    def test_do_authorization_request_init(self):
+        req_args={'response_type': ['code']}
+        _info = self.client.do_authorization_request_init(state='ABCDE',
+                                                          request_args=req_args)
+        assert _info
+        assert _info['algs'] == {}
+        assert _info['body'] == None
+        assert _info['http_args'] == {}
+        assert _info['uri']
+        base, req = _info['uri'].split('?')
+        ar = AuthorizationRequest().from_urlencoded(req)
+        assert isinstance(_info['cis'], AuthorizationRequest)
+        assert ar == _info['cis']

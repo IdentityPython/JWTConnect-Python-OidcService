@@ -7,15 +7,17 @@ from jwkest import b64e
 from oiccli import CC_METHOD
 from oiccli import OIDCONF_PATTERN
 from oiccli import unreserved
-from oiccli.exception import GrantError, OicCliError
+from oiccli.exception import GrantError
 from oiccli.exception import HttpError
 from oiccli.exception import MissingEndpoint
+from oiccli.exception import OicCliError
 from oiccli.exception import ParseError
 from oiccli.exception import ResponseError
 from oiccli.exception import TokenError
 from oiccli.exception import Unsupported
 from oiccli.grant import Grant
 from oiccli.grant import Token
+from oiccli.http import HTTPLib
 from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
 from oiccli.http_util import R2C
@@ -44,7 +46,11 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-DEF_SIGN_ALG = "HS256"
+DEF_SIGN_ALG = {"id_token": "RS256",
+                "openid_request_object": "RS256",
+                "client_secret_jwt": "HS256",
+                "private_key_jwt": "RS256"}
+
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
 Version = "2.0"
@@ -80,15 +86,6 @@ def error_response(error, descr=None, status="400 Bad Request"):
                     status=status)
 
 
-def none_response(**kwargs):
-    _areq = kwargs["areq"]
-    aresp = NoneResponse()
-    if "state" in _areq:
-        aresp["state"] = _areq["state"]
-
-    return aresp
-
-
 def error(error, descr=None, status_code=400):
     stat_txt = R2C[status_code]._status
     return error_response(error=error, descr=descr, status=stat_txt)
@@ -104,7 +101,7 @@ def authz_error(error, descr=None, status_code=400):
 
 
 def redirect_authz_error(error, redirect_uri, descr=None, state="",
-        return_type=None):
+                         return_type=None):
     err = AuthorizationErrorResponse(error=error)
     if descr:
         err["error_description"] = descr
@@ -146,19 +143,13 @@ def compact(qsdict):
 
 # =============================================================================
 
-class HTTPLib(object):
-    def __call__(self, url, method, **kwargs):
-        pass
-
-
-# =============================================================================
-
 
 class Client(object):
     _endpoints = ENDPOINTS
 
     def __init__(self, client_id=None, ca_certs=None, client_authn_method=None,
-            keyjar=None, verify_ssl=True, config=None, client_cert=None):
+                 keyjar=None, verify_ssl=True, config=None, client_cert=None,
+                 httplib=None):
         """
 
         :param client_id: The client identifier
@@ -170,11 +161,14 @@ class Client(object):
         :return: Client instance
         """
 
-        self.httpd = HTTPLib()
+        self.httpd = httplib or HTTPLib(ca_certs=ca_certs,
+                                        verify_ssl=verify_ssl,
+                                        client_cert=client_cert,
+                                        keyjar=keyjar)
 
-        self.ca_certs = ca_certs
-        self.verify_ssl = verify_ssl
-        self.client_cert = client_cert
+        # self.ca_certs = ca_certs
+        # self.verify_ssl = verify_ssl
+        # self.client_cert = client_cert
         self.keyjar = keyjar
 
         self.client_id = client_id
@@ -343,13 +337,13 @@ class Client(object):
         return request(**kwargs)
 
     def construct_Message(self, request=Message, request_args=None,
-            extra_args=None, **kwargs):
+                          extra_args=None, **kwargs):
 
         return self.construct_request(request, request_args, extra_args)
 
     def construct_AuthorizationRequest(self, request=AuthorizationRequest,
-            request_args=None, extra_args=None,
-            **kwargs):
+                                       request_args=None, extra_args=None,
+                                       **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -369,9 +363,9 @@ class Client(object):
         return self.construct_request(request, request_args, extra_args)
 
     def construct_AccessTokenRequest(self,
-            request=AccessTokenRequest,
-            request_args=None, extra_args=None,
-            **kwargs):
+                                     request=AccessTokenRequest,
+                                     request_args=None, extra_args=None,
+                                     **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -400,9 +394,9 @@ class Client(object):
         return self.construct_request(request, request_args, extra_args)
 
     def construct_RefreshAccessTokenRequest(self,
-            request=RefreshAccessTokenRequest,
-            request_args=None, extra_args=None,
-            **kwargs):
+                                            request=RefreshAccessTokenRequest,
+                                            request_args=None, extra_args=None,
+                                            **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -419,8 +413,8 @@ class Client(object):
         return self.construct_request(request, request_args, extra_args)
 
     def construct_ResourceRequest(self, request=ResourceRequest,
-            request_args=None, extra_args=None,
-            **kwargs):
+                                  request_args=None, extra_args=None,
+                                  **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -431,7 +425,7 @@ class Client(object):
         return self.construct_request(request, request_args, extra_args)
 
     def uri_and_body(self, reqmsg, cis, method="POST", request_args=None,
-            **kwargs):
+                     **kwargs):
 
         if "endpoint" in kwargs and kwargs["endpoint"]:
             uri = kwargs["endpoint"]
@@ -445,16 +439,16 @@ class Client(object):
         except KeyError:
             h_args = {}
 
-        return uri, body, h_args, cis
+        return {'uri': uri, 'body': body, 'h_args': h_args, 'cis': cis}
 
     def request_info(self, request, method="POST", request_args=None,
-            extra_args=None, lax=False, **kwargs):
+                     extra_args=None, lax=False, **kwargs):
 
         if request_args is None:
             request_args = {}
 
         try:
-            cls = getattr(self, "construct_%s" % request.__name__)
+            cls = getattr(self, "construct_{}".format(request.__name__))
             cis = cls(request_args=request_args, extra_args=extra_args,
                       **kwargs)
         except AttributeError:
@@ -485,7 +479,7 @@ class Client(object):
                                  **kwargs)
 
     def authorization_request_info(self, request_args=None, extra_args=None,
-            **kwargs):
+                                   **kwargs):
         return self.request_info(AuthorizationRequest, "GET",
                                  request_args, extra_args, **kwargs)
 
@@ -501,7 +495,7 @@ class Client(object):
         return info
 
     def parse_response(self, response, info="", sformat="json", state="",
-            **kwargs):
+                       **kwargs):
         """
         Parse a response
 
@@ -592,7 +586,7 @@ class Client(object):
         return resp
 
     def init_authentication_method(self, cis, authn_method, request_args=None,
-            http_args=None, **kwargs):
+                                   http_args=None, **kwargs):
 
         if http_args is None:
             http_args = {}
@@ -606,7 +600,7 @@ class Client(object):
             return http_args
 
     def parse_request_response(self, reqresp, response, body_type, state="",
-            **kwargs):
+                               **kwargs):
         """
         
         :param reqresp: A dictionary with keys ['status', 'text', 'url
@@ -617,31 +611,31 @@ class Client(object):
         :return: 
         """
 
-        if reqresp['status'] in SUCCESSFUL:
+        if reqresp.status_code in SUCCESSFUL:
             body_type = verify_header(reqresp, body_type)
-        elif reqresp['status_code'] in [302, 303]:  # redirect
+        elif reqresp.status_code in [302, 303]:  # redirect
             return reqresp
-        elif reqresp['status_code'] == 500:
-            logger.error("(%d) %s" % (reqresp['status'], reqresp['text']))
-            raise ParseError("ERROR: Something went wrong: %s" % reqresp['text'])
-        elif reqresp['status'] in [400, 401]:
+        elif reqresp.status_code == 500:
+            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
+            raise ParseError("ERROR: Something went wrong: %s" % reqresp.text)
+        elif reqresp.status_code in [400, 401]:
             # expecting an error response
             if issubclass(response, ErrorResponse):
                 pass
         else:
-            logger.error("(%d) %s" % (reqresp['status'], reqresp['text']))
+            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
             raise HttpError("HTTP ERROR: %s [%s] on %s" % (
-                reqresp['text'], reqresp['status'], reqresp.url))
+                reqresp.text, reqresp.status_code, reqresp.url))
 
         if response:
             if body_type == 'txt':
                 # no meaning trying to parse unstructured text
-                return reqresp['text']
-            return self.parse_response(response, reqresp['text'], body_type,
+                return reqresp.text
+            return self.parse_response(response, reqresp.text, body_type,
                                        state, **kwargs)
 
         # could be an error response
-        if reqresp['status'] in [200, 400, 401]:
+        if reqresp.status_code in [200, 400, 401]:
             if body_type == 'txt':
                 body_type = 'urlencoded'
             try:
@@ -659,8 +653,8 @@ class Client(object):
         return reqresp
 
     def request_and_return(self, url, response=None, method="GET", body=None,
-            body_type="json", state="", http_args=None,
-            **kwargs):
+                           body_type="json", state="", http_args=None,
+                           **kwargs):
         """
         :param url: The URL to which the request should be sent
         :param response: Response type
@@ -686,12 +680,10 @@ class Client(object):
         return self.parse_request_response(resp, response, body_type, state,
                                            **kwargs)
 
-    def do_authorization_request(self, request=AuthorizationRequest,
-            state="", body_type="", method="GET",
-            request_args=None, extra_args=None,
-            http_args=None,
-            response_cls=AuthorizationResponse,
-            **kwargs):
+    def do_authorization_request_init(self, request=AuthorizationRequest,
+                                      state="", method="GET", request_args=None,
+                                      extra_args=None, http_args=None,
+                                      **kwargs):
 
         if state:
             try:
@@ -700,133 +692,150 @@ class Client(object):
                 request_args = {"state": state}
 
         kwargs['authn_endpoint'] = 'authorization'
-        url, body, ht_args, csi = self.request_info(request, method,
-                                                    request_args, extra_args,
-                                                    **kwargs)
+        _info = self.request_info(request, method, request_args, extra_args,
+                                  **kwargs)
 
         try:
-            self.authz_req[request_args["state"]] = csi
+            self.authz_req[request_args["state"]] = _info['cis']
         except TypeError:
             pass
 
-        if http_args is None:
-            http_args = ht_args
-        else:
-            http_args.update(ht_args)
+        _info = self.update_http_args(http_args, _info)
 
         try:
-            algs = kwargs["algs"]
+            _info['algs'] = kwargs["algs"]
         except KeyError:
-            algs = {}
+            _info['algs'] = {}
 
-        resp = self.request_and_return(url, response_cls, method, body,
-                                       body_type, state=state,
-                                       http_args=http_args, algs=algs)
+        return _info
+
+    def do_authorization_request(self, request=AuthorizationRequest,
+                                 state="", body_type="", method="GET",
+                                 request_args=None, extra_args=None,
+                                 http_args=None,
+                                 response_cls=AuthorizationResponse,
+                                 **kwargs):
+
+        _req_info = self.do_authorization_request_init(
+            request=request, state=state, body_type=body_type, method=method,
+            request_args=request_args, extra_args=extra_args,
+            http_args=http_args, **kwargs)
+
+        resp = self.request_and_return(_req_info['url'], response_cls, method,
+                                       _req_info['body'], body_type,
+                                       state=state, http_args=http_args,
+                                       algs=_req_info['algs'])
 
         if isinstance(resp, Message):
             if resp.type() in RESPONSE2ERROR["AuthorizationResponse"]:
-                resp.state = csi.state
+                resp.state = _req_info['cis'].state
 
         return resp
 
-    def do_access_token_request(self, request=AccessTokenRequest,
-            scope="", state="", body_type="json",
-            method="POST", request_args=None,
-            extra_args=None, http_args=None,
-            response_cls=AccessTokenResponse,
-            authn_method="", **kwargs):
+    def update_http_args(self, http_args, info):
+        if http_args is None:
+            http_args = info['h_args']
+        else:
+            http_args.update(info['h_args'])
+
+        info['http_args'] = http_args
+        return info
+
+    def do_access_token_request_init(self, request=AccessTokenRequest,
+                                     scope="", state="", body_type="json",
+                                     method="POST", request_args=None,
+                                     extra_args=None, http_args=None,
+                                     response_cls=AccessTokenResponse,
+                                     authn_method="", **kwargs):
 
         kwargs['authn_endpoint'] = 'token'
         # method is default POST
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    scope=scope, state=state,
-                                                    authn_method=authn_method,
-                                                    **kwargs)
+        _info = self.request_info(request=request, method=method,
+                                  request_args=request_args,
+                                  extra_args=extra_args, scope=scope,
+                                  state=state, authn_method=authn_method,
+                                  **kwargs)
 
-        if http_args is None:
-            http_args = ht_args
-        else:
-            http_args.update(ht_args)
+        _info = self.update_http_args(http_args, _info)
 
         if self.events is not None:
-            self.events.store('request_url', url)
-            self.events.store('request_http_args', http_args)
-            self.events.store('Request', body)
+            self.events.store('request_url', _info['url'])
+            self.events.store('request_http_args', _info['http_args'])
+            self.events.store('Request', _info['body'])
 
-        logger.debug("<do_access_token> URL: %s, Body: %s" % (url, body))
-        logger.debug("<do_access_token> response_cls: %s" % response_cls)
+        logger.debug("<do_access_token> URL: {}, Body: {}".format(_info['url'],
+                                                                  _info[
+                                                                      'body']))
+        logger.debug("<do_access_token> response_cls: {}".format(response_cls))
+        return _info
 
-        return self.request_and_return(url, response_cls, method, body,
+    def do_access_token_request(self, request=AccessTokenRequest,
+                                scope="", state="", body_type="json",
+                                method="POST", request_args=None,
+                                extra_args=None, http_args=None,
+                                response_cls=AccessTokenResponse,
+                                authn_method="", **kwargs):
+
+        _info = self.do_access_token_request_init(
+            request=request, method=method, request_args=request_args,
+            extra_args=extra_args, scope=scope, state=state,
+            authn_method=authn_method, **kwargs)
+
+        return self.request_and_return(_info['url'], response_cls, method,
+                                       _info['body'],
                                        body_type, state=state,
                                        http_args=http_args, **kwargs)
 
-    def do_access_token_refresh(self, request=RefreshAccessTokenRequest,
-            state="", body_type="json", method="POST",
-            request_args=None, extra_args=None,
-            http_args=None,
-            response_cls=AccessTokenResponse,
-            authn_method="", **kwargs):
+    def do_access_token_refresh_init(self, request=RefreshAccessTokenRequest,
+                                     state="", method="POST",
+                                     request_args=None, extra_args=None,
+                                     http_args=None, authn_method="", **kwargs):
 
         token = self.get_token(also_expired=True, state=state, **kwargs)
         kwargs['authn_endpoint'] = 'refresh'
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    token=token,
-                                                    authn_method=authn_method)
+        _info = self.request_info(request, method=method,
+                                  request_args=request_args,
+                                  extra_args=extra_args,
+                                  token=token,
+                                  authn_method=authn_method)
 
-        if http_args is None:
-            http_args = ht_args
-        else:
-            http_args.update(ht_args)
+        _info = self.update_http_args(http_args, _info)
+        return _info
 
-        return self.request_and_return(url, response_cls, method, body,
-                                       body_type, state=state,
+    def do_access_token_refresh(self, request=RefreshAccessTokenRequest,
+                                state="", body_type="json", method="POST",
+                                request_args=None, extra_args=None,
+                                http_args=None,
+                                response_cls=AccessTokenResponse,
+                                authn_method="", **kwargs):
+
+        _info = self.do_access_token_refresh_init(
+            request=request, method=method, request_args=request_args,
+            extra_args=extra_args, state=state,
+            authn_method=authn_method, **kwargs)
+
+        return self.request_and_return(_info['url'], response_cls, method,
+                                       _info['body'], body_type, state=state,
                                        http_args=http_args)
 
-    # def do_revocate_token(self, request=TokenRevocationRequest,
-    #                       scope="", state="", body_type="json", method="POST",
-    #                       request_args=None, extra_args=None, http_args=None,
-    #                       response_cls=None, authn_method=""):
-    #
-    #     url, body, ht_args, csi = self.request_info(request, method=method,
-    #                                                 request_args=request_args,
-    #                                                 extra_args=extra_args,
-    #                                                 scope=scope, state=state,
-    #                                                 authn_method=authn_method)
-    #
-    #     if http_args is None:
-    #         http_args = ht_args
-    #     else:
-    #         http_args.update(ht_args)
-    #
-    #     return self.request_and_return(url, response_cls, method, body,
-    #                                    body_type, state=state,
-    #                                    http_args=http_args)
-
     def do_any(self, request, endpoint="", scope="", state="", body_type="json",
-            method="POST", request_args=None, extra_args=None,
-            http_args=None, response=None, authn_method=""):
+               method="POST", request_args=None, extra_args=None,
+               http_args=None, response=None, authn_method=""):
 
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    scope=scope, state=state,
-                                                    authn_method=authn_method,
-                                                    endpoint=endpoint)
+        _info = self.request_info(request, method=method,
+                                  request_args=request_args,
+                                  extra_args=extra_args, scope=scope,
+                                  state=state, authn_method=authn_method,
+                                  endpoint=endpoint)
 
-        if http_args is None:
-            http_args = ht_args
-        else:
-            http_args.update(ht_args)
+        _info = self.update_http_args(http_args, _info)
 
-        return self.request_and_return(url, response, method, body, body_type,
+        return self.request_and_return(_info['url'], response, method,
+                                       _info['body'], body_type,
                                        state=state, http_args=http_args)
 
     def fetch_protected_resource(self, uri, method="GET", headers=None,
-            state="", **kwargs):
+                                 state="", **kwargs):
 
         if "token" in kwargs and kwargs["token"]:
             token = kwargs["token"]
@@ -938,8 +947,8 @@ class Client(object):
             self.keyjar.load_keys(pcr, _pcr_issuer)
 
     def provider_config(self, issuer, keys=True, endpoints=True,
-            response_cls=ASConfigurationResponse,
-            serv_pattern=OIDCONF_PATTERN):
+                        response_cls=ASConfigurationResponse,
+                        serv_pattern=OIDCONF_PATTERN):
         if issuer.endswith("/"):
             _issuer = issuer[:-1]
         else:

@@ -299,12 +299,13 @@ class Client(oauth2.Client):
     def __init__(self, client_id=None, ca_certs=None,
                  client_prefs=None, client_authn_method=None, keyjar=None,
                  verify_ssl=True, config=None, client_cert=None,
-                 requests_dir='requests'):
+                 requests_dir='requests', httplib=None):
 
         oauth2.Client.__init__(self, client_id, ca_certs,
                                client_authn_method=client_authn_method,
                                keyjar=keyjar, verify_ssl=verify_ssl,
-                               config=config, client_cert=client_cert)
+                               config=config, client_cert=client_cert,
+                               httplib=httplib)
 
         self.file_store = "./file/"
         self.file_uri = "http://localhost/"
