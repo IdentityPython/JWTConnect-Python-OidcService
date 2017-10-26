@@ -119,7 +119,7 @@ class ClientSecretBasic(ClientAuthnMethod):
             pass
 
         if isinstance(cis, AccessTokenRequest) and cis[
-                'grant_type'] == 'authorization_code':
+            'grant_type'] == 'authorization_code':
             if 'client_id' not in cis:
                 try:
                     cis['client_id'] = self.cli.client_id
@@ -198,7 +198,8 @@ class BearerHeader(ClientAuthnMethod):
                     try:
                         _acc_token = kwargs["access_token"]
                     except KeyError:
-                        _acc_token = self.cli.get_token(**kwargs).access_token
+                        _acc_token = self.cli.grant_db.get_token(
+                            **kwargs).access_token
         else:
             try:
                 _acc_token = kwargs["access_token"]
@@ -252,7 +253,8 @@ class BearerBody(ClientAuthnMethod):
                         raise AuthnFailure("Missing state specification")
                     kwargs["state"] = self.cli.state
 
-                cis["access_token"] = self.cli.get_token(**kwargs).access_token
+                cis["access_token"] = self.cli.grant_db.get_token(
+                    **kwargs).access_token
 
         return http_args
 

@@ -1,5 +1,6 @@
 import time
 
+from oiccli.exception import GrantError, TokenError
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.time_util import utc_time_sans_frac
@@ -160,3 +161,39 @@ class Grant(object):
                     if token.scope == otok.scope:
                         otok.replaced = True
                 self.tokens.append(token)
+
+
+class GrantDB(object):
+    grant_class = Grant
+
+    def __init__(self):
+        self._db = {}
+
+    def __getitem__(self, state):
+        return self._db[state]
+
+    def __setitem__(self, instance, value):
+        self._db[instance] = value
+
+    def get_token(self, also_expired=False, **kwargs):
+        try:
+            return kwargs["token"]
+        except KeyError:
+            grant = self[kwargs['state']]
+
+            try:
+                token = grant.get_token(kwargs["scope"])
+            except KeyError:
+                token = grant.get_token("")
+                if not token:
+                    raise TokenError("No token found for scope")
+
+        if token is None:
+            raise TokenError("No suitable token found")
+
+        if also_expired:
+            return token
+        elif token.is_valid():
+            return token
+        else:
+            raise TokenError("Token has expired")

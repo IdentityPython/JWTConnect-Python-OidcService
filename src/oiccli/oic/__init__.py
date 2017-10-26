@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 
+from oiccli.grant import Token, GrantDB
 from oiccli.oauth2 import HTTP_ARGS
 from oiccli.util import get_or_post
 from oicmsg.exception import CommunicationError
@@ -9,6 +10,7 @@ from oicmsg.exception import IssuerMismatch
 from oicmsg.exception import MissingParameter
 from oicmsg.exception import RegistrationError
 from oicmsg.exception import RequestError
+
 
 try:
     from json import JSONDecodeError
@@ -25,28 +27,28 @@ from jwkest.jwe import JWE
 from jwkest import jws, as_bytes
 from jwkest import jwe
 
-from oiccli import oauth2
+from oiccli import oauth2, grant
 from oiccli import rndstr
 from oiccli import OIDCONF_PATTERN
 from oiccli import sanitize
 
+from oiccli.oic import requests
 from oiccli.exception import AccessDenied
 from oiccli.exception import AuthnToOld
 from oiccli.exception import ConfigurationError
 from oiccli.exception import OicCliError
 from oiccli.exception import ParameterError
 from oiccli.exception import SubMismatch
-
-
-from oiccli.webfinger import OIC_ISSUER
 from oiccli.exception import OtherError
 from oiccli.exception import ParseError
 from oiccli.exception import MissingRequiredAttribute
+from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import WebFinger
+
+from oicmsg import time_util
+from oicmsg.key_jar import KeyJar
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
-#from oiccli.util import get_or_post
-
 from oicmsg.oic import ClaimsRequest
 from oicmsg.oic import IdToken
 from oicmsg.oic import RegistrationResponse
@@ -65,51 +67,15 @@ from oicmsg.oic import CheckIDRequest
 from oicmsg.oic import EndSessionRequest
 from oicmsg.oic import OpenIDSchema
 from oicmsg.oic import ProviderConfigurationResponse
-from oicmsg.oic import TokenErrorResponse
-from oicmsg.oic import ClientRegistrationErrorResponse
 from oicmsg.oic import UserInfoErrorResponse
-from oicmsg.oic import AuthorizationErrorResponse
-from oicmsg import time_util
-from oicmsg.key_jar import KeyJar
-# from oic.utils.webfinger import OIC_ISSUER
-# from oic.utils.webfinger import WebFinger
 
-__author__ = 'rohe0002'
+__author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-ENDPOINTS = ["authorization_endpoint", "token_endpoint",
-             "userinfo_endpoint", "refresh_session_endpoint",
-             "end_session_endpoint", "registration_endpoint",
-             "check_id_endpoint"]
-
-RESPONSE2ERROR = {
-    "AuthorizationResponse": [AuthorizationErrorResponse,
-                              TokenErrorResponse],
-    "AccessTokenResponse": [TokenErrorResponse],
-    "IdToken": [ErrorResponse],
-    "RegistrationResponse": [ClientRegistrationErrorResponse],
-    "OpenIDSchema": [UserInfoErrorResponse]
-}
-
-REQUEST2ENDPOINT = {
-    "AuthorizationRequest": "authorization_endpoint",
-    "OpenIDRequest": "authorization_endpoint",
-    "AccessTokenRequest": "token_endpoint",
-    "RefreshAccessTokenRequest": "token_endpoint",
-    "UserInfoRequest": "userinfo_endpoint",
-    "CheckSessionRequest": "check_session_endpoint",
-    "CheckIDRequest": "check_id_endpoint",
-    "EndSessionRequest": "end_session_endpoint",
-    "RefreshSessionRequest": "refresh_session_endpoint",
-    "RegistrationRequest": "registration_endpoint",
-    "RotateSecret": "registration_endpoint",
-    # ---
-    "ResourceRequest": "resource_endpoint",
-    'TokenIntrospectionRequest': 'introspection_endpoint',
-    'TokenRevocationRequest': 'revocation_endpoint',
-    "ROPCAccessTokenRequest": "token_endpoint",
-}
+DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
+                    'RefreshAccessTokenRequest', 'ProviderInfoDiscovery',
+                    'UserInfoRequest', 'RegistrationRequest']
 
 # -----------------------------------------------------------------------------
 
@@ -197,11 +163,7 @@ def make_openid_request(arq, keys=None, userinfo_claims=None,
     return oir.to_jwt(key=keys, algorithm=request_object_signing_alg)
 
 
-class Token(oauth2.Token):
-    pass
-
-
-class Grant(oauth2.Grant):
+class Grant(grant.Grant):
     _authz_resp = AuthorizationResponse
     _acc_resp = AccessTokenResponse
     _token_class = Token
@@ -294,35 +256,31 @@ def claims_match(value, claimspec):
 
 
 class Client(oauth2.Client):
-    _endpoints = ENDPOINTS
 
     def __init__(self, client_id=None, ca_certs=None,
                  client_prefs=None, client_authn_method=None, keyjar=None,
                  verify_ssl=True, config=None, client_cert=None,
-                 requests_dir='requests', httplib=None):
+                 requests_dir='requests', httplib=None, services=None,
+                 service_factory=None):
 
+        service_factory = service_factory or requests.factory
         oauth2.Client.__init__(self, client_id, ca_certs,
                                client_authn_method=client_authn_method,
                                keyjar=keyjar, verify_ssl=verify_ssl,
                                config=config, client_cert=client_cert,
-                               httplib=httplib)
+                               httplib=httplib, services=services,
+                               service_factory=service_factory)
 
         self.file_store = "./file/"
         self.file_uri = "http://localhost/"
         self.base_url = ''
 
-        # OpenID connect specific endpoints
-        for endpoint in ENDPOINTS:
-            setattr(self, endpoint, "")
-
         self.id_token = None
         self.log = None
 
-        self.request2endpoint = REQUEST2ENDPOINT
-        self.response2error = RESPONSE2ERROR
+        self.grant_db = GrantDB
+        self.grant_db.grant_class = Grant
 
-        self.grant_class = Grant
-        self.token_class = Token
         self.provider_info = Message()
         self.registration_response = {}
         self.client_prefs = client_prefs or {}

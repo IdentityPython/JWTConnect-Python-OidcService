@@ -1,5 +1,3 @@
-from future.backports.urllib.parse import urlparse
-
 import logging
 
 from jwkest import b64e
@@ -7,38 +5,23 @@ from jwkest import b64e
 from oiccli import CC_METHOD
 from oiccli import OIDCONF_PATTERN
 from oiccli import unreserved
-from oiccli.exception import GrantError
-from oiccli.exception import HttpError
-from oiccli.exception import MissingEndpoint
 from oiccli.exception import OicCliError
-from oiccli.exception import ParseError
-from oiccli.exception import ResponseError
-from oiccli.exception import TokenError
 from oiccli.exception import Unsupported
-from oiccli.grant import Grant
-from oiccli.grant import Token
+from oiccli.grant import GrantDB
 from oiccli.http import HTTPLib
 from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
 from oiccli.http_util import R2C
 from oiccli.http_util import SeeOther
-from oiccli.util import get_or_post
-from oiccli.util import verify_header
+
+from oiccli.oauth2 import requests
+from oiccli.request import Request
 
 from oicmsg.exception import GrantExpired
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import ROPCAccessTokenRequest
-from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import ASConfigurationResponse
 from oicmsg.oauth2 import AuthorizationErrorResponse
-from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
-from oicmsg.oauth2 import NoneResponse
-from oicmsg.oauth2 import RefreshAccessTokenRequest
-from oicmsg.oauth2 import ResourceRequest
-from oicmsg.oauth2 import TokenErrorResponse
 from oicmsg.key_jar import KeyJar
 from oicmsg.time_util import utc_time_sans_frac
 
@@ -51,27 +34,12 @@ DEF_SIGN_ALG = {"id_token": "RS256",
                 "client_secret_jwt": "HS256",
                 "private_key_jwt": "RS256"}
 
-SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
-
 Version = "2.0"
 
 HTTP_ARGS = ["headers", "redirections", "connection_type"]
 
-REQUEST2ENDPOINT = {
-    "AuthorizationRequest": "authorization_endpoint",
-    "AccessTokenRequest": "token_endpoint",
-    # ROPCAccessTokenRequest: "authorization_endpoint",
-    # CCAccessTokenRequest: "authorization_endpoint",
-    "RefreshAccessTokenRequest": "token_endpoint",
-    "TokenRevocationRequest": "token_endpoint"}
-
-RESPONSE2ERROR = {
-    "AuthorizationResponse": [AuthorizationErrorResponse, TokenErrorResponse],
-    "AccessTokenResponse": [TokenErrorResponse]
-}
-
-ENDPOINTS = ["authorization_endpoint", "token_endpoint",
-             "token_revocation_endpoint"]
+DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
+                    'RefreshAccessTokenRequest', 'ProviderInfoDiscovery']
 
 
 class ExpiredToken(OicCliError):
@@ -145,11 +113,9 @@ def compact(qsdict):
 
 
 class Client(object):
-    _endpoints = ENDPOINTS
-
     def __init__(self, client_id=None, ca_certs=None, client_authn_method=None,
                  keyjar=None, verify_ssl=True, config=None, client_cert=None,
-                 httplib=None):
+                 httplib=None, services=None, service_factory=None):
         """
 
         :param client_id: The client identifier
@@ -166,33 +132,35 @@ class Client(object):
                                         client_cert=client_cert,
                                         keyjar=keyjar)
 
-        # self.ca_certs = ca_certs
-        # self.verify_ssl = verify_ssl
-        # self.client_cert = client_cert
         self.keyjar = keyjar
 
+        self.service_factory = service_factory or requests.factory
+        self.service = {}
+        _srvs = services or DEFAULT_SERVICES
+        for serv in _srvs:
+            _srv = self.service_factory(
+                serv, httplib=self.httpd, keyjar=self.keyjar,
+                client_authn_method=client_authn_method)
+            self.service[_srv.request] = _srv
+
+        # For any unspecified service
+        self.service['any'] = Request(httplib=self.httpd, keyjar=self.keyjar,
+                                      client_authn_method=client_authn_method)
+
         self.client_id = client_id
-        self.client_authn_method = client_authn_method
         self.verify_ssl = verify_ssl
         # self.secret_type = "basic "
 
         # self.state = None
         self.nonce = None
 
-        self.grant = {}
+        self.grant_db = GrantDB()
         self.state2nonce = {}
         # own endpoint
         self.redirect_uris = [None]
 
-        # service endpoints
-        self.authorization_endpoint = None
-        self.token_endpoint = None
-        self.token_revocation_endpoint = None
-
-        self.request2endpoint = REQUEST2ENDPOINT
-        self.response2error = RESPONSE2ERROR
-        self.grant_class = Grant
-        self.token_class = Token
+        # self.request2endpoint = REQUEST2ENDPOINT
+        # self.response2error = RESPONSE2ERROR
 
         self.provider_info = {}
         self._c_secret = None
@@ -210,8 +178,9 @@ class Client(object):
         self.provider_info = {}
         self.events = None
 
-    def store_response(self, clinst, text):
-        pass
+    def client_info(self):
+        return {'client_id': self.client_id, 'client_secret': self._c_secret,
+                'redirect_uris': self.redirect_uris}
 
     def get_client_secret(self):
         return self._c_secret
@@ -230,157 +199,48 @@ class Client(object):
 
     client_secret = property(get_client_secret, set_client_secret)
 
-    def reset(self):
-        # self.state = None
-        self.nonce = None
-
-        self.grant = {}
-
-        self.authorization_endpoint = None
-        self.token_endpoint = None
-        self.redirect_uris = None
-
-    def grant_from_state(self, state):
-        for key, grant in self.grant.items():
-            if key == state:
-                return grant
-
-        return None
-
-    def _parse_args(self, request, **kwargs):
-        ar_args = kwargs.copy()
-
-        for prop in request.c_param.keys():
-            if prop in ar_args:
-                continue
-            else:
-                if prop == "redirect_uri":
-                    _val = getattr(self, "redirect_uris", [None])[0]
-                    if _val:
-                        ar_args[prop] = _val
-                else:
-                    _val = getattr(self, prop, None)
-                    if _val:
-                        ar_args[prop] = _val
-
-        return ar_args
-
-    def _endpoint(self, endpoint, **kwargs):
+    def construct(self, request_type, request_args=None, extra_args=None,
+                  **kwargs):
         try:
-            uri = kwargs[endpoint]
-            if uri:
-                del kwargs[endpoint]
+            self.service[request_type]
         except KeyError:
-            uri = ""
+            raise NotImplemented(request_type)
 
-        if not uri:
-            try:
-                uri = getattr(self, endpoint)
-            except Exception:
-                raise MissingEndpoint("No '%s' specified" % endpoint)
+        met = getattr(self, 'construct_{}_request'.format(request_type))
+        return met(self.client_info(), request_args, extra_args, **kwargs)
 
-        if not uri:
-            raise MissingEndpoint("No '%s' specified" % endpoint)
-
-        return uri
-
-    def get_grant(self, state, **kwargs):
-        # try:
-        # _state = kwargs["state"]
-        # if not _state:
-        #         _state = self.state
-        # except KeyError:
-        #     _state = self.state
-
-        try:
-            return self.grant[state]
-        except KeyError:
-            raise GrantError("No grant found for state:'%s'" % state)
-
-    def get_token(self, also_expired=False, **kwargs):
-        try:
-            return kwargs["token"]
-        except KeyError:
-            grant = self.get_grant(**kwargs)
-
-            try:
-                token = grant.get_token(kwargs["scope"])
-            except KeyError:
-                token = grant.get_token("")
-                if not token:
-                    try:
-                        token = self.grant[kwargs["state"]].get_token("")
-                    except KeyError:
-                        raise TokenError("No token found for scope")
-
-        if token is None:
-            raise TokenError("No suitable token found")
-
-        if also_expired:
-            return token
-        elif token.is_valid():
-            return token
-        else:
-            raise TokenError("Token has expired")
-
-    def construct_request(self, request, request_args=None, extra_args=None):
-        if request_args is None:
-            request_args = {}
-
-        # logger.debug("request_args: %s" % sanitize(request_args))
-        kwargs = self._parse_args(request, **request_args)
-
-        if extra_args:
-            kwargs.update(extra_args)
-            # logger.debug("kwargs: %s" % sanitize(kwargs))
-        # logger.debug("request: %s" % sanitize(request))
-        return request(**kwargs)
-
-    def construct_Message(self, request=Message, request_args=None,
-                          extra_args=None, **kwargs):
-
-        return self.construct_request(request, request_args, extra_args)
-
-    def construct_AuthorizationRequest(self, request=AuthorizationRequest,
-                                       request_args=None, extra_args=None,
-                                       **kwargs):
-
-        if request_args is not None:
-            try:  # change default
-                new = request_args["redirect_uri"]
-                if new:
-                    self.redirect_uris = [new]
-            except KeyError:
-                pass
-        else:
-            request_args = {}
+    def construct_authorization_request(self, cli_info=None, request_args=None,
+                                        extra_args=None, **kwargs):
 
         if "client_id" not in request_args:
             request_args["client_id"] = self.client_id
         elif not request_args["client_id"]:
             request_args["client_id"] = self.client_id
 
-        return self.construct_request(request, request_args, extra_args)
+        if cli_info is None:
+            cli_info = self.client_info()
 
-    def construct_AccessTokenRequest(self,
-                                     request=AccessTokenRequest,
-                                     request_args=None, extra_args=None,
-                                     **kwargs):
+        return self.service['authorization'].construct(cli_info, request_args,
+                                                       extra_args)
+
+    def construct_accesstoken_request(self, cli_info=None, request_args=None,
+                                      extra_args=None, state='', **kwargs):
 
         if request_args is None:
             request_args = {}
-        if request is not ROPCAccessTokenRequest:
-            grant = self.get_grant(**kwargs)
+        # if request is not ROPCAccessTokenRequest:
 
-            if not grant.is_valid():
-                raise GrantExpired("Authorization Code to old %s > %s" % (
-                    utc_time_sans_frac(),
-                    grant.grant_expiration_time))
+        grant = self.grant_db[state]
 
-            request_args["code"] = grant.code
+        if not grant.is_valid():
+            raise GrantExpired("Authorization Code to old %s > %s" % (
+                utc_time_sans_frac(),
+                grant.grant_expiration_time))
+
+        request_args["code"] = grant.code
 
         try:
-            request_args['state'] = kwargs['state']
+            request_args['state'] = state
         except KeyError:
             pass
 
@@ -391,17 +251,20 @@ class Client(object):
             request_args["client_id"] = self.client_id
         elif not request_args["client_id"]:
             request_args["client_id"] = self.client_id
-        return self.construct_request(request, request_args, extra_args)
 
-    def construct_RefreshAccessTokenRequest(self,
-                                            request=RefreshAccessTokenRequest,
-                                            request_args=None, extra_args=None,
-                                            **kwargs):
+        if cli_info is None:
+            cli_info = self.client_info()
+
+        return self.service['accesstoken'].construct(cli_info, request_args,
+                                                     extra_args)
+
+    def construct_refresh_token_request(self, cli_info=None, request_args=None,
+                                        extra_args=None, **kwargs):
 
         if request_args is None:
             request_args = {}
 
-        token = self.get_token(also_expired=True, **kwargs)
+        token = self.grant_db.get_token(also_expired=True, **kwargs)
 
         request_args["refresh_token"] = token.refresh_token
 
@@ -410,260 +273,28 @@ class Client(object):
         except AttributeError:
             pass
 
-        return self.construct_request(request, request_args, extra_args)
+        if cli_info is None:
+            cli_info = self.client_info()
 
-    def construct_ResourceRequest(self, request=ResourceRequest,
-                                  request_args=None, extra_args=None,
-                                  **kwargs):
+        return self.service['refresh_token'].construct(cli_info, request_args,
+                                                       extra_args)
 
-        if request_args is None:
-            request_args = {}
+    def session_info(self):
+        return {'client_id': self.client_id,
+                'provider_info': self.provider_info,
+                'issuer': self.issuer,
+                'grant_db': self.grant_db}
 
-        token = self.get_token(**kwargs)
-
-        request_args["access_token"] = token.access_token
-        return self.construct_request(request, request_args, extra_args)
-
-    def uri_and_body(self, reqmsg, cis, method="POST", request_args=None,
-                     **kwargs):
-
-        if "endpoint" in kwargs and kwargs["endpoint"]:
-            uri = kwargs["endpoint"]
-        else:
-            uri = self._endpoint(self.request2endpoint[reqmsg.__name__],
-                                 **request_args)
-
-        uri, body, kwargs = get_or_post(uri, method, cis, **kwargs)
-        try:
-            h_args = {"headers": kwargs["headers"]}
-        except KeyError:
-            h_args = {}
-
-        return {'uri': uri, 'body': body, 'h_args': h_args, 'cis': cis}
-
-    def request_info(self, request, method="POST", request_args=None,
-                     extra_args=None, lax=False, **kwargs):
-
-        if request_args is None:
-            request_args = {}
-
-        try:
-            cls = getattr(self, "construct_{}".format(request.__name__))
-            cis = cls(request_args=request_args, extra_args=extra_args,
-                      **kwargs)
-        except AttributeError:
-            cis = self.construct_request(request, request_args, extra_args)
-
-        if self.events:
-            self.events.store('Protocol request', cis)
-
-        if 'nonce' in cis and 'state' in cis:
-            self.state2nonce[cis['state']] = cis['nonce']
-
-        cis.lax = lax
-
-        if "authn_method" in kwargs:
-            h_arg = self.init_authentication_method(cis,
-                                                    request_args=request_args,
-                                                    **kwargs)
-        else:
-            h_arg = None
-
-        if h_arg:
-            if "headers" in kwargs.keys():
-                kwargs["headers"].update(h_arg["headers"])
-            else:
-                kwargs["headers"] = h_arg["headers"]
-
-        return self.uri_and_body(request, cis, method, request_args,
-                                 **kwargs)
-
-    def authorization_request_info(self, request_args=None, extra_args=None,
-                                   **kwargs):
-        return self.request_info(AuthorizationRequest, "GET",
-                                 request_args, extra_args, **kwargs)
-
-    def get_urlinfo(self, info):
-        if '?' in info or '#' in info:
-            parts = urlparse(info)
-            scheme, netloc, path, params, query, fragment = parts[:6]
-            # either query of fragment
-            if query:
-                info = query
-            else:
-                info = fragment
-        return info
-
-    def parse_response(self, response, info="", sformat="json", state="",
-                       **kwargs):
+    def do_request(self, url, method, body, http_args):
         """
-        Parse a response
+        Send the request to the other entity, receive the response 
+        and return it.
 
-        :param response: Response type
-        :param info: The response, can be either in a JSON or an urlencoded
-            format
-        :param sformat: Which serialization that was used
-        :param state: The state
-        :param kwargs: Extra key word arguments
-        :return: The parsed and to some extend verified response
-        """
-
-        _r2e = self.response2error
-
-        if sformat == "urlencoded":
-            info = self.get_urlinfo(info)
-
-        # if self.events:
-        #    self.events.store('Response', info)
-        resp = response().deserialize(info, sformat, **kwargs)
-        msg = 'Initial response parsing => "{}"'
-        logger.debug(msg.format(resp.to_dict()))
-        if self.events:
-            self.events.store('Response', resp.to_dict())
-
-        if "error" in resp and not isinstance(resp, ErrorResponse):
-            resp = None
-            try:
-                errmsgs = _r2e[response.__name__]
-            except KeyError:
-                errmsgs = [ErrorResponse]
-
-            try:
-                for errmsg in errmsgs:
-                    try:
-                        resp = errmsg().deserialize(info, sformat)
-                        resp.verify()
-                        break
-                    except Exception:
-                        resp = None
-            except KeyError:
-                pass
-        elif resp.only_extras():
-            resp = None
-        else:
-            kwargs["client_id"] = self.client_id
-            try:
-                kwargs['iss'] = self.provider_info['issuer']
-            except (KeyError, AttributeError):
-                if self.issuer:
-                    kwargs['iss'] = self.issuer
-
-            if "key" not in kwargs and "keyjar" not in kwargs:
-                kwargs["keyjar"] = self.keyjar
-
-            logger.debug("Verify response with {}".format(kwargs))
-            verf = resp.verify(**kwargs)
-
-            if not verf:
-                logger.error('Verification of the response failed')
-                raise OicCliError("Verification of the response failed")
-            if resp.type() == "AuthorizationResponse" and "scope" not in resp:
-                try:
-                    resp["scope"] = kwargs["scope"]
-                except KeyError:
-                    pass
-
-        if not resp:
-            logger.error('Missing or faulty response')
-            raise ResponseError("Missing or faulty response")
-
-        self.store_response(resp, info)
-
-        if resp.type() in ["AuthorizationResponse", "AccessTokenResponse"]:
-            try:
-                _state = resp["state"]
-            except (AttributeError, KeyError):
-                _state = ""
-
-            if not _state:
-                _state = state
-
-            try:
-                self.grant[_state].update(resp)
-            except KeyError:
-                self.grant[_state] = self.grant_class(resp=resp)
-
-        return resp
-
-    def init_authentication_method(self, cis, authn_method, request_args=None,
-                                   http_args=None, **kwargs):
-
-        if http_args is None:
-            http_args = {}
-        if request_args is None:
-            request_args = {}
-
-        if authn_method:
-            return self.client_authn_method[authn_method](self).construct(
-                cis, request_args, http_args, **kwargs)
-        else:
-            return http_args
-
-    def parse_request_response(self, reqresp, response, body_type, state="",
-                               **kwargs):
-        """
-        
-        :param reqresp: A dictionary with keys ['status', 'text', 'url
-        :param response: 
-        :param body_type: 
-        :param state: 
-        :param kwargs: 
+        :param url: 
+        :param method: 
+        :param body: 
+        :param http_args: 
         :return: 
-        """
-
-        if reqresp.status_code in SUCCESSFUL:
-            body_type = verify_header(reqresp, body_type)
-        elif reqresp.status_code in [302, 303]:  # redirect
-            return reqresp
-        elif reqresp.status_code == 500:
-            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
-            raise ParseError("ERROR: Something went wrong: %s" % reqresp.text)
-        elif reqresp.status_code in [400, 401]:
-            # expecting an error response
-            if issubclass(response, ErrorResponse):
-                pass
-        else:
-            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
-            raise HttpError("HTTP ERROR: %s [%s] on %s" % (
-                reqresp.text, reqresp.status_code, reqresp.url))
-
-        if response:
-            if body_type == 'txt':
-                # no meaning trying to parse unstructured text
-                return reqresp.text
-            return self.parse_response(response, reqresp.text, body_type,
-                                       state, **kwargs)
-
-        # could be an error response
-        if reqresp.status_code in [200, 400, 401]:
-            if body_type == 'txt':
-                body_type = 'urlencoded'
-            try:
-                err = ErrorResponse().deserialize(reqresp.message,
-                                                  method=body_type)
-                try:
-                    err.verify()
-                except OicCliError:
-                    pass
-                else:
-                    return err
-            except Exception:
-                pass
-
-        return reqresp
-
-    def request_and_return(self, url, response=None, method="GET", body=None,
-                           body_type="json", state="", http_args=None,
-                           **kwargs):
-        """
-        :param url: The URL to which the request should be sent
-        :param response: Response type
-        :param method: Which HTTP method to use
-        :param body: A message body if any
-        :param body_type: The format of the body of the return message
-        :param http_args: Arguments for the HTTP client
-        :return: A cls or ErrorResponse instance or the HTTP response
-            instance if no response body was expected.
         """
 
         if http_args is None:
@@ -674,196 +305,102 @@ class Client(object):
         except Exception:
             raise
 
-        if "keyjar" not in kwargs:
-            kwargs["keyjar"] = self.keyjar
+        return resp
 
-        return self.parse_request_response(resp, response, body_type, state,
-                                           **kwargs)
+    def do_authorization_request(self, state="", body_type="", method="GET",
+                                 request_args=None, extra_args=None,
+                                 http_args=None,
+                                 **kwargs):
 
-    def do_authorization_request_init(self, request=AuthorizationRequest,
-                                      state="", method="GET", request_args=None,
-                                      extra_args=None, http_args=None,
-                                      **kwargs):
-
-        if state:
-            try:
-                request_args["state"] = state
-            except TypeError:
-                request_args = {"state": state}
-
-        kwargs['authn_endpoint'] = 'authorization'
-        _info = self.request_info(request, method, request_args, extra_args,
-                                  **kwargs)
+        _srv = self.service['authorization']
+        _info = _srv.do_request_init(self.client_info(), state=state,
+                                     method=method, request_args=request_args,
+                                     extra_args=extra_args,
+                                     http_args=http_args, **kwargs)
 
         try:
             self.authz_req[request_args["state"]] = _info['cis']
         except TypeError:
             pass
 
-        _info = self.update_http_args(http_args, _info)
+        req_resp = self.do_request(_info['url'], method, _info['body'],
+                                   http_args=http_args)
 
-        try:
-            _info['algs'] = kwargs["algs"]
-        except KeyError:
-            _info['algs'] = {}
-
-        return _info
-
-    def do_authorization_request(self, request=AuthorizationRequest,
-                                 state="", body_type="", method="GET",
-                                 request_args=None, extra_args=None,
-                                 http_args=None,
-                                 response_cls=AuthorizationResponse,
-                                 **kwargs):
-
-        _req_info = self.do_authorization_request_init(
-            request=request, state=state, body_type=body_type, method=method,
-            request_args=request_args, extra_args=extra_args,
-            http_args=http_args, **kwargs)
-
-        resp = self.request_and_return(_req_info['url'], response_cls, method,
-                                       _req_info['body'], body_type,
-                                       state=state, http_args=http_args,
-                                       algs=_req_info['algs'])
+        resp = _srv.parse_request_response(req_resp, body_type, state, **kwargs)
 
         if isinstance(resp, Message):
-            if resp.type() in RESPONSE2ERROR["AuthorizationResponse"]:
-                resp.state = _req_info['cis'].state
+            if resp.type() == _srv.error_msg:
+                resp.state = _info['cis'].state
 
         return resp
 
-    def update_http_args(self, http_args, info):
-        if http_args is None:
-            http_args = info['h_args']
-        else:
-            http_args.update(info['h_args'])
-
-        info['http_args'] = http_args
-        return info
-
-    def do_access_token_request_init(self, request=AccessTokenRequest,
-                                     scope="", state="", body_type="json",
-                                     method="POST", request_args=None,
-                                     extra_args=None, http_args=None,
-                                     response_cls=AccessTokenResponse,
-                                     authn_method="", **kwargs):
-
-        kwargs['authn_endpoint'] = 'token'
-        # method is default POST
-        _info = self.request_info(request=request, method=method,
-                                  request_args=request_args,
-                                  extra_args=extra_args, scope=scope,
-                                  state=state, authn_method=authn_method,
-                                  **kwargs)
-
-        _info = self.update_http_args(http_args, _info)
-
-        if self.events is not None:
-            self.events.store('request_url', _info['url'])
-            self.events.store('request_http_args', _info['http_args'])
-            self.events.store('Request', _info['body'])
-
-        logger.debug("<do_access_token> URL: {}, Body: {}".format(_info['url'],
-                                                                  _info[
-                                                                      'body']))
-        logger.debug("<do_access_token> response_cls: {}".format(response_cls))
-        return _info
-
-    def do_access_token_request(self, request=AccessTokenRequest,
-                                scope="", state="", body_type="json",
+    def do_access_token_request(self, scope="", state="", body_type="json",
                                 method="POST", request_args=None,
                                 extra_args=None, http_args=None,
-                                response_cls=AccessTokenResponse,
                                 authn_method="", **kwargs):
 
-        _info = self.do_access_token_request_init(
-            request=request, method=method, request_args=request_args,
-            extra_args=extra_args, scope=scope, state=state,
-            authn_method=authn_method, **kwargs)
+        _srv = self.service['accesstoken']
+        _info = _srv.do_request_init(
+            self.client_info(), state=state, method=method, scope=scope,
+            request_args=request_args, extra_args=extra_args,
+            authn_method=authn_method, http_args=http_args, **kwargs)
 
-        return self.request_and_return(_info['url'], response_cls, method,
-                                       _info['body'],
-                                       body_type, state=state,
-                                       http_args=http_args, **kwargs)
+        return _srv.request_and_return(
+            _info['url'], method, _info['body'], body_type, state=state,
+            http_args=_info['http_args'], session_info=self.session_info(),
+            **kwargs)
 
-    def do_access_token_refresh_init(self, request=RefreshAccessTokenRequest,
-                                     state="", method="POST",
-                                     request_args=None, extra_args=None,
-                                     http_args=None, authn_method="", **kwargs):
-
-        token = self.get_token(also_expired=True, state=state, **kwargs)
-        kwargs['authn_endpoint'] = 'refresh'
-        _info = self.request_info(request, method=method,
-                                  request_args=request_args,
-                                  extra_args=extra_args,
-                                  token=token,
-                                  authn_method=authn_method)
-
-        _info = self.update_http_args(http_args, _info)
-        return _info
-
-    def do_access_token_refresh(self, request=RefreshAccessTokenRequest,
-                                state="", body_type="json", method="POST",
+    def do_access_token_refresh(self, state="", body_type="json", method="POST",
                                 request_args=None, extra_args=None,
                                 http_args=None,
-                                response_cls=AccessTokenResponse,
                                 authn_method="", **kwargs):
 
-        _info = self.do_access_token_refresh_init(
-            request=request, method=method, request_args=request_args,
-            extra_args=extra_args, state=state,
-            authn_method=authn_method, **kwargs)
+        kwargs['token'] = self.grant_db.get_token(also_expired=True,
+                                                  state=state, **kwargs)
+        kwargs['authn_endpoint'] = 'refresh'
 
-        return self.request_and_return(_info['url'], response_cls, method,
-                                       _info['body'], body_type, state=state,
-                                       http_args=http_args)
+        _srv = self.service['refresh_token']
+        _info = _srv.do_request_init(
+            self.client_info(), state=state, method=method,
+            request_args=request_args, extra_args=extra_args,
+            authn_method=authn_method, http_args=http_args, **kwargs)
 
-    def do_any(self, request, endpoint="", scope="", state="", body_type="json",
-               method="POST", request_args=None, extra_args=None,
-               http_args=None, response=None, authn_method=""):
-
-        _info = self.request_info(request, method=method,
-                                  request_args=request_args,
-                                  extra_args=extra_args, scope=scope,
-                                  state=state, authn_method=authn_method,
-                                  endpoint=endpoint)
-
-        _info = self.update_http_args(http_args, _info)
-
-        return self.request_and_return(_info['url'], response, method,
-                                       _info['body'], body_type,
-                                       state=state, http_args=http_args)
+        return _srv.request_and_return(
+            _info['url'], method, _info['body'], body_type, state=state,
+            http_args=_info['http_args'], session_info=self.session_info(),
+            **kwargs)
 
     def fetch_protected_resource(self, uri, method="GET", headers=None,
-                                 state="", **kwargs):
+                                 state="", body_type='json', **kwargs):
 
         if "token" in kwargs and kwargs["token"]:
             token = kwargs["token"]
             request_args = {"access_token": token}
         else:
             try:
-                token = self.get_token(state=state, **kwargs)
+                token = self.grant_db.get_token(state=state, **kwargs)
             except ExpiredToken:
                 # The token is to old, refresh
                 self.do_access_token_refresh()
-                token = self.get_token(state=state, **kwargs)
+                token = self.grant_db.get_token(state=state, **kwargs)
             request_args = {"access_token": token.access_token}
 
         if headers is None:
             headers = {}
 
-        if "authn_method" in kwargs:
-            http_args = self.init_authentication_method(
-                request_args=request_args, **kwargs)
-        else:
-            # If nothing defined this is the default
-            http_args = self.client_authn_method[
-                "bearer_header"](self).construct(request_args=request_args)
+        _srv = self.service['any']
+        if "authn_method" not in kwargs:
+            kwargs['authn_method'] = 'bearer_header'
+        kwargs['endpoint'] = uri
 
-        headers.update(http_args["headers"])
+        _info = _srv.do_request_init(
+            self.client_info(), state=state, method=method,
+            request_args=request_args, **kwargs)
 
-        logger.debug("Fetch URI: %s" % uri)
-        return self.httpd(uri, method, headers=headers)
+        return _srv.request_and_return(
+            _info['url'], method, _info['body'], body_type, state=state,
+            http_args=_info['http_args'], session_info=self.session_info(),
+            **kwargs)
 
     def add_code_challenge(self):
         """
@@ -896,80 +433,27 @@ class Client(object):
         return {"code_challenge": code_challenge,
                 "code_challenge_method": _method}, code_verifier
 
-    def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
-        """
-        Deal with Provider Config Response
-        :param pcr: The ProviderConfigResponse instance
-        :param issuer: The one I thought should be the issuer of the config
-        :param keys: Should I deal with keys
-        :param endpoints: Should I deal with endpoints, that is store them
-        as attributes in self.
-        """
+    def do_provider_info_discovery(self, state="", body_type="json",
+                                   method="GET", request_args=None,
+                                   extra_args=None, http_args=None,
+                                   authn_method="", **kwargs):
 
-        if "issuer" in pcr:
-            _pcr_issuer = pcr["issuer"]
-            if pcr["issuer"].endswith("/"):
-                if issuer.endswith("/"):
-                    _issuer = issuer
-                else:
-                    _issuer = issuer + "/"
-            else:
-                if issuer.endswith("/"):
-                    _issuer = issuer[:-1]
-                else:
-                    _issuer = issuer
+        _srv = self.service['discovery']
+        _info = _srv.do_request_init(
+            self.client_info(), state=state, method=method,
+            request_args=request_args, extra_args=extra_args,
+            authn_method=authn_method, http_args=http_args, **kwargs)
 
-            try:
-                self.allow["issuer_mismatch"]
-            except KeyError:
-                try:
-                    assert _issuer == _pcr_issuer
-                except AssertionError:
-                    raise OicCliError(
-                        "provider info issuer mismatch '%s' != '%s'" % (
-                            _issuer, _pcr_issuer))
+        _sinfo = self.session_info()
 
-            self.provider_info = pcr
-        else:
-            _pcr_issuer = issuer
+        res = _srv.request_and_return(
+            _info['url'], method, _info['body'], body_type, state=state,
+            http_args=_info['http_args'], session_info=_sinfo,
+            **kwargs)
 
-        self.issuer = _pcr_issuer
+        try:
+            self.keyjar = _sinfo['keyjar']
+        except KeyError:
+            pass
 
-        if endpoints:
-            for key, val in pcr.items():
-                if key.endswith("_endpoint"):
-                    setattr(self, key, val)
-
-        if keys:
-            if self.keyjar is None:
-                self.keyjar = KeyJar()
-
-            self.keyjar.load_keys(pcr, _pcr_issuer)
-
-    def provider_config(self, issuer, keys=True, endpoints=True,
-                        response_cls=ASConfigurationResponse,
-                        serv_pattern=OIDCONF_PATTERN):
-        if issuer.endswith("/"):
-            _issuer = issuer[:-1]
-        else:
-            _issuer = issuer
-
-        url = serv_pattern % _issuer
-
-        pcr = None
-        r = self.httpd(url)
-        if r['status'] == 200:
-            pcr = response_cls().from_json(r.text)
-        elif r['status'] == 302:
-            while r['status'] == 302:
-                r = self.httpd(r.headers["location"])
-                if r['status'] == 200:
-                    pcr = response_cls().from_json(r.text)
-                    break
-
-        if pcr is None:
-            raise OicCliError("Trying '%s', status %s" % (url, r['status']))
-
-        self.handle_provider_config(pcr, issuer, keys, endpoints)
-
-        return pcr
+        return res

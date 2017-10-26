@@ -22,11 +22,11 @@ from oiccli.oauth2 import Client
 from oiccli.grant import Grant
 from oiccli.oic import JWT_BEARER
 from oicmsg.key_bundle import KeyBundle
-from oicmsg.oauth2 import AccessTokenRequest, RefreshAccessTokenRequest, \
-    ROPCAccessTokenRequest
+from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ResourceRequest
+from oicmsg.oauth2 import ROPCAccessTokenRequest
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 
@@ -110,14 +110,15 @@ class TestBearerHeader(object):
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
     def test_construct_with_token(self, client):
+        session_info = client.session_info()
         resp1 = AuthorizationResponse(code="auth_grant", state="state")
-        client.parse_response(AuthorizationResponse, resp1.to_urlencoded(),
-                              "urlencoded")
+        client.service['authorization'].parse_response(
+            resp1.to_urlencoded(), session_info, "urlencoded")
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="state")
-        client.parse_response(AccessTokenResponse, resp2.to_urlencoded(),
-                              "urlencoded")
+        client.service['accesstoken'].parse_response(
+            resp2.to_urlencoded(), session_info, "urlencoded")
 
         http_args = BearerHeader(client).construct(ResourceRequest(),
                                                    state="state")
@@ -143,7 +144,7 @@ class TestBearerBody(object):
                                   example_parameter="example_value",
                                   scope=["inner", "outer"])
         grant.add_token(atr)
-        client.grant["state"] = grant
+        client.grant_db["state"] = grant
 
         cis = ResourceRequest()
         http_args = BearerBody(client).construct(cis, {}, state="state",
@@ -153,13 +154,13 @@ class TestBearerBody(object):
 
     def test_construct_with_request(self, client):
         resp1 = AuthorizationResponse(code="auth_grant", state="state")
-        client.parse_response(AuthorizationResponse, resp1.to_urlencoded(),
-                              "urlencoded")
+        client.service['authorization'].parse_response(
+            resp1.to_urlencoded(), client.session_info(), "urlencoded")
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="state")
-        client.parse_response(AccessTokenResponse, resp2.to_urlencoded(),
-                              "urlencoded")
+        client.service['accesstoken'].parse_response(
+            resp2.to_urlencoded(), client.session_info(),"urlencoded")
 
         cis = ResourceRequest()
         BearerBody(client).construct(cis, state="state")

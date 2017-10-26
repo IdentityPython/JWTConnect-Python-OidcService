@@ -109,3 +109,7 @@ class SubMismatch(OicCliError):
 
 class ConfigurationError(OicCliError):
     pass
+
+
+class WrongContentType(OicCliError):
+    pass

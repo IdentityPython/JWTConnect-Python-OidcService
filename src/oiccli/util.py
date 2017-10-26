@@ -5,8 +5,8 @@ from future.backports.http.cookiejar import http2time
 
 from oiccli import sanitize
 from oiccli.exception import TimeFormatError
+from oiccli.exception import WrongContentType
 from oicmsg.exception import UnSupported
-
 
 logger = logging.getLogger(__name__)
 
@@ -168,15 +168,16 @@ def match_to_(val, vlist):
 def verify_header(reqresp, body_type):
     """
     
-    :param reqresp: Dictionary with keys: ['status', 'text', 'headers', 'url'] 
-    :param body_type: 
-    :return: 
+    :param reqresp: Class instance with attributes: ['status', 'text', 
+        'headers', 'url'] 
+    :param body_type: If information returned in the body part 
+    :return: Verified body content type
     """
-    logger.debug("resp.headers: %s" % (sanitize(reqresp['headers']),))
-    logger.debug("resp.txt: %s" % (sanitize(reqresp['text']),))
+    logger.debug("resp.headers: %s" % (sanitize(reqresp.headers),))
+    logger.debug("resp.txt: %s" % (sanitize(reqresp.text),))
 
     if body_type == "":
-        _ctype = reqresp['headers']["content-type"]
+        _ctype = reqresp.headers["content-type"]
         if match_to_("application/json", _ctype):
             body_type = 'json'
         elif match_to_("application/jwt", _ctype):
@@ -186,32 +187,22 @@ def verify_header(reqresp, body_type):
         else:
             body_type = 'txt'  # reasonable default ??
     elif body_type == "json":
-        try:
-            assert match_to_("application/json",
-                             reqresp['headers']["content-type"])
-        except AssertionError:
-            try:
-                assert match_to_("application/jwt",
-                                 reqresp['headers']["content-type"])
+        if match_to_("application/json", reqresp.headers["content-type"]):
+            pass
+        else:
+            if match_to_("application/jwt", reqresp.headers["content-type"]):
                 body_type = "jwt"
-            except AssertionError:
-                raise AssertionError("content-type: %s" % (
-                    reqresp['headers']["content-type"],))
+            else:
+                raise WrongContentType(reqresp.headers["content-type"])
     elif body_type == "jwt":
-        try:
-            assert match_to_("application/jwt",
-                             reqresp['headers']["content-type"])
-        except AssertionError:
-            raise AssertionError(
-                "Wrong content-type in header, got: {} expected 'application/jwt'".format(
-                    reqresp['headers']["content-type"]))
+        if not match_to_("application/jwt", reqresp.headers["content-type"]):
+            raise WrongContentType(reqresp.headers["content-type"])
     elif body_type == "urlencoded":
-        try:
-            assert match_to_(DEFAULT_POST_CONTENT_TYPE,
-                             reqresp['headers']["content-type"])
-        except AssertionError:
-            assert match_to_("text/plain",
-                             reqresp['headers']["content-type"])
+        if not match_to_(DEFAULT_POST_CONTENT_TYPE,
+                         reqresp.headers["content-type"]):
+            # I can live with text/plain
+            if not match_to_("text/plain", reqresp.headers["content-type"]):
+                raise WrongContentType(reqresp.headers["content-type"])
     else:
         raise ValueError("Unknown return format: %s" % body_type)
 

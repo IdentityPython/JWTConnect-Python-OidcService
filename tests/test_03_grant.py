@@ -1,5 +1,6 @@
 # pylint: disable=missing-docstring,no-self-use
 from oiccli.grant import Grant
+from oiccli.grant import GrantDB
 from oiccli.grant import Token
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationResponse
@@ -109,3 +110,6 @@ def test_grant_access_token():
     assert token.is_valid() is True
 
     assert str(grant) != ""
+
+def test_grant_db():
+    gdb = GrantDB()

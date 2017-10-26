@@ -45,91 +45,44 @@ class TestClient(object):
         self.client.behaviour = {
             "request_object_signing_alg": DEF_SIGN_ALG["openid_request_object"]}
 
-    def test_construct_Message(self):
-        msg = self.client.construct_Message(request_args={'foo': 'bar'})
-        assert isinstance(msg, Message)
-        assert list(msg.keys()) == ['foo']
-        assert msg['foo'] == 'bar'
-
-    def test_construct_AuthorizationRequest(self):
-        req_args = {'state': 'ABCDE'}
-        msg = self.client.construct_AuthorizationRequest(request_args=req_args)
+    def test_construct_authorization_request(self):
+        req_args = {'state': 'ABCDE',
+                    'redirect_uri': 'https://example.com/auth_cb',
+                    'response_type': ['code']}
+        msg = self.client.construct_authorization_request(
+            self.client.client_info(), request_args=req_args)
         assert isinstance(msg, AuthorizationRequest)
         assert msg['client_id'] == 'client_1'
-        assert msg['redirect_uri'] == 'http://example.com/redirect'
+        assert msg['redirect_uri'] == 'https://example.com/auth_cb'
 
-    def test_construct_AccessTokenRequest(self):
+    def test_construct_accesstoken_request(self):
         # Bind access code to state
-        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
+        self.client.grant_db['ABCDE'] = Grant(resp={'code': 'CODE'})
 
         req_args = {}
-        msg = self.client.construct_AccessTokenRequest(request_args=req_args,
-                                                       state='ABCDE')
+        msg = self.client.construct_accesstoken_request(
+            self.client.client_info(), request_args=req_args, state='ABCDE')
         assert isinstance(msg, AccessTokenRequest)
         assert msg.to_dict() == {'client_id': 'client_1',
                                  'client_secret': 'abcdefghijklmnop',
                                  'code': 'CODE',
                                  'grant_type': 'authorization_code',
-                                 'redirect_uri': 'http://example.com/redirect',
                                  'state': 'ABCDE'}
 
-    def test_construct_RefreshAccessTokenRequest(self):
+    def test_construct_refresh_token_request(self):
         # Bind access code to state
-        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
+        self.client.grant_db['ABCDE'] = Grant(resp={'code': 'CODE'})
 
         # Bind token to state
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.grant["ABCDE"].tokens.append(Token(resp))
+        self.client.grant_db["ABCDE"].tokens.append(Token(resp))
 
         req_args = {}
-        msg = self.client.construct_RefreshAccessTokenRequest(
+        msg = self.client.construct_refresh_token_request(
             request_args=req_args, state='ABCDE')
         assert isinstance(msg, RefreshAccessTokenRequest)
         assert msg.to_dict() == {'client_id': 'client_1',
                                  'client_secret': 'abcdefghijklmnop',
                                  'grant_type': 'refresh_token',
                                  'refresh_token': 'refresh_with_me'}
-
-    def test_construct_ResourceRequest(self):
-        # Bind access code to state
-        self.client.grant['ABCDE'] = Grant(resp={'code': 'CODE'})
-
-        # Bind token to state
-        resp = AccessTokenResponse(refresh_token="refresh_with_me",
-                                   access_token="access")
-        self.client.grant["ABCDE"].tokens.append(Token(resp))
-
-        req_args = {}
-        msg = self.client.construct_ResourceRequest(
-            request_args=req_args, state='ABCDE')
-        assert isinstance(msg, ResourceRequest)
-        assert msg.to_dict() == {'access_token': 'access'}
-
-    def test_request_info_authorization_request(self):
-        req_args = {'state': 'ABCDE', 'response_type':'code'}
-        _info = self.client.request_info(
-            AuthorizationRequest, 'GET', request_args=req_args)
-
-        assert _info['uri']
-        base, req = _info['uri'].split('?')
-        ar = AuthorizationRequest().from_urlencoded(req)
-        assert base == 'http://example.com/authorization'
-        assert _info['body'] is None
-        assert _info['h_args'] == {}
-        assert isinstance(_info['cis'], AuthorizationRequest)
-        assert ar == _info['cis']
-
-    def test_do_authorization_request_init(self):
-        req_args={'response_type': ['code']}
-        _info = self.client.do_authorization_request_init(state='ABCDE',
-                                                          request_args=req_args)
-        assert _info
-        assert _info['algs'] == {}
-        assert _info['body'] == None
-        assert _info['http_args'] == {}
-        assert _info['uri']
-        base, req = _info['uri'].split('?')
-        ar = AuthorizationRequest().from_urlencoded(req)
-        assert isinstance(_info['cis'], AuthorizationRequest)
-        assert ar == _info['cis']
