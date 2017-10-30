@@ -253,7 +253,7 @@ class TestProviderInfoRequest(object):
             ProviderConfigurationResponse(
                 issuer=self._iss, response_types_supported=['code'],
                 grant_types_supported=['Bearer'],
-                subject_types_supported=['pair'],
+                subject_types_supported=['pairwise'],
                 authorization_endpoint='https://example.com/op/authz',
                 id_token_signing_alg_values_supported=['RS256'],
                 jwks_uri='https://example.com/op/jwks.json',
