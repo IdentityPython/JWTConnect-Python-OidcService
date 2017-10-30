@@ -3,10 +3,12 @@ import logging
 
 import sys
 
+from oicmsg.time_util import utc_time_sans_frac
+
 from oiccli import OIDCONF_PATTERN
 from oiccli.exception import OicCliError
 from oicmsg import oauth2
-from oicmsg.exception import MissingParameter
+from oicmsg.exception import MissingParameter, GrantExpired
 from oicmsg.key_jar import KeyJar
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import TokenErrorResponse
@@ -43,6 +45,20 @@ def _post_x_parse_response(self, resp, session_info, state=''):
         raise
 
 
+def set_state(request_args, kwargs):
+    try:
+        _state = kwargs['state']
+    except KeyError:
+        try:
+            request_args['state']
+        except KeyError:
+            raise MissingParameter('state')
+    else:
+        request_args['state'] = _state
+
+    return request_args
+
+
 class AuthorizationRequest(Request):
     msg_type = oauth2.AuthorizationRequest
     response_cls = oauth2.AuthorizationResponse
@@ -65,15 +81,19 @@ class AuthorizationRequest(Request):
     def _post_parse_response(self, resp, session_info, state=''):
         _post_x_parse_response(self, resp, session_info, state='')
 
-    def do_request_init(self, cli_info, state="", method="GET",
+    def do_request_init(self, cli_info, method="GET",
                         request_args=None, extra_args=None, http_args=None,
                         **kwargs):
+        """
 
-        if state:
-            try:
-                request_args["state"] = state
-            except TypeError:
-                request_args = {"state": state}
+        :param cli_info:
+        :param method:
+        :param request_args:
+        :param extra_args:
+        :param http_args:
+        :param kwargs:
+        :return:
+        """
 
         kwargs['authn_endpoint'] = 'authorization'
         _info = self.request_info(cli_info, method, request_args, extra_args,
@@ -100,6 +120,13 @@ class AuthorizationRequest(Request):
         else:
             request_args = {}
 
+        request_args = set_state(request_args, kwargs)
+
+        if "client_id" not in request_args:
+            request_args["client_id"] = cli_info.client_id
+        elif not request_args["client_id"]:
+            request_args["client_id"] = cli_info.client_id
+
         return Request.construct(self, cli_info, request_args, extra_args)
 
 
@@ -114,7 +141,7 @@ class AccessTokenRequest(Request):
     def _post_parse_response(self, resp, session_info, state=''):
         _post_x_parse_response(self, resp, session_info, state='')
 
-    def do_request_init(self, cli_info, scope="", state="", body_type="json",
+    def do_request_init(self, cli_info, scope="", body_type="json",
                         method="POST", request_args=None,
                         extra_args=None, http_args=None,
                         authn_method="", **kwargs):
@@ -123,7 +150,7 @@ class AccessTokenRequest(Request):
 
         _info = self.request_info(
             cli_info, method=method, request_args=request_args,
-            extra_args=extra_args, scope=scope, state=state,
+            extra_args=extra_args, scope=scope,
             authn_method=authn_method, **kwargs)
 
         _info = self.update_http_args(http_args, _info)
@@ -140,6 +167,32 @@ class AccessTokenRequest(Request):
 
         return _info
 
+    def construct(self, cli_info, request_args=None, extra_args=None, **kwargs):
+        if request_args is None:
+            request_args = {}
+        # if request is not ROPCAccessTokenRequest:
+
+        request_args = set_state(request_args, kwargs)
+
+        grant = cli_info.grant_db[request_args['state']]
+
+        if not grant.is_valid():
+            raise GrantExpired("Authorization Code to old %s > %s" % (
+                utc_time_sans_frac(),
+                grant.grant_expiration_time))
+
+        request_args["code"] = grant.code
+
+        if "grant_type" not in request_args:
+            request_args["grant_type"] = "authorization_code"
+
+        if "client_id" not in request_args:
+            request_args["client_id"] = cli_info.client_id
+        elif not request_args["client_id"]:
+            request_args["client_id"] = cli_info.client_id
+
+        return Request.construct(self, cli_info, request_args=request_args,
+                                 extra_args=extra_args)
 
 class RefreshAccessTokenRequest(Request):
     msg_type = oauth2.RefreshAccessTokenRequest
@@ -149,9 +202,25 @@ class RefreshAccessTokenRequest(Request):
     synchronous = True
     request = 'refresh_token'
 
-    def do_request_init(self, cli_info, state="", method="POST",
-                        request_args=None, extra_args=None, http_args=None,
-                        authn_method="", **kwargs):
+    def construct(self, cli_info, request_args=None, extra_args=None, **kwargs):
+        if request_args is None:
+            request_args = {}
+
+        token = cli_info.grant_db.get_token(also_expired=True, **kwargs)
+
+        request_args["refresh_token"] = token.refresh_token
+
+        try:
+            request_args["scope"] = token.scope
+        except AttributeError:
+            pass
+
+        return Request.construct(self, cli_info, request_args=request_args,
+                                 extra_args=extra_args)
+
+    def do_request_init(self, cli_info, method="POST", request_args=None,
+                        extra_args=None, http_args=None, authn_method="",
+                        **kwargs):
         _info = self.request_info(cli_info, method=method,
                                   request_args=request_args,
                                   extra_args=extra_args,

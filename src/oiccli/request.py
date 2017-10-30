@@ -1,7 +1,5 @@
-import inspect
 import logging
 
-import sys
 from future.backports.urllib.parse import urlparse
 from oiccli.exception import HttpError
 from oiccli.exception import MissingEndpoint
@@ -10,8 +8,6 @@ from oiccli.exception import ParseError
 from oiccli.exception import ResponseError
 from oiccli.util import get_or_post
 from oiccli.util import verify_header
-from oicmsg import oauth2
-from oicmsg.exception import MissingParameter
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
@@ -39,12 +35,22 @@ class Request(object):
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         self.httplib = httplib
-        self.events = None
         self.keyjar = keyjar
         self.client_authn_method = client_authn_method
+        self.events = None
         self.endpoint = ''
+        self.default_request_args = {}
 
     def _parse_args(self, cli_info, **kwargs):
+        """
+        Go through the attributes that the message class can contain and
+        add values if they are missing and exists in the client info or
+        when there are default values.
+
+        :param cli_info: Client info
+        :param kwargs: Initial set of attributes.
+        :return: Possibly augmented set of attributes
+        """
         ar_args = kwargs.copy()
 
         for prop in self.msg_type.c_param.keys():
@@ -54,11 +60,22 @@ class Request(object):
                 try:
                     ar_args[prop] = cli_info[prop]
                 except KeyError:
-                    pass
+                    try:
+                        ar_args[prop] = self.default_request_args[prop]
+                    except KeyError:
+                        pass
 
         return ar_args
 
     def construct(self, cli_info, request_args=None, extra_args=None):
+        """
+        Instantiate the message class instance
+
+        :param cli_info: Information about the client
+        :param request_args:
+        :param extra_args:
+        :return: message class instance
+        """
         if request_args is None:
             request_args = {}
 
@@ -67,8 +84,8 @@ class Request(object):
 
         if extra_args:
             kwargs.update(extra_args)
-            # logger.debug("kwargs: %s" % sanitize(kwargs))
-        # logger.debug("request: %s" % sanitize(request))
+
+        # logger.debug("kwargs: %s" % sanitize(kwargs))
         return self.msg_type(**kwargs)
 
     def _endpoint(self, **kwargs):
@@ -93,11 +110,17 @@ class Request(object):
         return uri
 
     def uri_and_body(self, cis, method="POST", request_args=None, **kwargs):
+        """
+        Based on the HTTP method place the protocol message in the right
+        place.
 
-        if "endpoint" in kwargs and kwargs["endpoint"]:
-            uri = kwargs["endpoint"]
-        else:
-            uri = self._endpoint(**request_args)
+        :param cis: Message class instance
+        :param method: HTTP method
+        :param request_args: Message arguments
+        :param kwargs: Extra keyword argument
+        :return: Dictionary
+        """
+        uri = self._endpoint(**request_args)
 
         uri, body, kwargs = get_or_post(uri, method, cis, **kwargs)
         try:
@@ -109,7 +132,17 @@ class Request(object):
 
     def init_authentication_method(self, cis, authn_method, request_args=None,
                                    http_args=None, **kwargs):
+        """
+        Place the necessary information in the necessary places depending on
+        client authentication method.
 
+        :param cis: Message class instance
+        :param authn_method: Client authentication method
+        :param request_args: Message argument
+        :param http_args: HTTP header arguments
+        :param kwargs: Extra keyword arguments
+        :return: Extended set of HTTP header arguments
+        """
         if http_args is None:
             http_args = {}
         if request_args is None:
@@ -161,9 +194,22 @@ class Request(object):
         info['http_args'] = http_args
         return info
 
-    def do_request_init(self, cli_info, state="", body_type="", method="GET",
+    def do_request_init(self, cli_info, body_type="", method="GET",
                         request_args=None, extra_args=None, http_args=None,
                         **kwargs):
+        """
+        Builds the request message and constructs the HTTP headers.
+
+        :param cli_info: Client information
+        :param body_type: Which serialization to use for the HTTP body
+        :param method: HTTP method used.
+        :param request_args: Message arguments
+        :param extra_args: Extra arguments
+        :param http_args: Initial HTTP header arguments
+        :param kwargs: extra keyword arguments
+        :return: Dictionary with the necessary information for the HTTP
+            request
+        """
         try:
             authn_method = kwargs['authn_method']
         except:
@@ -171,7 +217,7 @@ class Request(object):
 
         _info = self.request_info(cli_info, method=method,
                                   request_args=request_args,
-                                  extra_args=extra_args, state=state,
+                                  extra_args=extra_args,
                                   authn_method=authn_method, **kwargs)
 
         return self.update_http_args(http_args, _info)
@@ -190,17 +236,17 @@ class Request(object):
                 info = fragment
         return info
 
-    def _post_parse_response(self, resp, session_info, state=''):
+    def _post_parse_response(self, resp, client_info, state=''):
         pass
 
-    def parse_response(self, info, session_info, sformat="json",
-                       state="", **kwargs):
+    def parse_response(self, info, client_info, sformat="json", state="",
+                       **kwargs):
         """
         Parse a response
 
         :param info: The response, can be either in a JSON or an urlencoded
             format
-        :param session_info: Information about client and server
+        :param client_info: Information about client and server
         :param sformat: Which serialization that was used
         :param state: The state
         :param kwargs: Extra key word arguments
@@ -243,12 +289,12 @@ class Request(object):
         # elif resp.only_extras():
         #     resp = None
         else:
-            kwargs["client_id"] = session_info['client_id']
+            kwargs["client_id"] = client_info['client_id']
             try:
-                kwargs['iss'] = session_info['provider_info']['issuer']
+                kwargs['iss'] = client_info['provider_info']['issuer']
             except (KeyError, AttributeError):
                 try:
-                    kwargs['iss'] = session_info['issuer']
+                    kwargs['iss'] = client_info['issuer']
                 except KeyError:
                     pass
 
@@ -275,7 +321,7 @@ class Request(object):
             raise ResponseError("Missing or faulty response")
 
         try:
-            self._post_parse_response(resp, session_info)
+            self._post_parse_response(resp, client_info, state)
         except Exception as err:
             raise
 
@@ -295,13 +341,13 @@ class Request(object):
         else:
             return err
 
-    def parse_request_response(self, reqresp, session_info, body_type='',
+    def parse_request_response(self, reqresp, client_info, body_type='',
                                state="", **kwargs):
         """
         Deal with a request response
          
         :param reqresp: The HTTP request response
-        :param session_info: Information about the client/server session
+        :param client_info: Information about the client/server session
         :param body_type: If response in body one of 'json', 'jwt' or 
             'urlencoded'
         :param state: Session identifier
@@ -316,7 +362,7 @@ class Request(object):
 
         if reqresp.status_code in SUCCESSFUL:
             try:
-                return self.parse_response(reqresp.text, session_info,
+                return self.parse_response(reqresp.text, client_info,
                                            value_type, state, **kwargs)
             except Exception as err:
                 logger.error(err)

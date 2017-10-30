@@ -111,59 +111,16 @@ def compact(qsdict):
 
 # =============================================================================
 
-
-class Client(object):
-    def __init__(self, client_id=None, ca_certs=None, client_authn_method=None,
-                 keyjar=None, verify_ssl=True, config=None, client_cert=None,
-                 httplib=None, services=None, service_factory=None):
-        """
-
-        :param client_id: The client identifier
-        :param ca_certs: Certificates used to verify HTTPS certificates
-        :param client_authn_method: Methods that this client can use to
-            authenticate itself. It's a dictionary with method names as
-            keys and method classes as values.
-        :param verify_ssl: Whether the SSL certificate should be verified.
-        :return: Client instance
-        """
-
-        self.httpd = httplib or HTTPLib(ca_certs=ca_certs,
-                                        verify_ssl=verify_ssl,
-                                        client_cert=client_cert,
-                                        keyjar=keyjar)
-
+class ClientInfo(object):
+    def __init__(self, keyjar, client_id='', config=None, events=None):
         self.keyjar = keyjar
-
-        self.service_factory = service_factory or requests.factory
-        self.service = {}
-        _srvs = services or DEFAULT_SERVICES
-        for serv in _srvs:
-            _srv = self.service_factory(
-                serv, httplib=self.httpd, keyjar=self.keyjar,
-                client_authn_method=client_authn_method)
-            self.service[_srv.request] = _srv
-
-        # For any unspecified service
-        self.service['any'] = Request(httplib=self.httpd, keyjar=self.keyjar,
-                                      client_authn_method=client_authn_method)
-
         self.client_id = client_id
-        self.verify_ssl = verify_ssl
-        # self.secret_type = "basic "
-
-        # self.state = None
-        self.nonce = None
-
         self.grant_db = GrantDB()
         self.state2nonce = {}
-        # own endpoint
+        # own endpoints
         self.redirect_uris = [None]
 
-        # self.request2endpoint = REQUEST2ENDPOINT
-        # self.response2error = RESPONSE2ERROR
-
         self.provider_info = {}
-        self._c_secret = None
         self.kid = {"sig": {}, "enc": {}}
         self.authz_req = None
 
@@ -176,11 +133,7 @@ class Client(object):
             self.issuer = ''
         self.allow = {}
         self.provider_info = {}
-        self.events = None
-
-    def client_info(self):
-        return {'client_id': self.client_id, 'client_secret': self._c_secret,
-                'redirect_uris': self.redirect_uris}
+        self.events = events
 
     def get_client_secret(self):
         return self._c_secret
@@ -199,6 +152,45 @@ class Client(object):
 
     client_secret = property(get_client_secret, set_client_secret)
 
+
+class Client(object):
+    def __init__(self, client_id='', ca_certs=None, client_authn_method=None,
+                 keyjar=None, verify_ssl=True, config=None, client_cert=None,
+                 httplib=None, services=None, service_factory=None):
+        """
+
+        :param client_id: The client identifier
+        :param ca_certs: Certificates used to verify HTTPS certificates
+        :param client_authn_method: Methods that this client can use to
+            authenticate itself. It's a dictionary with method names as
+            keys and method classes as values.
+        :param verify_ssl: Whether the SSL certificate should be verified.
+        :return: Client instance
+        """
+
+        self.http = httplib or HTTPLib(ca_certs=ca_certs,
+                                   verify_ssl=verify_ssl,
+                                   client_cert=client_cert,
+                                   keyjar=keyjar)
+
+        self.events = None
+        self.client_info = ClientInfo(keyjar, client_id=client_id)
+
+        self.service_factory = service_factory or requests.factory
+        self.service = {}
+        _srvs = services or DEFAULT_SERVICES
+        for serv in _srvs:
+            _srv = self.service_factory(
+                serv, httplib=self.http, keyjar=self.keyjar,
+                client_authn_method=client_authn_method)
+            self.service[_srv.request] = _srv
+
+        # For any unspecified service
+        self.service['any'] = Request(httplib=self.http, keyjar=self.keyjar,
+                                      client_authn_method=client_authn_method)
+
+        self.verify_ssl = verify_ssl
+
     def construct(self, request_type, request_args=None, extra_args=None,
                   **kwargs):
         try:
@@ -207,83 +199,7 @@ class Client(object):
             raise NotImplemented(request_type)
 
         met = getattr(self, 'construct_{}_request'.format(request_type))
-        return met(self.client_info(), request_args, extra_args, **kwargs)
-
-    def construct_authorization_request(self, cli_info=None, request_args=None,
-                                        extra_args=None, **kwargs):
-
-        if "client_id" not in request_args:
-            request_args["client_id"] = self.client_id
-        elif not request_args["client_id"]:
-            request_args["client_id"] = self.client_id
-
-        if cli_info is None:
-            cli_info = self.client_info()
-
-        return self.service['authorization'].construct(cli_info, request_args,
-                                                       extra_args)
-
-    def construct_accesstoken_request(self, cli_info=None, request_args=None,
-                                      extra_args=None, state='', **kwargs):
-
-        if request_args is None:
-            request_args = {}
-        # if request is not ROPCAccessTokenRequest:
-
-        grant = self.grant_db[state]
-
-        if not grant.is_valid():
-            raise GrantExpired("Authorization Code to old %s > %s" % (
-                utc_time_sans_frac(),
-                grant.grant_expiration_time))
-
-        request_args["code"] = grant.code
-
-        try:
-            request_args['state'] = state
-        except KeyError:
-            pass
-
-        if "grant_type" not in request_args:
-            request_args["grant_type"] = "authorization_code"
-
-        if "client_id" not in request_args:
-            request_args["client_id"] = self.client_id
-        elif not request_args["client_id"]:
-            request_args["client_id"] = self.client_id
-
-        if cli_info is None:
-            cli_info = self.client_info()
-
-        return self.service['accesstoken'].construct(cli_info, request_args,
-                                                     extra_args)
-
-    def construct_refresh_token_request(self, cli_info=None, request_args=None,
-                                        extra_args=None, **kwargs):
-
-        if request_args is None:
-            request_args = {}
-
-        token = self.grant_db.get_token(also_expired=True, **kwargs)
-
-        request_args["refresh_token"] = token.refresh_token
-
-        try:
-            request_args["scope"] = token.scope
-        except AttributeError:
-            pass
-
-        if cli_info is None:
-            cli_info = self.client_info()
-
-        return self.service['refresh_token'].construct(cli_info, request_args,
-                                                       extra_args)
-
-    def session_info(self):
-        return {'client_id': self.client_id,
-                'provider_info': self.provider_info,
-                'issuer': self.issuer,
-                'grant_db': self.grant_db}
+        return met(self.client_info, request_args, extra_args, **kwargs)
 
     def do_request(self, url, method, body, http_args):
         """
@@ -301,7 +217,7 @@ class Client(object):
             http_args = {}
 
         try:
-            resp = self.httpd(url, method, data=body, **http_args)
+            resp = self.http(url, method, data=body, **http_args)
         except Exception:
             raise
 
@@ -313,26 +229,24 @@ class Client(object):
                                  **kwargs):
 
         _srv = self.service['authorization']
-        _info = _srv.do_request_init(self.client_info(), state=state,
+        _info = _srv.do_request_init(self.client_info, state=state,
                                      method=method, request_args=request_args,
                                      extra_args=extra_args,
                                      http_args=http_args, **kwargs)
 
-        try:
-            self.authz_req[request_args["state"]] = _info['cis']
-        except TypeError:
-            pass
+        # redirect to the authorization server
 
-        req_resp = self.do_request(_info['url'], method, _info['body'],
-                                   http_args=http_args)
-
-        resp = _srv.parse_request_response(req_resp, body_type, state, **kwargs)
-
-        if isinstance(resp, Message):
-            if resp.type() == _srv.error_msg:
-                resp.state = _info['cis'].state
-
-        return resp
+        #
+        # req_resp = self.do_request(_info['url'], method, _info['body'],
+        #                            http_args=http_args)
+        #
+        # resp = _srv.parse_request_response(req_resp, body_type, state, **kwargs)
+        #
+        # if isinstance(resp, Message):
+        #     if resp.type() == _srv.error_msg:
+        #         resp.state = _info['cis'].state
+        #
+        # return resp
 
     def do_access_token_request(self, scope="", state="", body_type="json",
                                 method="POST", request_args=None,
@@ -341,13 +255,13 @@ class Client(object):
 
         _srv = self.service['accesstoken']
         _info = _srv.do_request_init(
-            self.client_info(), state=state, method=method, scope=scope,
+            self.client_info, state=state, method=method, scope=scope,
             request_args=request_args, extra_args=extra_args,
             authn_method=authn_method, http_args=http_args, **kwargs)
 
         return _srv.request_and_return(
             _info['url'], method, _info['body'], body_type, state=state,
-            http_args=_info['http_args'], session_info=self.session_info(),
+            http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)
 
     def do_access_token_refresh(self, state="", body_type="json", method="POST",
