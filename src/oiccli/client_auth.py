@@ -6,8 +6,8 @@ from jwkest.jws import alg2keytype
 
 from oiccli import rndstr
 from oiccli import sanitize
-from oiccli.oauth2 import DEF_SIGN_ALG
-from oiccli.oic import JWT_BEARER
+from oiccli import DEF_SIGN_ALG
+from oiccli import JWT_BEARER
 from oicmsg.exception import FailedAuthentication
 from oicmsg.message import VREQUIRED
 from oicmsg.oauth2 import AccessTokenRequest

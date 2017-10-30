@@ -62,6 +62,10 @@ class AuthorizationRequest(requests.AuthorizationRequest):
     response_cls = oic.AuthorizationResponse
     error_msg = oic.AuthorizationErrorResponse
 
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        super().__init__(httplib, keyjar, client_authn_method)
+        self.default_request_args = {'scope': ['openid']}
+
 
 class AccessTokenRequest(requests.AccessTokenRequest):
     msg_type = oic.AccessTokenRequest

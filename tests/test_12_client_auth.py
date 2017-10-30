@@ -11,6 +11,7 @@ from jwkest.jwk import rsa_load
 from jwkest.jws import JWS
 from jwkest.jwt import JWT
 
+from oiccli import JWT_BEARER
 from oiccli.client_auth import BearerBody
 from oiccli.client_auth import BearerHeader
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
@@ -21,18 +22,19 @@ from oiccli.client_auth import PrivateKeyJWT
 from oiccli.client_auth import valid_client_info
 from oiccli.oauth2 import Client
 from oiccli.grant import Grant
-from oiccli.oic import JWT_BEARER
 from oicmsg.key_bundle import KeyBundle
 from oicmsg.oauth2 import AccessTokenRequest, CCAccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ResourceRequest
-from oicmsg.oauth2 import ROPCAccessTokenRequest
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
-
-CLIENT_CONF = {'issuer': 'https://example.com/as'}
 CLIENT_ID = "A"
+
+CLIENT_CONF = {'issuer': 'https://example.com/as',
+               'redirect_uris': ['https://example.com/cli/authz_cb'],
+               'client_secret': 'boarding pass',
+               'client_id': CLIENT_ID}
 
 
 def _eq(l1, l2):
@@ -41,10 +43,8 @@ def _eq(l1, l2):
 
 @pytest.fixture
 def client():
-    client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD,
+    client = Client(client_authn_method=CLIENT_AUTHN_METHOD,
                     config=CLIENT_CONF)
-    client.client_info.redirect_uris=['https://example.com/cli/authz_cb']
-    client.client_info.client_secret='boarding pass'
     _gdb = client.client_info.grant_db
     _gdb['ABCDE'] = _gdb.grant_class(
         resp=AuthorizationResponse(code='access_code'))

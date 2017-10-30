@@ -36,10 +36,13 @@ class TestClient(object):
     @pytest.fixture(autouse=True)
     def create_client(self):
         self.redirect_uri = "http://example.com/redirect"
-        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD)
-        self.client.client_info = ClientInfo(
-            None, redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_1', client_secret='abcdefghijklmnop')
+        self.client = Client(client_authn_method=CLIENT_AUTHN_METHOD)
+        conf = {
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'client_id': 'client_1',
+            'client_secret': 'abcdefghijklmnop'
+        }
+        self.client.client_info = ClientInfo(config=conf)
         _gdb = self.client.client_info.grant_db
         _gdb['ABCDE'] = _gdb.grant_class(
             resp=AuthorizationResponse(code='access_code'))
@@ -61,8 +64,8 @@ class TestClient(object):
             self.client.client_info, request_args=req_args, state='ABCDE')
         assert isinstance(msg, AccessTokenRequest)
         assert msg.to_dict() == {'client_id': 'client_1',
-                                 'client_secret': 'abcdefghijklmnop',
                                  'code': 'access_code',
+                                 'client_secret': 'abcdefghijklmnop',
                                  'grant_type': 'authorization_code'}
 
     def test_construct_refresh_token_request(self):

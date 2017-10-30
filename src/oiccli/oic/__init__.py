@@ -2,15 +2,6 @@ import hashlib
 import logging
 import os
 
-from oiccli.grant import Token, GrantDB
-from oiccli.oauth2 import HTTP_ARGS
-from oiccli.util import get_or_post
-from oicmsg.exception import CommunicationError
-from oicmsg.exception import IssuerMismatch
-from oicmsg.exception import MissingParameter
-from oicmsg.exception import RegistrationError
-from oicmsg.exception import RequestError
-
 try:
     from json import JSONDecodeError
 except ImportError:  # Only works for >= 3.5
@@ -23,10 +14,13 @@ import six
 from future.backports.urllib.parse import urlparse
 
 from jwkest.jwe import JWE
-from jwkest import jws, as_bytes
-from jwkest import jwe
+from jwkest import jwe, as_bytes
+from jwkest import jws
 
-from oiccli import oauth2, grant
+from oiccli import DEF_SIGN_ALG
+from oiccli import grant
+from oiccli import HTTP_ARGS
+from oiccli import oauth2
 from oiccli import rndstr
 from oiccli import sanitize
 
@@ -39,10 +33,16 @@ from oiccli.exception import ParameterError
 from oiccli.exception import SubMismatch
 from oiccli.exception import OtherError
 from oiccli.exception import MissingRequiredAttribute
+from oiccli.grant import GrantDB
+from oiccli.grant import Token
+from oiccli.util import get_or_post
 from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import WebFinger
 
 from oicmsg import time_util
+from oicmsg.exception import MissingParameter
+from oicmsg.exception import RegistrationError
+from oicmsg.exception import RequestError
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
 from oicmsg.oic import ClaimsRequest
@@ -70,15 +70,8 @@ DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
 
 # -----------------------------------------------------------------------------
 
-JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-SAML2_BEARER_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:saml2-bearer"
-
 # This should probably be part of the configuration
 MAX_AUTHENTICATION_AGE = 86400
-DEF_SIGN_ALG = {"id_token": "RS256",
-                "openid_request_object": "RS256",
-                "client_secret_jwt": "HS256",
-                "private_key_jwt": "RS256"}
 
 # -----------------------------------------------------------------------------
 ACR_LISTS = [
@@ -863,100 +856,6 @@ class Client(oauth2.Client):
         self.store_response(res, resp.txt)
         return res
 
-    # def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
-    #     """
-    #     Deal with Provider Config Response
-    #     :param pcr: The ProviderConfigResponse instance
-    #     :param issuer: The one I thought should be the issuer of the config
-    #     :param keys: Should I deal with keys
-    #     :param endpoints: Should I deal with endpoints, that is store them
-    #     as attributes in self.
-    #     """
-    #
-    #     if "issuer" in pcr:
-    #         _pcr_issuer = pcr["issuer"]
-    #         if pcr["issuer"].endswith("/"):
-    #             if issuer.endswith("/"):
-    #                 _issuer = issuer
-    #             else:
-    #                 _issuer = issuer + "/"
-    #         else:
-    #             if issuer.endswith("/"):
-    #                 _issuer = issuer[:-1]
-    #             else:
-    #                 _issuer = issuer
-    #
-    #         try:
-    #             self.allow["issuer_mismatch"]
-    #         except KeyError:
-    #             try:
-    #                 assert _issuer == _pcr_issuer
-    #             except AssertionError:
-    #                 raise IssuerMismatch("'%s' != '%s'" % (_issuer,
-    #                                                        _pcr_issuer), pcr)
-    #
-    #         self.provider_info = pcr
-    #     else:
-    #         _pcr_issuer = issuer
-    #
-    #     if endpoints:
-    #         for key, val in pcr.items():
-    #             if key.endswith("_endpoint"):
-    #                 setattr(self, key, val)
-    #
-    #     if keys:
-    #         if self.keyjar is None:
-    #             self.keyjar = KeyJar(verify_ssl=self.verify_ssl)
-    #
-    #         self.keyjar.load_keys(pcr, _pcr_issuer)
-    #
-    # def provider_config(self, issuer, keys=True, endpoints=True,
-    #                     response_cls=ProviderConfigurationResponse,
-    #                     serv_pattern=OIDCONF_PATTERN):
-    #     if issuer.endswith("/"):
-    #         _issuer = issuer[:-1]
-    #     else:
-    #         _issuer = issuer
-    #
-    #     url = serv_pattern % _issuer
-    #
-    #     pcr = None
-    #     r = self.httpd(url, allow_redirects=True)
-    #     if r.status_code == 200:
-    #         try:
-    #             pcr = response_cls().from_json(r.text)
-    #         except Exception:
-    #             # FIXME: This should catch specific exception from `from_json()`
-    #             _err_txt = "Faulty provider config response: {}".format(r.text)
-    #             logger.error(sanitize(_err_txt))
-    #             raise ParseError(_err_txt)
-    #     # elif r.status_code == 302 or r.status_code == 301:
-    #     #     while r.status_code == 302 or r.status_code == 301:
-    #     #         redirect_header = r.headers["location"]
-    #     #         if not urlparse(redirect_header).scheme:
-    #     #             # Relative URL was provided - construct new redirect
-    #     #             # using an issuer
-    #     #             _split = urlparse(issuer)
-    #     #             new_url = urlunparse((_split.scheme, _split.netloc,
-    #     #                                   as_unicode(redirect_header),
-    #     #                                   _split.params,
-    #     #                                   _split.query, _split.fragment))
-    #     #             r = self.httpd(new_url)
-    #     #             if r.status_code == 200:
-    #     #                 pcr = response_cls().from_json(r.text)
-    #     #                 break
-    #
-    #     # logger.debug("Provider info: %s" % sanitize(pcr))
-    #     if pcr is None:
-    #         raise CommunicationError(
-    #             "Trying '%s', status %s" % (url, r.status_code))
-    #
-    #     self.store_response(pcr, r.text)
-    #
-    #     self.handle_provider_config(pcr, issuer, keys, endpoints)
-    #
-    #     return pcr
-
     def unpack_aggregated_claims(self, userinfo):
         if userinfo["_claim_sources"]:
             for csrc, spec in userinfo["_claim_sources"].items():
@@ -1220,7 +1119,7 @@ class Client(oauth2.Client):
 
         if "redirect_uris" not in req:
             try:
-                req["redirect_uris"] = self.redirect_uris
+                req["redirect_uris"] = self.client_info.redirect_uris
             except AttributeError:
                 raise MissingRequiredAttribute("redirect_uris", req)
 

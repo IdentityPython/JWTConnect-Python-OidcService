@@ -1,19 +1,21 @@
 import pytest
+
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oicmsg.oic import ProviderConfigurationResponse
-
-from oiccli.oauth2 import ClientInfo, build_services, DEFAULT_SERVICES
-
 from oiccli.exception import WrongContentType
+from oiccli.oauth2 import build_services
+from oiccli.oauth2 import ClientInfo
+from oiccli.oauth2 import DEFAULT_SERVICES
+from oiccli.oic.requests import factory
+from oiccli.request import Request
 
-from oicmsg.oauth2 import AccessTokenRequest, Message, ASConfigurationResponse
+from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
+from oicmsg.oauth2 import Message
+from oicmsg.oic import ProviderConfigurationResponse
 
-from oiccli.oic.requests import factory
-from oiccli.request import Request
 
 
 class Response(object):
@@ -40,7 +42,7 @@ class TestAuthorizationRequest(object):
     def test_construct(self):
         req_args = {'foo': 'bar'}
         _req = self.req.construct(self.cli_info, request_args=req_args,
-                                  state='state', scope=['openid'])
+                                  state='state')
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
                                     'redirect_uri', 'state', 'scope'}
@@ -49,7 +51,7 @@ class TestAuthorizationRequest(object):
         req_args = {'response_type': 'code'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args,
-                                      state='state', scope=['openid'])
+                                      state='state')
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
         assert _info['body'] is None
         assert _info['cis'].to_dict() == {
@@ -62,8 +64,7 @@ class TestAuthorizationRequest(object):
         assert msg == _info['cis']
 
     def test_request_init(self):
-        req_args = {'response_type': 'code', 'state': 'state',
-                    'scope': ['openid']}
+        req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'cis', 'http_args', 'uri', 'algs',

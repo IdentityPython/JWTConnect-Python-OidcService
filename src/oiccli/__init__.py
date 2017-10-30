@@ -18,6 +18,15 @@ CC_METHOD = {
     'S512': hashlib.sha512,
 }
 
+DEF_SIGN_ALG = {"id_token": "RS256",
+                "openid_request_object": "RS256",
+                "client_secret_jwt": "HS256",
+                "private_key_jwt": "RS256"}
+
+HTTP_ARGS = ["headers", "redirections", "connection_type"]
+
+JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+SAML2_BEARER_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:saml2-bearer"
 
 def rndstr(size=16):
     """

@@ -4,6 +4,7 @@ from jwkest import b64e
 
 from oiccli import CC_METHOD
 from oiccli import unreserved
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.exception import OicCliError
 from oiccli.exception import Unsupported
 from oiccli.grant import GrantDB
@@ -23,14 +24,7 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-DEF_SIGN_ALG = {"id_token": "RS256",
-                "openid_request_object": "RS256",
-                "client_secret_jwt": "HS256",
-                "private_key_jwt": "RS256"}
-
 Version = "2.0"
-
-HTTP_ARGS = ["headers", "redirections", "connection_type"]
 
 DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
                     'RefreshAccessTokenRequest', 'ProviderInfoDiscovery']
@@ -106,26 +100,28 @@ def compact(qsdict):
 # =============================================================================
 
 class ClientInfo(object):
-    def __init__(self, keyjar, client_id='', config=None, events=None,
-                 **kwargs):
-        self.keyjar = keyjar
-        self.client_id = client_id
+    def __init__(self, keyjar=None, config=None, events=None, **kwargs):
+        self.keyjar = keyjar or KeyJar()
         self.grant_db = GrantDB()
         self.state2nonce = {}
-        # own endpoints
-        self.redirect_uris = [None]
-
         self.provider_info = {}
         self.kid = {"sig": {}, "enc": {}}
-        self.authz_req = None
 
         # the OAuth issuer is the URL of the authorization server's
         # configuration information location
         self.config = config or {}
+
+        for attr in ['client_id', 'issuer', 'client_secret']:
+            try:
+                setattr(self, attr, config[attr])
+            except:
+                setattr(self, attr, '')
+
         try:
-            self.issuer = self.config['issuer']
-        except KeyError:
-            self.issuer = ''
+            self.redirect_uris = config['redirect_uris']
+        except:
+            self.redirect_uris = [None]
+
         self.allow = {}
         self.provider_info = {}
         self.events = events
@@ -170,7 +166,7 @@ def build_services(srvs, service_factory, http, keyjar, client_authn_method):
 
 
 class Client(object):
-    def __init__(self, client_id='', ca_certs=None, client_authn_method=None,
+    def __init__(self, ca_certs=None, client_authn_method=None,
                  keyjar=None, verify_ssl=True, config=None, client_cert=None,
                  httplib=None, services=None, service_factory=None):
         """
@@ -193,14 +189,14 @@ class Client(object):
             keyjar = KeyJar()
 
         self.events = None
-        self.client_info = ClientInfo(keyjar, client_id=client_id,
-                                      config=config)
+        self.client_info = ClientInfo(keyjar, config=config)
 
+        _cam = client_authn_method or CLIENT_AUTHN_METHOD
         self.service_factory = service_factory or requests.factory
         _srvs = services or DEFAULT_SERVICES
 
         self.service = build_services(_srvs, self.service_factory, self.http,
-                                      keyjar, client_authn_method)
+                                      keyjar, _cam)
 
         self.client_info.service = self.service
 
