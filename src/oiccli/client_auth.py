@@ -33,10 +33,10 @@ class UnknownAuthnMethod(Exception):
 
 
 # ========================================================================
-def assertion_jwt(cli, keys, audience, algorithm, lifetime=600):
+def assertion_jwt(client_id, keys, audience, algorithm, lifetime=600):
     _now = utc_time_sans_frac()
 
-    at = AuthnToken(iss=cli.client_id, sub=cli.client_id,
+    at = AuthnToken(iss=client_id, sub=client_id,
                     aud=audience, jti=rndstr(32),
                     exp=_now + lifetime, iat=_now)
     logger.debug('AuthnToken: {}'.format(at.to_dict()))
@@ -329,9 +329,9 @@ class JWSAuthnMethod(ClientAuthnMethod):
             except KeyError:
                 _args = {}
 
-            cis["client_assertion"] = assertion_jwt(self.cli, signing_key,
-                                                    audience, algorithm,
-                                                    **_args)
+            cis["client_assertion"] = assertion_jwt(
+                self.cli.client_info.client_id, signing_key, audience,
+                algorithm, **_args)
 
             cis["client_assertion_type"] = JWT_BEARER
 

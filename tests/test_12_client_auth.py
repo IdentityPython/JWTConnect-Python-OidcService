@@ -204,9 +204,11 @@ class TestPrivateKeyJWT(object):
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
                             {"key": _key, "kty": "RSA", "use": "sig"}])
         client.client_info.keyjar[""] = kc_rsa
+        client.client_info.provider_info = {
+            'issuer': 'https://example.com/',
+            'token_endpoint': "https://example.com/token"}
         client.service['accesstoken'].endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
-                                'token_endpoint': "https://example.com/token"}
+
         cis = AccessTokenRequest()
         pkj = PrivateKeyJWT(client)
         http_args = pkj.construct(cis, algorithm="RS256",
@@ -217,13 +219,14 @@ class TestPrivateKeyJWT(object):
         jso = _jwt.payload()
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
         assert _jwt.headers == {'alg': 'RS256'}
-        assert jso['aud'] == [client.provider_info['token_endpoint']]
+        assert jso['aud'] == [client.client_info.provider_info['token_endpoint']]
 
 
 class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, client):
-        client.token_endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
+        _ci = client.client_info
+        _ci.token_endpoint = "https://example.com/token"
+        _ci.provider_info = {'issuer': 'https://example.com/',
                                 'token_endpoint': "https://example.com/token"}
 
         csj = ClientSecretJWT(client)
@@ -241,23 +244,23 @@ class TestClientSecretJWT_TE(object):
 
         _rj = JWS()
         info = _rj.verify_compact(
-            cas, [SYMKey(k=b64e(as_bytes(client.client_secret)))])
+            cas, [SYMKey(k=b64e(as_bytes(_ci.client_secret)))])
 
         assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [client.provider_info['token_endpoint']]
+        assert info['aud'] == [_ci.provider_info['token_endpoint']]
 
 
 class TestClientSecretJWT_UI(object):
     def test_client_secret_jwt(self, client):
-        client.token_endpoint = "https://example.com/token"
-        client.provider_info = {'issuer': 'https://example.com/',
+        _ci = client.client_info
+        _ci.token_endpoint = "https://example.com/token"
+        _ci.provider_info = {'issuer': 'https://example.com/',
                                 'token_endpoint': "https://example.com/token"}
 
         csj = ClientSecretJWT(client)
         cis = AccessTokenRequest()
 
-        csj.construct(cis, algorithm="HS256",
-                      authn_endpoint='userinfo')
+        csj.construct(cis, algorithm="HS256", authn_endpoint='userinfo')
         assert cis["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in cis
         cas = cis["client_assertion"]
@@ -267,11 +270,11 @@ class TestClientSecretJWT_UI(object):
         assert _jwt.headers == {'alg': 'HS256'}
 
         _rj = JWS()
-        info = _rj.verify_compact(
-            cas, [SYMKey(k=b64e(as_bytes(client.client_secret)))])
+        info = _rj.verify_compact(cas,
+                                  [SYMKey(k=b64e(as_bytes(_ci.client_secret)))])
 
         assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [client.provider_info['issuer']]
+        assert info['aud'] == [_ci.provider_info['issuer']]
 
 
 class TestValidClientInfo(object):
