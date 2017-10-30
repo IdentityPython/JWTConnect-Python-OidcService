@@ -1,13 +1,18 @@
 import pytest
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oicmsg.oic import ProviderConfigurationResponse
+
+from oiccli.oauth2 import ClientInfo, build_services, DEFAULT_SERVICES
+
 from oiccli.exception import WrongContentType
-from oiccli.grant import GrantDB
-from oiccli.oauth2 import ClientInfo
+
 from oicmsg.oauth2 import AccessTokenRequest, Message, ASConfigurationResponse
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
-from oiccli.oauth2.requests import factory
+
+from oiccli.oic.requests import factory
 from oiccli.request import Request
 
 
@@ -35,29 +40,30 @@ class TestAuthorizationRequest(object):
     def test_construct(self):
         req_args = {'foo': 'bar'}
         _req = self.req.construct(self.cli_info, request_args=req_args,
-                                  state='state')
+                                  state='state', scope=['openid'])
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
-                                    'redirect_uri', 'state'}
+                                    'redirect_uri', 'state', 'scope'}
 
     def test_request_info(self):
         req_args = {'response_type': 'code'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args,
-                                      state='state')
+                                      state='state', scope=['openid'])
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
         assert _info['body'] is None
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
-            'response_type': 'code', 'state': 'state'}
+            'response_type': 'code', 'state': 'state', 'scope': 'openid'}
         assert _info['h_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
 
     def test_request_init(self):
-        req_args = {'response_type': 'code', 'state':'state'}
+        req_args = {'response_type': 'code', 'state': 'state',
+                    'scope': ['openid']}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'cis', 'http_args', 'uri', 'algs',
@@ -66,7 +72,7 @@ class TestAuthorizationRequest(object):
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
-            'response_type': 'code', 'state': 'state'}
+            'response_type': 'code', 'state': 'state', 'scope': 'openid'}
         assert _info['h_args'] == {}
         assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
@@ -76,11 +82,12 @@ class TestAuthorizationRequest(object):
     def test_parse_request_response_urlencoded(self):
         req_resp = Response(
             200,
-            AuthorizationResponse(code='access_code',
-                                  state='state').to_urlencoded())
+            AuthorizationResponse(
+                code='access_code', state='state',
+                scope=['openid']).to_urlencoded())
         resp = self.req.parse_request_response(req_resp, self.cli_info)
         assert isinstance(resp, AuthorizationResponse)
-        assert set(resp.keys()) == {'code', 'state'}
+        assert set(resp.keys()) == {'code', 'state', 'scope'}
 
     def test_parse_request_response_200_error(self):
         req_resp = Response(
@@ -97,18 +104,22 @@ class TestAuthorizationRequest(object):
         assert set(resp.keys()) == {'error'}
 
     def test_parse_request_response_json(self):
-        req_resp = Response(200, AuthorizationResponse(code='access_code',
-                                                       state='state').to_json(),
-                            headers={'content-type': 'application/json'})
+        req_resp = Response(
+            200,
+            AuthorizationResponse(code='access_code', state='state',
+                                  scope=['openid']).to_json(),
+            headers={'content-type': 'application/json'})
         resp = self.req.parse_request_response(req_resp, self.cli_info,
                                                body_type='json')
         assert isinstance(resp, AuthorizationResponse)
-        assert set(resp.keys()) == {'code', 'state'}
+        assert set(resp.keys()) == {'code', 'state', 'scope'}
 
     def test_parse_request_response_wrong_content_type(self):
-        req_resp = Response(200, AuthorizationResponse(code='access_code',
-                                                       state='state').to_json(),
-                            headers={'content-type': "text/plain"})
+        req_resp = Response(
+            200,
+            AuthorizationResponse(code='access_code', state='state',
+                                  scope=['openid']).to_json(),
+            headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
                                                    body_type='json')
@@ -211,6 +222,7 @@ class TestAccessTokenRequest(object):
                                                    body_type='json')
 
 
+
 class TestProviderInfoRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
@@ -220,6 +232,9 @@ class TestProviderInfoRequest(object):
             None, config={'issuer': self._iss},
             redirect_uris=['https://example.com/cli/authz_cb'],
             client_id='client_id', client_secret='password')
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         _req = self.req.construct(self.cli_info)
@@ -235,14 +250,26 @@ class TestProviderInfoRequest(object):
     def test_parse_request_response(self):
         req_resp = Response(
             200,
-            ASConfigurationResponse(
+            ProviderConfigurationResponse(
                 issuer=self._iss, response_types_supported=['code'],
-                grant_types_supported=['Bearer']
+                grant_types_supported=['Bearer'],
+                subject_types_supported=['pair'],
+                authorization_endpoint='https://example.com/op/authz',
+                id_token_signing_alg_values_supported=['RS256'],
+                jwks_uri='https://example.com/op/jwks.json',
+                token_endpoint='https://example.com/op/token'
             ).to_json(),
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
                                                body_type='json')
-        assert isinstance(resp, ASConfigurationResponse)
-        assert set(resp.keys()) == {'issuer', 'response_types_supported',
-                                    'version', 'grant_types_supported'}
+        assert isinstance(resp, ProviderConfigurationResponse)
+        assert set(resp.keys()) == {
+            'issuer', 'response_types_supported', 'version',
+            'grant_types_supported', 'subject_types_supported',
+            'authorization_endpoint', 'jwks_uri',
+            'id_token_signing_alg_values_supported',
+            'request_uri_parameter_supported', 'request_parameter_supported',
+            'claims_parameter_supported', 'token_endpoint',
+            'token_endpoint_auth_methods_supported',
+            'require_request_uri_registration'}

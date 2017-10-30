@@ -156,6 +156,19 @@ class ClientInfo(object):
         setattr(self, key, value)
 
 
+def build_services(srvs, service_factory, http, keyjar, client_authn_method):
+    service = {}
+    for serv in srvs:
+        _srv = service_factory(serv, httplib=http, keyjar=keyjar,
+                               client_authn_method=client_authn_method)
+        service[_srv.request] = _srv
+
+    # For any unspecified service
+    service['any'] = Request(httplib=http, keyjar=keyjar,
+                             client_authn_method=client_authn_method)
+    return service
+
+
 class Client(object):
     def __init__(self, client_id='', ca_certs=None, client_authn_method=None,
                  keyjar=None, verify_ssl=True, config=None, client_cert=None,
@@ -184,17 +197,12 @@ class Client(object):
                                       config=config)
 
         self.service_factory = service_factory or requests.factory
-        self.service = {}
         _srvs = services or DEFAULT_SERVICES
-        for serv in _srvs:
-            _srv = self.service_factory(
-                serv, httplib=self.http, keyjar=keyjar,
-                client_authn_method=client_authn_method)
-            self.service[_srv.request] = _srv
 
-        # For any unspecified service
-        self.service['any'] = Request(httplib=self.http, keyjar=keyjar,
-                                      client_authn_method=client_authn_method)
+        self.service = build_services(_srvs, self.service_factory, self.http,
+                                      keyjar, client_authn_method)
+
+        self.client_info.service = self.service
 
         self.verify_ssl = verify_ssl
 

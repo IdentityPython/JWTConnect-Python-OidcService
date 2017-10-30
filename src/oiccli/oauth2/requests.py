@@ -267,7 +267,7 @@ class ProviderInfoDiscovery(Request):
 
         for key, val in resp.items():
             if key.endswith("_endpoint"):
-                for _srv in cli_info.services:
+                for _srv in cli_info.service.values():
                     if _srv.endpoint_name == key:
                         _srv.endpoint = val
 
