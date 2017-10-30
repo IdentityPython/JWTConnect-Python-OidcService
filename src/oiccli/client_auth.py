@@ -72,6 +72,8 @@ class ClientSecretBasic(ClientAuthnMethod):
         :return: dictionary of HTTP arguments
         """
 
+        _cinfo = self.cli.client_info
+
         if http_args is None:
             http_args = {}
 
@@ -84,7 +86,7 @@ class ClientSecretBasic(ClientAuthnMethod):
                 try:
                     passwd = cis["client_secret"]
                 except KeyError:
-                    passwd = self.cli.client_secret
+                    passwd = self.cli.cient_info.client_secret
 
         try:
             user = kwargs["user"]
@@ -108,7 +110,7 @@ class ClientSecretBasic(ClientAuthnMethod):
             'grant_type'] == 'authorization_code':
             if 'client_id' not in cis:
                 try:
-                    cis['client_id'] = self.cli.client_info.client_id
+                    cis['client_id'] = _cinfo.client_id
                 except AttributeError:
                     pass
         else:
@@ -135,17 +137,19 @@ class ClientSecretPost(ClientSecretBasic):
     """
 
     def construct(self, cis, request_args=None, http_args=None, **kwargs):
+        _cinfo = self.cli.client_info
+
         if "client_secret" not in cis:
             try:
                 cis["client_secret"] = http_args["client_secret"]
                 del http_args["client_secret"]
             except (KeyError, TypeError):
                 if self.cli.client_secret:
-                    cis["client_secret"] = self.cli.client_info.client_secret
+                    cis["client_secret"] = _cinfo.client_secret
                 else:
                     raise AuthnFailure("Missing client secret")
 
-        cis["client_id"] = self.cli.client_info.client_id
+        cis["client_id"] = _cinfo.client_id
 
         return http_args
 
@@ -164,6 +168,8 @@ class BearerHeader(ClientAuthnMethod):
         :return:
         """
 
+        _cinfo = self.cli.client_info
+
         if cis is not None:
             if "access_token" in cis:
                 _acc_token = cis["access_token"]
@@ -178,7 +184,7 @@ class BearerHeader(ClientAuthnMethod):
                     try:
                         _acc_token = kwargs["access_token"]
                     except KeyError:
-                        _acc_token = self.cli.client_info.grant_db.get_token(
+                        _acc_token = _cinfo.grant_db.get_token(
                             **kwargs).access_token
         else:
             try:
@@ -284,16 +290,18 @@ class JWSAuthnMethod(ClientAuthnMethod):
         # audience is the OP endpoint
         # audience = self.cli._endpoint(REQUEST2ENDPOINT[cis.type()])
         # OR OP identifier
+
+        _cinfo = self.cli.client_info
         algorithm = None
         if kwargs['authn_endpoint'] in ['token', 'refresh']:
             try:
-                algorithm = self.cli.client_info.registration_info[
+                algorithm = _cinfo.registration_info[
                     'token_endpoint_auth_signing_alg']
             except (KeyError, AttributeError):
                 pass
-            audience = self.cli.client_info.provider_info['token_endpoint']
+            audience = _cinfo.provider_info['token_endpoint']
         else:
-            audience = self.cli.client_info.provider_info['issuer']
+            audience = _cinfo.provider_info['issuer']
 
         if not algorithm:
             algorithm = self.choose_algorithm(**kwargs)
@@ -302,10 +310,10 @@ class JWSAuthnMethod(ClientAuthnMethod):
         try:
             if 'kid' in kwargs:
                 signing_key = [self.get_key_by_kid(kwargs["kid"], algorithm)]
-            elif ktype in self.cli.client_info.kid["sig"]:
+            elif ktype in _cinfo.kid["sig"]:
                 try:
                     signing_key = [self.get_key_by_kid(
-                        self.cli.client_info.kid["sig"][ktype], algorithm)]
+                        _cinfo.kid["sig"][ktype], algorithm)]
                 except KeyError:
                     signing_key = self.get_signing_key(algorithm)
             else:
@@ -330,7 +338,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
                 _args = {}
 
             cis["client_assertion"] = assertion_jwt(
-                self.cli.client_info.client_id, signing_key, audience,
+                _cinfo.client_id, signing_key, audience,
                 algorithm, **_args)
 
             cis["client_assertion_type"] = JWT_BEARER

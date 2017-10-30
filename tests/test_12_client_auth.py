@@ -64,15 +64,15 @@ class TestClientSecretBasic(object):
             base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
                 "utf-8"))}}
 
-    def test_does_not_remove_padding(self):
+    def test_does_not_remove_padding(self, client):
         cis = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
 
-        csb = ClientSecretBasic(None)
+        csb = ClientSecretBasic(client)
         http_args = csb.construct(cis, user="ab", password="c")
 
         assert http_args["headers"]["Authorization"].endswith("==")
 
-    def test_construct_cc(self):
+    def test_construct_cc(self, client):
         cis = CCAccessTokenRequest(grant_type="client_credentials")
 
         csb = ClientSecretBasic(client)
