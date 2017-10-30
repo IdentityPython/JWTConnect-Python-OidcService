@@ -7,27 +7,19 @@ from oicmsg.time_util import utc_time_sans_frac
 
 from oiccli import OIDCONF_PATTERN
 from oiccli.exception import OicCliError
-from oicmsg import oauth2
-from oicmsg.exception import MissingParameter, GrantExpired
-from oicmsg.key_jar import KeyJar
-from oicmsg.oauth2 import AuthorizationErrorResponse
-from oicmsg.oauth2 import TokenErrorResponse
-
 from oiccli.request import Request
+
+from oicmsg import oauth2
+from oicmsg.exception import GrantExpired
+from oicmsg.exception import MissingParameter
+from oicmsg.key_jar import KeyJar
 
 __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
-RESPONSE2ERROR = {
-    "AuthorizationResponse": [AuthorizationErrorResponse, TokenErrorResponse],
-    "AccessTokenResponse": [TokenErrorResponse]
-}
-
-
-def _post_x_parse_response(self, resp, session_info, state=''):
+def _post_x_parse_response(self, resp, cli_info, state=''):
     try:
         _state = resp["state"]
     except (AttributeError, KeyError):
@@ -36,7 +28,7 @@ def _post_x_parse_response(self, resp, session_info, state=''):
     if not _state:
         _state = state
 
-    _grant_db = session_info['grant_db']
+    _grant_db = cli_info.grant_db
     try:
         _grant_db[_state].update(resp)
     except KeyError:
@@ -54,6 +46,7 @@ def set_state(request_args, kwargs):
         except KeyError:
             raise MissingParameter('state')
     else:
+        del kwargs['state']
         request_args['state'] = _state
 
     return request_args
@@ -72,32 +65,29 @@ class AuthorizationRequest(Request):
 
         if 'redirect_uri' not in ar_args:
             try:
-                ar_args['redirect_uri'] = cli_info['redirect_uris'][0]
+                ar_args['redirect_uri'] = cli_info.redirect_uris[0]
             except (KeyError, AttributeError):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
 
-    def _post_parse_response(self, resp, session_info, state=''):
-        _post_x_parse_response(self, resp, session_info, state='')
+    def _post_parse_response(self, resp, cli_info, state=''):
+        _post_x_parse_response(self, resp, cli_info, state='')
 
-    def do_request_init(self, cli_info, method="GET",
-                        request_args=None, extra_args=None, http_args=None,
-                        **kwargs):
+    def do_request_init(self, cli_info, method="GET", request_args=None,
+                        http_args=None, **kwargs):
         """
 
         :param cli_info:
         :param method:
         :param request_args:
-        :param extra_args:
         :param http_args:
         :param kwargs:
         :return:
         """
 
         kwargs['authn_endpoint'] = 'authorization'
-        _info = self.request_info(cli_info, method, request_args, extra_args,
-                                  **kwargs)
+        _info = self.request_info(cli_info, method, request_args, **kwargs)
 
         _info = self.update_http_args(http_args, _info)
 
@@ -108,7 +98,7 @@ class AuthorizationRequest(Request):
 
         return _info
 
-    def construct(self, cli_info, request_args=None, extra_args=None, **kwargs):
+    def construct(self, cli_info, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -122,12 +112,7 @@ class AuthorizationRequest(Request):
 
         request_args = set_state(request_args, kwargs)
 
-        if "client_id" not in request_args:
-            request_args["client_id"] = cli_info.client_id
-        elif not request_args["client_id"]:
-            request_args["client_id"] = cli_info.client_id
-
-        return Request.construct(self, cli_info, request_args, extra_args)
+        return Request.construct(self, cli_info, request_args, **kwargs)
 
 
 class AccessTokenRequest(Request):
@@ -138,20 +123,18 @@ class AccessTokenRequest(Request):
     synchronous = True
     request = 'accesstoken'
 
-    def _post_parse_response(self, resp, session_info, state=''):
-        _post_x_parse_response(self, resp, session_info, state='')
+    def _post_parse_response(self, resp, cli_info, state=''):
+        _post_x_parse_response(self, resp, cli_info, state='')
 
     def do_request_init(self, cli_info, scope="", body_type="json",
-                        method="POST", request_args=None,
-                        extra_args=None, http_args=None,
+                        method="POST", request_args=None, http_args=None,
                         authn_method="", **kwargs):
 
         kwargs['authn_endpoint'] = 'token'
 
         _info = self.request_info(
             cli_info, method=method, request_args=request_args,
-            extra_args=extra_args, scope=scope,
-            authn_method=authn_method, **kwargs)
+            scope=scope, authn_method=authn_method, **kwargs)
 
         _info = self.update_http_args(http_args, _info)
 
@@ -167,7 +150,7 @@ class AccessTokenRequest(Request):
 
         return _info
 
-    def construct(self, cli_info, request_args=None, extra_args=None, **kwargs):
+    def construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
         # if request is not ROPCAccessTokenRequest:
@@ -175,6 +158,8 @@ class AccessTokenRequest(Request):
         request_args = set_state(request_args, kwargs)
 
         grant = cli_info.grant_db[request_args['state']]
+
+        del request_args['state']
 
         if not grant.is_valid():
             raise GrantExpired("Authorization Code to old %s > %s" % (
@@ -186,13 +171,9 @@ class AccessTokenRequest(Request):
         if "grant_type" not in request_args:
             request_args["grant_type"] = "authorization_code"
 
-        if "client_id" not in request_args:
-            request_args["client_id"] = cli_info.client_id
-        elif not request_args["client_id"]:
-            request_args["client_id"] = cli_info.client_id
-
         return Request.construct(self, cli_info, request_args=request_args,
-                                 extra_args=extra_args)
+                                 **kwargs)
+
 
 class RefreshAccessTokenRequest(Request):
     msg_type = oauth2.RefreshAccessTokenRequest
@@ -202,7 +183,7 @@ class RefreshAccessTokenRequest(Request):
     synchronous = True
     request = 'refresh_token'
 
-    def construct(self, cli_info, request_args=None, extra_args=None, **kwargs):
+    def construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -215,15 +196,12 @@ class RefreshAccessTokenRequest(Request):
         except AttributeError:
             pass
 
-        return Request.construct(self, cli_info, request_args=request_args,
-                                 extra_args=extra_args)
+        return Request.construct(self, cli_info, request_args=request_args)
 
     def do_request_init(self, cli_info, method="POST", request_args=None,
-                        extra_args=None, http_args=None, authn_method="",
-                        **kwargs):
+                        http_args=None, authn_method="", **kwargs):
         _info = self.request_info(cli_info, method=method,
                                   request_args=request_args,
-                                  extra_args=extra_args,
                                   token=kwargs['token'],
                                   authn_method=authn_method)
 
@@ -239,9 +217,9 @@ class ProviderInfoDiscovery(Request):
     request = 'provider_info'
 
     def request_info(self, cli_info, method="GET", request_args=None,
-                     extra_args=None, lax=False, **kwargs):
+                     lax=False, **kwargs):
 
-        issuer = cli_info['issuer']
+        issuer = cli_info.issuer
 
         if issuer.endswith("/"):
             _issuer = issuer[:-1]
@@ -250,13 +228,13 @@ class ProviderInfoDiscovery(Request):
 
         return {'uri': OIDCONF_PATTERN % _issuer}
 
-    def _post_parse_response(self, resp, session_info, **kwargs):
+    def _post_parse_response(self, resp, cli_info, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response
-        :param session_info: Information about the client/server session
+        :param cli_info: Information about the client/server session
         """
-        issuer = session_info['issuer']
+        issuer = cli_info.issuer
 
         if "issuer" in resp:
             _pcr_issuer = resp["issuer"]
@@ -272,8 +250,8 @@ class ProviderInfoDiscovery(Request):
                     _issuer = issuer
 
             try:
-                session_info["allow_issuer_mismatch"]
-            except KeyError:
+                cli_info.allow_issuer_mismatch
+            except AttributeError:
                 try:
                     assert _issuer == _pcr_issuer
                 except AssertionError:
@@ -284,22 +262,22 @@ class ProviderInfoDiscovery(Request):
         else:  # No prior knowledge
             _pcr_issuer = issuer
 
-        session_info['issuer'] = _pcr_issuer
-        session_info['provider_info'] = resp
+        cli_info.issuer = _pcr_issuer
+        cli_info.provider_info = resp
 
         for key, val in resp.items():
             if key.endswith("_endpoint"):
-                for _srv in session_info['services']:
+                for _srv in cli_info.services:
                     if _srv.endpoint_name == key:
                         _srv.endpoint = val
 
         try:
-            kj = session_info['keyjar']
+            kj = cli_info.keyjar
         except KeyError:
             kj = KeyJar()
 
         kj.load_keys(resp, _pcr_issuer)
-        session_info['keyjar'] = kj
+        cli_info.keyjar = kj
 
 
 def factory(req_name, **kwargs):

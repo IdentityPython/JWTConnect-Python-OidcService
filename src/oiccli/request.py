@@ -24,6 +24,8 @@ RESPONSE2ERROR = {
     "AccessTokenResponse": [TokenErrorResponse]
 }
 
+SPECIAL_ARGS = ['authn_endpoint', 'authn_endpoint']
+
 
 class Request(object):
     msg_type = Message
@@ -58,8 +60,8 @@ class Request(object):
                 continue
             else:
                 try:
-                    ar_args[prop] = cli_info[prop]
-                except KeyError:
+                    ar_args[prop] = getattr(cli_info, prop)
+                except AttributeError:
                     try:
                         ar_args[prop] = self.default_request_args[prop]
                     except KeyError:
@@ -67,26 +69,26 @@ class Request(object):
 
         return ar_args
 
-    def construct(self, cli_info, request_args=None, extra_args=None):
+    def construct(self, cli_info, request_args=None, **kwargs):
         """
         Instantiate the message class instance
 
         :param cli_info: Information about the client
         :param request_args:
-        :param extra_args:
+        :param kwargs: extra keyword arguments
         :return: message class instance
         """
         if request_args is None:
             request_args = {}
 
         # logger.debug("request_args: %s" % sanitize(request_args))
-        kwargs = self._parse_args(cli_info, **request_args)
+        _args = self._parse_args(cli_info, **request_args)
 
-        if extra_args:
-            kwargs.update(extra_args)
+        if kwargs:
+            _args.update(kwargs)
 
         # logger.debug("kwargs: %s" % sanitize(kwargs))
-        return self.msg_type(**kwargs)
+        return self.msg_type(**_args)
 
     def _endpoint(self, **kwargs):
         try:
@@ -155,12 +157,15 @@ class Request(object):
             return http_args
 
     def request_info(self, cli_info, method="GET", request_args=None,
-                     extra_args=None, lax=False, **kwargs):
+                     lax=False, **kwargs):
 
         if request_args is None:
             request_args = {}
 
-        cis = self.construct(cli_info, request_args, extra_args)
+        _args = dict(
+            [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
+
+        cis = self.construct(cli_info, request_args, **_args)
 
         if self.events:
             self.events.store('Protocol request', cis)
@@ -195,8 +200,7 @@ class Request(object):
         return info
 
     def do_request_init(self, cli_info, body_type="", method="GET",
-                        request_args=None, extra_args=None, http_args=None,
-                        **kwargs):
+                        request_args=None, http_args=None, **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -204,7 +208,6 @@ class Request(object):
         :param body_type: Which serialization to use for the HTTP body
         :param method: HTTP method used.
         :param request_args: Message arguments
-        :param extra_args: Extra arguments
         :param http_args: Initial HTTP header arguments
         :param kwargs: extra keyword arguments
         :return: Dictionary with the necessary information for the HTTP
@@ -217,7 +220,6 @@ class Request(object):
 
         _info = self.request_info(cli_info, method=method,
                                   request_args=request_args,
-                                  extra_args=extra_args,
                                   authn_method=authn_method, **kwargs)
 
         return self.update_http_args(http_args, _info)
@@ -257,7 +259,7 @@ class Request(object):
             info = self.get_urlinfo(info)
 
         if self.events:
-           self.events.store('Response', info)
+            self.events.store('Response', info)
 
         resp = self.response_cls().deserialize(info, sformat, **kwargs)
 
@@ -289,12 +291,12 @@ class Request(object):
         # elif resp.only_extras():
         #     resp = None
         else:
-            kwargs["client_id"] = client_info['client_id']
+            kwargs["client_id"] = client_info.client_id
             try:
-                kwargs['iss'] = client_info['provider_info']['issuer']
+                kwargs['iss'] = client_info.provider_info['issuer']
             except (KeyError, AttributeError):
                 try:
-                    kwargs['iss'] = client_info['issuer']
+                    kwargs['iss'] = client_info.issuer
                 except KeyError:
                     pass
 
@@ -321,7 +323,7 @@ class Request(object):
             raise ResponseError("Missing or faulty response")
 
         try:
-            self._post_parse_response(resp, client_info, state)
+            self._post_parse_response(resp, client_info, state=state)
         except Exception as err:
             raise
 

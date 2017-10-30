@@ -11,7 +11,6 @@ from oicmsg.exception import MissingParameter
 from oicmsg.exception import RegistrationError
 from oicmsg.exception import RequestError
 
-
 try:
     from json import JSONDecodeError
 except ImportError:  # Only works for >= 3.5
@@ -29,7 +28,6 @@ from jwkest import jwe
 
 from oiccli import oauth2, grant
 from oiccli import rndstr
-from oiccli import OIDCONF_PATTERN
 from oiccli import sanitize
 
 from oiccli.oic import requests
@@ -40,13 +38,11 @@ from oiccli.exception import OicCliError
 from oiccli.exception import ParameterError
 from oiccli.exception import SubMismatch
 from oiccli.exception import OtherError
-from oiccli.exception import ParseError
 from oiccli.exception import MissingRequiredAttribute
 from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import WebFinger
 
 from oicmsg import time_util
-from oicmsg.key_jar import KeyJar
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
 from oicmsg.oic import ClaimsRequest
@@ -55,18 +51,13 @@ from oicmsg.oic import RegistrationResponse
 from oicmsg.oic import AuthorizationResponse
 from oicmsg.oic import AccessTokenResponse
 from oicmsg.oic import Claims
-from oicmsg.oic import AccessTokenRequest
-from oicmsg.oic import RefreshAccessTokenRequest
 from oicmsg.oic import UserInfoRequest
-from oicmsg.oic import AuthorizationRequest
 from oicmsg.oic import OpenIDRequest
 from oicmsg.oic import RegistrationRequest
-from oicmsg.oic import RefreshSessionRequest
 from oicmsg.oic import CheckSessionRequest
 from oicmsg.oic import CheckIDRequest
 from oicmsg.oic import EndSessionRequest
 from oicmsg.oic import OpenIDSchema
-from oicmsg.oic import ProviderConfigurationResponse
 from oicmsg.oic import UserInfoErrorResponse
 
 __author__ = 'Roland Hedberg'
@@ -256,7 +247,6 @@ def claims_match(value, claimspec):
 
 
 class Client(oauth2.Client):
-
     def __init__(self, client_id=None, ca_certs=None,
                  client_prefs=None, client_authn_method=None, keyjar=None,
                  verify_ssl=True, config=None, client_cert=None,
@@ -278,7 +268,7 @@ class Client(oauth2.Client):
         self.id_token = None
         self.log = None
 
-        self.grant_db = GrantDB
+        self.grant_db = GrantDB()
         self.grant_db.grant_class = Grant
 
         self.provider_info = Message()
@@ -304,7 +294,7 @@ class Client(oauth2.Client):
         try:
             return kwargs["id_token"]
         except KeyError:
-            grant = self.get_grant(**kwargs)
+            grant = self.grant_db[kwargs['state']]
 
         if grant:
             try:
@@ -388,14 +378,11 @@ class Client(oauth2.Client):
         assert webname.startswith(self.base_url)
         return webname[len(self.base_url):]
 
-    def construct_AuthorizationRequest(self, request=AuthorizationRequest,
-                                       request_args=None, extra_args=None,
-                                       request_param=None, **kwargs):
+    def construct_authorization_request(self, request_args=None,
+                                        extra_args=None, request_param=None,
+                                        **kwargs):
 
         if request_args is not None:
-            # if "claims" in request_args:
-            # kwargs["claims"] = request_args["claims"]
-            #     del request_args["claims"]
             if "nonce" not in request_args:
                 _rt = request_args["response_type"]
                 if "token" in _rt or "id_token" in _rt:
@@ -413,10 +400,9 @@ class Client(oauth2.Client):
                 request_param = "request"
             del kwargs["request_method"]
 
-        areq = oauth2.Client.construct_AuthorizationRequest(self, request,
-                                                            request_args,
-                                                            extra_args,
-                                                            **kwargs)
+        areq = oauth2.Client.construct_authorization_request(self, request_args,
+                                                             extra_args,
+                                                             **kwargs)
 
         if request_param:
             alg = None
@@ -465,27 +451,21 @@ class Client(oauth2.Client):
 
         return areq
 
-    def construct_AccessTokenRequest(self, request=AccessTokenRequest,
-                                     request_args=None, extra_args=None,
-                                     **kwargs):
+    def construct_accesstoken_request(self, request_args=None, extra_args=None,
+                                      **kwargs):
 
-        return oauth2.Client.construct_AccessTokenRequest(self, request,
-                                                          request_args,
-                                                          extra_args, **kwargs)
+        return oauth2.Client.construct_accesstoken_request(self, request_args,
+                                                           extra_args, **kwargs)
 
-    def construct_RefreshAccessTokenRequest(self,
-                                            request=RefreshAccessTokenRequest,
-                                            request_args=None, extra_args=None,
-                                            **kwargs):
+    def construct_refresh_token_request(self, request_args=None,
+                                        extra_args=None, **kwargs):
 
-        return oauth2.Client.construct_RefreshAccessTokenRequest(self, request,
-                                                                 request_args,
-                                                                 extra_args,
-                                                                 **kwargs)
+        return oauth2.Client.construct_refresh_token_request(self, request_args,
+                                                             extra_args,
+                                                             **kwargs)
 
-    def construct_UserInfoRequest(self, request=UserInfoRequest,
-                                  request_args=None, extra_args=None,
-                                  **kwargs):
+    def construct_userinfo_request(self, request_args=None, extra_args=None,
+                                   **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -495,26 +475,23 @@ class Client(oauth2.Client):
         else:
             if "scope" not in kwargs:
                 kwargs["scope"] = "openid"
-            token = self.get_token(**kwargs)
+            token = self.grant_db.get_token(**kwargs)
             if token is None:
                 raise MissingParameter("No valid token available")
 
             request_args["access_token"] = token.access_token
 
-        return self.construct_request(request, request_args, extra_args)
+        return self.construct('userinfo', request_args, extra_args)
 
-    def construct_RegistrationRequest(self, request=RegistrationRequest,
-                                      request_args=None, extra_args=None,
+    def construct_registration_request(self, request_args=None, extra_args=None,
                                       **kwargs):
 
-        return self.construct_request(request, request_args, extra_args)
+        return self.construct('registration', request_args, extra_args)
 
-    def construct_RefreshSessionRequest(self,
-                                        request=RefreshSessionRequest,
-                                        request_args=None, extra_args=None,
-                                        **kwargs):
+    def construct_refresh_session_request(self, request_args=None,
+                                         extra_args=None, **kwargs):
 
-        return self.construct_request(request, request_args, extra_args)
+        return self.construct('refresh_session', request_args, extra_args)
 
     def _id_token_based(self, request, request_args=None, extra_args=None,
                         **kwargs):
@@ -536,24 +513,23 @@ class Client(oauth2.Client):
 
             request_args[_prop] = id_token
 
-        return self.construct_request(request, request_args, extra_args)
+        return self.construct(request, request_args, extra_args)
 
-    def construct_CheckSessionRequest(self, request=CheckSessionRequest,
+    def construct_check_session_request(self, request=CheckSessionRequest,
                                       request_args=None, extra_args=None,
                                       **kwargs):
 
-        return self._id_token_based(request, request_args, extra_args, **kwargs)
+        return self._id_token_based('check_session', request_args, extra_args, **kwargs)
 
-    def construct_CheckIDRequest(self, request=CheckIDRequest,
+    def construct_checkid_request(self, request=CheckIDRequest,
                                  request_args=None,
                                  extra_args=None, **kwargs):
 
         # access_token is where the id_token will be placed
-        return self._id_token_based(request, request_args, extra_args,
+        return self._id_token_based('check_id', request_args, extra_args,
                                     prop="access_token", **kwargs)
 
-    def construct_EndSessionRequest(self, request=EndSessionRequest,
-                                    request_args=None, extra_args=None,
+    def construct_end_session_request(self, request_args=None, extra_args=None,
                                     **kwargs):
 
         if request_args is None:
@@ -567,18 +543,11 @@ class Client(oauth2.Client):
         # if "redirect_url" not in request_args:
         #            request_args["redirect_url"] = self.redirect_url
 
-        return self._id_token_based(request, request_args, extra_args,
+        return self._id_token_based('end_session', request_args, extra_args,
                                     **kwargs)
 
     # ------------------------------------------------------------------------
-    def authorization_request_info(self, request_args=None, extra_args=None,
-                                   **kwargs):
-        return self.request_info(AuthorizationRequest, "GET",
-                                 request_args, extra_args, **kwargs)
-
-    # ------------------------------------------------------------------------
-    def do_authorization_request(self, request=AuthorizationRequest,
-                                 state="", body_type="", method="GET",
+    def do_authorization_request(self, state="", body_type="", method="GET",
                                  request_args=None, extra_args=None,
                                  http_args=None,
                                  response_cls=AuthorizationResponse):
@@ -589,24 +558,22 @@ class Client(oauth2.Client):
             _args, code_verifier = self.add_code_challenge()
             request_args.update(_args)
 
-        return oauth2.Client.do_authorization_request(self, request, state,
+        return oauth2.Client.do_authorization_request(self, state,
                                                       body_type, method,
                                                       request_args,
                                                       extra_args, http_args,
-                                                      response_cls,
                                                       algs=algs)
 
-    def do_access_token_request(self, request=AccessTokenRequest,
-                                scope="", state="", body_type="json",
+    def do_access_token_request(self, scope="", state="", body_type="json",
                                 method="POST", request_args=None,
                                 extra_args=None, http_args=None,
                                 response_cls=AccessTokenResponse,
                                 authn_method="client_secret_basic", **kwargs):
 
-        atr = oauth2.Client.do_access_token_request(self, request, scope,
+        atr = oauth2.Client.do_access_token_request(self, scope,
                                                     state, body_type, method,
                                                     request_args, extra_args,
-                                                    http_args, response_cls,
+                                                    http_args,
                                                     authn_method, **kwargs)
         try:
             _idt = atr['id_token']
@@ -620,43 +587,34 @@ class Client(oauth2.Client):
                 pass
         return atr
 
-    def do_access_token_refresh(self, request=RefreshAccessTokenRequest,
-                                state="", body_type="json", method="POST",
+    def do_access_token_refresh(self, state="", body_type="json", method="POST",
                                 request_args=None, extra_args=None,
                                 http_args=None,
                                 response_cls=AccessTokenResponse,
                                 **kwargs):
 
-        return oauth2.Client.do_access_token_refresh(self, request, state,
+        return oauth2.Client.do_access_token_refresh(self, state,
                                                      body_type, method,
                                                      request_args,
                                                      extra_args, http_args,
-                                                     response_cls, **kwargs)
+                                                     **kwargs)
 
-    def do_registration_request(self, request=RegistrationRequest,
-                                scope="", state="", body_type="json",
+    def do_registration_request(self, scope="", state="", body_type="json",
                                 method="POST", request_args=None,
                                 extra_args=None, http_args=None,
-                                response_cls=None):
+                                authn_method='', **kwargs):
 
-        url, body, ht_args, csi = self.request_info(request, method=method,
-                                                    request_args=request_args,
-                                                    extra_args=extra_args,
-                                                    scope=scope, state=state)
+        _srv = self.service['registration']
 
-        if http_args is None:
-            http_args = ht_args
-        else:
-            http_args.update(http_args)
+        _info = _srv.do_request_init(
+            self.client_info(), state=state, method=method, scope=scope,
+            request_args=request_args, extra_args=extra_args,
+            authn_method=authn_method, http_args=http_args, **kwargs)
 
-        if response_cls is None:
-            response_cls = RegistrationResponse
-
-        response = self.request_and_return(url, response_cls, method, body,
-                                           body_type, state=state,
-                                           http_args=http_args)
-
-        return response
+        return _srv.request_and_return(
+            _info['url'], method, _info['body'], body_type, state=state,
+            http_args=_info['http_args'], session_info=self.session_info(),
+            **kwargs)
 
     def do_check_session_request(self, request=CheckSessionRequest,
                                  scope="",
@@ -905,99 +863,99 @@ class Client(oauth2.Client):
         self.store_response(res, resp.txt)
         return res
 
-    def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
-        """
-        Deal with Provider Config Response
-        :param pcr: The ProviderConfigResponse instance
-        :param issuer: The one I thought should be the issuer of the config
-        :param keys: Should I deal with keys
-        :param endpoints: Should I deal with endpoints, that is store them
-        as attributes in self.
-        """
-
-        if "issuer" in pcr:
-            _pcr_issuer = pcr["issuer"]
-            if pcr["issuer"].endswith("/"):
-                if issuer.endswith("/"):
-                    _issuer = issuer
-                else:
-                    _issuer = issuer + "/"
-            else:
-                if issuer.endswith("/"):
-                    _issuer = issuer[:-1]
-                else:
-                    _issuer = issuer
-
-            try:
-                self.allow["issuer_mismatch"]
-            except KeyError:
-                try:
-                    assert _issuer == _pcr_issuer
-                except AssertionError:
-                    raise IssuerMismatch("'%s' != '%s'" % (_issuer,
-                                                           _pcr_issuer), pcr)
-
-            self.provider_info = pcr
-        else:
-            _pcr_issuer = issuer
-
-        if endpoints:
-            for key, val in pcr.items():
-                if key.endswith("_endpoint"):
-                    setattr(self, key, val)
-
-        if keys:
-            if self.keyjar is None:
-                self.keyjar = KeyJar(verify_ssl=self.verify_ssl)
-
-            self.keyjar.load_keys(pcr, _pcr_issuer)
-
-    def provider_config(self, issuer, keys=True, endpoints=True,
-                        response_cls=ProviderConfigurationResponse,
-                        serv_pattern=OIDCONF_PATTERN):
-        if issuer.endswith("/"):
-            _issuer = issuer[:-1]
-        else:
-            _issuer = issuer
-
-        url = serv_pattern % _issuer
-
-        pcr = None
-        r = self.httpd(url, allow_redirects=True)
-        if r.status_code == 200:
-            try:
-                pcr = response_cls().from_json(r.text)
-            except Exception:
-                # FIXME: This should catch specific exception from `from_json()`
-                _err_txt = "Faulty provider config response: {}".format(r.text)
-                logger.error(sanitize(_err_txt))
-                raise ParseError(_err_txt)
-        # elif r.status_code == 302 or r.status_code == 301:
-        #     while r.status_code == 302 or r.status_code == 301:
-        #         redirect_header = r.headers["location"]
-        #         if not urlparse(redirect_header).scheme:
-        #             # Relative URL was provided - construct new redirect
-        #             # using an issuer
-        #             _split = urlparse(issuer)
-        #             new_url = urlunparse((_split.scheme, _split.netloc,
-        #                                   as_unicode(redirect_header),
-        #                                   _split.params,
-        #                                   _split.query, _split.fragment))
-        #             r = self.httpd(new_url)
-        #             if r.status_code == 200:
-        #                 pcr = response_cls().from_json(r.text)
-        #                 break
-
-        # logger.debug("Provider info: %s" % sanitize(pcr))
-        if pcr is None:
-            raise CommunicationError(
-                "Trying '%s', status %s" % (url, r.status_code))
-
-        self.store_response(pcr, r.text)
-
-        self.handle_provider_config(pcr, issuer, keys, endpoints)
-
-        return pcr
+    # def handle_provider_config(self, pcr, issuer, keys=True, endpoints=True):
+    #     """
+    #     Deal with Provider Config Response
+    #     :param pcr: The ProviderConfigResponse instance
+    #     :param issuer: The one I thought should be the issuer of the config
+    #     :param keys: Should I deal with keys
+    #     :param endpoints: Should I deal with endpoints, that is store them
+    #     as attributes in self.
+    #     """
+    #
+    #     if "issuer" in pcr:
+    #         _pcr_issuer = pcr["issuer"]
+    #         if pcr["issuer"].endswith("/"):
+    #             if issuer.endswith("/"):
+    #                 _issuer = issuer
+    #             else:
+    #                 _issuer = issuer + "/"
+    #         else:
+    #             if issuer.endswith("/"):
+    #                 _issuer = issuer[:-1]
+    #             else:
+    #                 _issuer = issuer
+    #
+    #         try:
+    #             self.allow["issuer_mismatch"]
+    #         except KeyError:
+    #             try:
+    #                 assert _issuer == _pcr_issuer
+    #             except AssertionError:
+    #                 raise IssuerMismatch("'%s' != '%s'" % (_issuer,
+    #                                                        _pcr_issuer), pcr)
+    #
+    #         self.provider_info = pcr
+    #     else:
+    #         _pcr_issuer = issuer
+    #
+    #     if endpoints:
+    #         for key, val in pcr.items():
+    #             if key.endswith("_endpoint"):
+    #                 setattr(self, key, val)
+    #
+    #     if keys:
+    #         if self.keyjar is None:
+    #             self.keyjar = KeyJar(verify_ssl=self.verify_ssl)
+    #
+    #         self.keyjar.load_keys(pcr, _pcr_issuer)
+    #
+    # def provider_config(self, issuer, keys=True, endpoints=True,
+    #                     response_cls=ProviderConfigurationResponse,
+    #                     serv_pattern=OIDCONF_PATTERN):
+    #     if issuer.endswith("/"):
+    #         _issuer = issuer[:-1]
+    #     else:
+    #         _issuer = issuer
+    #
+    #     url = serv_pattern % _issuer
+    #
+    #     pcr = None
+    #     r = self.httpd(url, allow_redirects=True)
+    #     if r.status_code == 200:
+    #         try:
+    #             pcr = response_cls().from_json(r.text)
+    #         except Exception:
+    #             # FIXME: This should catch specific exception from `from_json()`
+    #             _err_txt = "Faulty provider config response: {}".format(r.text)
+    #             logger.error(sanitize(_err_txt))
+    #             raise ParseError(_err_txt)
+    #     # elif r.status_code == 302 or r.status_code == 301:
+    #     #     while r.status_code == 302 or r.status_code == 301:
+    #     #         redirect_header = r.headers["location"]
+    #     #         if not urlparse(redirect_header).scheme:
+    #     #             # Relative URL was provided - construct new redirect
+    #     #             # using an issuer
+    #     #             _split = urlparse(issuer)
+    #     #             new_url = urlunparse((_split.scheme, _split.netloc,
+    #     #                                   as_unicode(redirect_header),
+    #     #                                   _split.params,
+    #     #                                   _split.query, _split.fragment))
+    #     #             r = self.httpd(new_url)
+    #     #             if r.status_code == 200:
+    #     #                 pcr = response_cls().from_json(r.text)
+    #     #                 break
+    #
+    #     # logger.debug("Provider info: %s" % sanitize(pcr))
+    #     if pcr is None:
+    #         raise CommunicationError(
+    #             "Trying '%s', status %s" % (url, r.status_code))
+    #
+    #     self.store_response(pcr, r.text)
+    #
+    #     self.handle_provider_config(pcr, issuer, keys, endpoints)
+    #
+    #     return pcr
 
     def unpack_aggregated_claims(self, userinfo):
         if userinfo["_claim_sources"]:
@@ -1291,7 +1249,7 @@ class Client(oauth2.Client):
         headers = {"content-type": "application/json"}
 
         rsp = self.httpd(url, "POST", data=req.to_json(),
-                                headers=headers)
+                         headers=headers)
 
         return self.handle_registration_info(rsp)
 

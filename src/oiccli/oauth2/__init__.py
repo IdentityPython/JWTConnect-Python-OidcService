@@ -3,7 +3,6 @@ import logging
 from jwkest import b64e
 
 from oiccli import CC_METHOD
-from oiccli import OIDCONF_PATTERN
 from oiccli import unreserved
 from oiccli.exception import OicCliError
 from oiccli.exception import Unsupported
@@ -13,17 +12,12 @@ from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
 from oiccli.http_util import R2C
 from oiccli.http_util import SeeOther
-
 from oiccli.oauth2 import requests
 from oiccli.request import Request
 
-from oicmsg.exception import GrantExpired
-from oicmsg.oauth2 import ASConfigurationResponse
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
-from oicmsg.oauth2 import Message
 from oicmsg.key_jar import KeyJar
-from oicmsg.time_util import utc_time_sans_frac
 
 __author__ = 'Roland Hedberg'
 
@@ -112,7 +106,8 @@ def compact(qsdict):
 # =============================================================================
 
 class ClientInfo(object):
-    def __init__(self, keyjar, client_id='', config=None, events=None):
+    def __init__(self, keyjar, client_id='', config=None, events=None,
+                 **kwargs):
         self.keyjar = keyjar
         self.client_id = client_id
         self.grant_db = GrantDB()
@@ -134,6 +129,11 @@ class ClientInfo(object):
         self.allow = {}
         self.provider_info = {}
         self.events = events
+        self.behaviour = {}
+        self.client_prefs = {}
+
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
     def get_client_secret(self):
         return self._c_secret
@@ -152,6 +152,9 @@ class ClientInfo(object):
 
     client_secret = property(get_client_secret, set_client_secret)
 
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
 
 class Client(object):
     def __init__(self, client_id='', ca_certs=None, client_authn_method=None,
@@ -169,24 +172,28 @@ class Client(object):
         """
 
         self.http = httplib or HTTPLib(ca_certs=ca_certs,
-                                   verify_ssl=verify_ssl,
-                                   client_cert=client_cert,
-                                   keyjar=keyjar)
+                                       verify_ssl=verify_ssl,
+                                       client_cert=client_cert,
+                                       keyjar=keyjar)
+
+        if not keyjar:
+            keyjar = KeyJar()
 
         self.events = None
-        self.client_info = ClientInfo(keyjar, client_id=client_id)
+        self.client_info = ClientInfo(keyjar, client_id=client_id,
+                                      config=config)
 
         self.service_factory = service_factory or requests.factory
         self.service = {}
         _srvs = services or DEFAULT_SERVICES
         for serv in _srvs:
             _srv = self.service_factory(
-                serv, httplib=self.http, keyjar=self.keyjar,
+                serv, httplib=self.http, keyjar=keyjar,
                 client_authn_method=client_authn_method)
             self.service[_srv.request] = _srv
 
         # For any unspecified service
-        self.service['any'] = Request(httplib=self.http, keyjar=self.keyjar,
+        self.service['any'] = Request(httplib=self.http, keyjar=keyjar,
                                       client_authn_method=client_authn_method)
 
         self.verify_ssl = verify_ssl
@@ -201,119 +208,20 @@ class Client(object):
         met = getattr(self, 'construct_{}_request'.format(request_type))
         return met(self.client_info, request_args, extra_args, **kwargs)
 
-    def do_request(self, url, method, body, http_args):
-        """
-        Send the request to the other entity, receive the response 
-        and return it.
+    def do_request(self, request_type, scope="", body_type="json",
+                   method="POST", request_args=None, extra_args=None,
+                   http_args=None, authn_method="", **kwargs):
 
-        :param url: 
-        :param method: 
-        :param body: 
-        :param http_args: 
-        :return: 
-        """
+        _srv = self.service[request_type]
 
-        if http_args is None:
-            http_args = {}
-
-        try:
-            resp = self.http(url, method, data=body, **http_args)
-        except Exception:
-            raise
-
-        return resp
-
-    def do_authorization_request(self, state="", body_type="", method="GET",
-                                 request_args=None, extra_args=None,
-                                 http_args=None,
-                                 **kwargs):
-
-        _srv = self.service['authorization']
-        _info = _srv.do_request_init(self.client_info, state=state,
-                                     method=method, request_args=request_args,
-                                     extra_args=extra_args,
-                                     http_args=http_args, **kwargs)
-
-        # redirect to the authorization server
-
-        #
-        # req_resp = self.do_request(_info['url'], method, _info['body'],
-        #                            http_args=http_args)
-        #
-        # resp = _srv.parse_request_response(req_resp, body_type, state, **kwargs)
-        #
-        # if isinstance(resp, Message):
-        #     if resp.type() == _srv.error_msg:
-        #         resp.state = _info['cis'].state
-        #
-        # return resp
-
-    def do_access_token_request(self, scope="", state="", body_type="json",
-                                method="POST", request_args=None,
-                                extra_args=None, http_args=None,
-                                authn_method="", **kwargs):
-
-        _srv = self.service['accesstoken']
         _info = _srv.do_request_init(
-            self.client_info, state=state, method=method, scope=scope,
+            self.client_info, method=method, scope=scope,
             request_args=request_args, extra_args=extra_args,
             authn_method=authn_method, http_args=http_args, **kwargs)
 
         return _srv.request_and_return(
-            _info['url'], method, _info['body'], body_type, state=state,
+            _info['url'], method, _info['body'], body_type,
             http_args=_info['http_args'], client_info=self.client_info,
-            **kwargs)
-
-    def do_access_token_refresh(self, state="", body_type="json", method="POST",
-                                request_args=None, extra_args=None,
-                                http_args=None,
-                                authn_method="", **kwargs):
-
-        kwargs['token'] = self.grant_db.get_token(also_expired=True,
-                                                  state=state, **kwargs)
-        kwargs['authn_endpoint'] = 'refresh'
-
-        _srv = self.service['refresh_token']
-        _info = _srv.do_request_init(
-            self.client_info(), state=state, method=method,
-            request_args=request_args, extra_args=extra_args,
-            authn_method=authn_method, http_args=http_args, **kwargs)
-
-        return _srv.request_and_return(
-            _info['url'], method, _info['body'], body_type, state=state,
-            http_args=_info['http_args'], session_info=self.session_info(),
-            **kwargs)
-
-    def fetch_protected_resource(self, uri, method="GET", headers=None,
-                                 state="", body_type='json', **kwargs):
-
-        if "token" in kwargs and kwargs["token"]:
-            token = kwargs["token"]
-            request_args = {"access_token": token}
-        else:
-            try:
-                token = self.grant_db.get_token(state=state, **kwargs)
-            except ExpiredToken:
-                # The token is to old, refresh
-                self.do_access_token_refresh()
-                token = self.grant_db.get_token(state=state, **kwargs)
-            request_args = {"access_token": token.access_token}
-
-        if headers is None:
-            headers = {}
-
-        _srv = self.service['any']
-        if "authn_method" not in kwargs:
-            kwargs['authn_method'] = 'bearer_header'
-        kwargs['endpoint'] = uri
-
-        _info = _srv.do_request_init(
-            self.client_info(), state=state, method=method,
-            request_args=request_args, **kwargs)
-
-        return _srv.request_and_return(
-            _info['url'], method, _info['body'], body_type, state=state,
-            http_args=_info['http_args'], session_info=self.session_info(),
             **kwargs)
 
     def add_code_challenge(self):
@@ -323,7 +231,7 @@ class Client(object):
         :return:
         """
         try:
-            cv_len = self.config['code_challenge']['length']
+            cv_len = self.client_info.config['code_challenge']['length']
         except KeyError:
             cv_len = 64  # Use default
 
@@ -331,7 +239,7 @@ class Client(object):
         _cv = code_verifier.encode()
 
         try:
-            _method = self.config['code_challenge']['method']
+            _method = self.client_info.config['code_challenge']['method']
         except KeyError:
             _method = 'S256'
 
@@ -346,28 +254,3 @@ class Client(object):
 
         return {"code_challenge": code_challenge,
                 "code_challenge_method": _method}, code_verifier
-
-    def do_provider_info_discovery(self, state="", body_type="json",
-                                   method="GET", request_args=None,
-                                   extra_args=None, http_args=None,
-                                   authn_method="", **kwargs):
-
-        _srv = self.service['discovery']
-        _info = _srv.do_request_init(
-            self.client_info(), state=state, method=method,
-            request_args=request_args, extra_args=extra_args,
-            authn_method=authn_method, http_args=http_args, **kwargs)
-
-        _sinfo = self.session_info()
-
-        res = _srv.request_and_return(
-            _info['url'], method, _info['body'], body_type, state=state,
-            http_args=_info['http_args'], session_info=_sinfo,
-            **kwargs)
-
-        try:
-            self.keyjar = _sinfo['keyjar']
-        except KeyError:
-            pass
-
-        return res

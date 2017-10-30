@@ -5,16 +5,19 @@ import time
 import sys
 from jwkest.jwk import rsa_load
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.grant import Grant, Token
-from oiccli.oauth2 import Client, DEF_SIGN_ALG
+from oiccli.grant import Token
+from oiccli.oauth2 import Client
+from oiccli.oauth2 import ClientInfo
 from oicmsg.key_bundle import KeyBundle
-from oicmsg.oauth2 import Message, AuthorizationRequest, AccessTokenRequest, \
-    RefreshAccessTokenRequest, AccessTokenResponse, ResourceRequest
+from oicmsg.oauth2 import AccessTokenRequest
+from oicmsg.oauth2 import AccessTokenResponse
+from oicmsg.oauth2 import AuthorizationRequest
+from oicmsg.oauth2 import AuthorizationResponse
+from oicmsg.oauth2 import RefreshAccessTokenRequest
 from oicmsg.oic import IdToken
 from oicmsg.time_util import utc_time_sans_frac
 
 sys.path.insert(0, '.')
-from MockOP import MockOP
 
 BASE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "data/keys"))
@@ -33,54 +36,45 @@ class TestClient(object):
     @pytest.fixture(autouse=True)
     def create_client(self):
         self.redirect_uri = "http://example.com/redirect"
-        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD,
-                             httplib=MockOP())
-        self.client.redirect_uris = [self.redirect_uri]
-        self.client.authorization_endpoint = "http://example.com/authorization"
-        self.client.token_endpoint = "http://example.com/token"
-        self.client.userinfo_endpoint = "http://example.com/userinfo"
-        self.client.check_session_endpoint = "https://example.com/check_session"
-        self.client.client_secret = "abcdefghijklmnop"
-        self.client.keyjar[""] = KC_RSA
-        self.client.behaviour = {
-            "request_object_signing_alg": DEF_SIGN_ALG["openid_request_object"]}
+        self.client = Client(CLIENT_ID, client_authn_method=CLIENT_AUTHN_METHOD)
+        self.client.client_info = ClientInfo(
+            None, redirect_uris=['https://example.com/cli/authz_cb'],
+            client_id='client_1', client_secret='abcdefghijklmnop')
+        _gdb = self.client.client_info.grant_db
+        _gdb['ABCDE'] = _gdb.grant_class(
+            resp=AuthorizationResponse(code='access_code'))
 
     def test_construct_authorization_request(self):
         req_args = {'state': 'ABCDE',
                     'redirect_uri': 'https://example.com/auth_cb',
                     'response_type': ['code']}
-        msg = self.client.construct_authorization_request(
-            self.client.client_info(), request_args=req_args)
+        msg = self.client.service['authorization'].construct(
+            self.client.client_info, request_args=req_args)
         assert isinstance(msg, AuthorizationRequest)
         assert msg['client_id'] == 'client_1'
         assert msg['redirect_uri'] == 'https://example.com/auth_cb'
 
     def test_construct_accesstoken_request(self):
         # Bind access code to state
-        self.client.grant_db['ABCDE'] = Grant(resp={'code': 'CODE'})
-
         req_args = {}
-        msg = self.client.construct_accesstoken_request(
-            self.client.client_info(), request_args=req_args, state='ABCDE')
+        msg = self.client.service['accesstoken'].construct(
+            self.client.client_info, request_args=req_args, state='ABCDE')
         assert isinstance(msg, AccessTokenRequest)
         assert msg.to_dict() == {'client_id': 'client_1',
                                  'client_secret': 'abcdefghijklmnop',
-                                 'code': 'CODE',
-                                 'grant_type': 'authorization_code',
-                                 'state': 'ABCDE'}
+                                 'code': 'access_code',
+                                 'grant_type': 'authorization_code'}
 
     def test_construct_refresh_token_request(self):
         # Bind access code to state
-        self.client.grant_db['ABCDE'] = Grant(resp={'code': 'CODE'})
-
         # Bind token to state
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.grant_db["ABCDE"].tokens.append(Token(resp))
+        self.client.client_info.grant_db["ABCDE"].tokens.append(Token(resp))
 
         req_args = {}
-        msg = self.client.construct_refresh_token_request(
-            request_args=req_args, state='ABCDE')
+        msg = self.client.service['refresh_token'].construct(
+            self.client.client_info, request_args=req_args, state='ABCDE')
         assert isinstance(msg, RefreshAccessTokenRequest)
         assert msg.to_dict() == {'client_id': 'client_1',
                                  'client_secret': 'abcdefghijklmnop',
