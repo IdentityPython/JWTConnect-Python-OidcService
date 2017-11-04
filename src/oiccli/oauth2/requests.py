@@ -71,34 +71,31 @@ class AuthorizationRequest(Request):
 
         return ar_args
 
-    def _post_parse_response(self, resp, cli_info, state=''):
+    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
         _post_x_parse_response(self, resp, cli_info, state='')
 
-    def do_request_init(self, cli_info, method="GET", request_args=None,
-                        http_args=None, **kwargs):
-        """
-
-        :param cli_info:
-        :param method:
-        :param request_args:
-        :param http_args:
-        :param kwargs:
-        :return:
-        """
-
-        kwargs['authn_endpoint'] = 'authorization'
-        _info = self.request_info(cli_info, method, request_args, **kwargs)
-
-        _info = self.update_http_args(http_args, _info)
+    def do_request_init(self, cli_info, body_type="", method="GET",
+                        authn_method='', request_args=None, http_args=None,
+                        **kwargs):
 
         try:
-            _info['algs'] = kwargs["algs"]
+            _algs = kwargs['algs']
         except KeyError:
-            _info['algs'] = {}
+            _algs = {}
+        else:
+            del kwargs['algs']
 
+        _info = Request.do_request_init(self, cli_info, body_type=body_type,
+                                        method=method,
+                                        authn_method=authn_method,
+                                        request_args=request_args,
+                                        http_args=http_args,
+                                        **kwargs)
+
+        _info['algs'] = _algs
         return _info
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -110,9 +107,7 @@ class AuthorizationRequest(Request):
         else:
             request_args = {}
 
-        request_args = set_state(request_args, kwargs)
-
-        return Request.construct(self, cli_info, request_args, **kwargs)
+        return set_state(request_args, kwargs), {}
 
 
 class AccessTokenRequest(Request):
@@ -122,35 +117,13 @@ class AccessTokenRequest(Request):
     endpoint_name = 'token_endpoint'
     synchronous = True
     request = 'accesstoken'
+    default_authn_method = 'client_secret_basic'
+    http_method = 'POST'
 
-    def _post_parse_response(self, resp, cli_info, state=''):
+    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
         _post_x_parse_response(self, resp, cli_info, state='')
 
-    def do_request_init(self, cli_info, scope="", body_type="json",
-                        method="POST", request_args=None, http_args=None,
-                        authn_method="", **kwargs):
-
-        kwargs['authn_endpoint'] = 'token'
-
-        _info = self.request_info(
-            cli_info, method=method, request_args=request_args,
-            scope=scope, authn_method=authn_method, **kwargs)
-
-        _info = self.update_http_args(http_args, _info)
-
-        if self.events is not None:
-            self.events.store('request_url', _info['url'])
-            self.events.store('request_http_args', _info['http_args'])
-            self.events.store('Request', _info['body'])
-
-        logger.debug("<do_access_token> URL: {}, Body: {}".format(
-            _info['uri'], _info['body']))
-        logger.debug("<do_access_token> response_cls: {}".format(
-            self.response_cls))
-
-        return _info
-
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
         # if request is not ROPCAccessTokenRequest:
@@ -171,8 +144,7 @@ class AccessTokenRequest(Request):
         if "grant_type" not in request_args:
             request_args["grant_type"] = "authorization_code"
 
-        return Request.construct(self, cli_info, request_args=request_args,
-                                 **kwargs)
+        return request_args, {}
 
 
 class RefreshAccessTokenRequest(Request):
@@ -182,8 +154,10 @@ class RefreshAccessTokenRequest(Request):
     endpoint_name = 'token_endpoint'
     synchronous = True
     request = 'refresh_token'
+    default_authn_method = 'bearer_header'
+    http_method = 'POST'
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -196,17 +170,7 @@ class RefreshAccessTokenRequest(Request):
         except AttributeError:
             pass
 
-        return Request.construct(self, cli_info, request_args=request_args)
-
-    def do_request_init(self, cli_info, method="POST", request_args=None,
-                        http_args=None, authn_method="", **kwargs):
-        _info = self.request_info(cli_info, method=method,
-                                  request_args=request_args,
-                                  token=kwargs['token'],
-                                  authn_method=authn_method)
-
-        _info = self.update_http_args(http_args, _info)
-        return _info
+        return request_args, {}
 
 
 class ProviderInfoDiscovery(Request):
@@ -215,6 +179,7 @@ class ProviderInfoDiscovery(Request):
     error_msg = oauth2.ErrorResponse
     synchronous = True
     request = 'provider_info'
+    http_method = 'GET'
 
     def request_info(self, cli_info, method="GET", request_args=None,
                      lax=False, **kwargs):

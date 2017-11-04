@@ -14,7 +14,7 @@ from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import RefreshAccessTokenRequest
 from oiccli.oic import Client
-from oicmsg.oic import IdToken
+from oicmsg.oic import IdToken, UserInfoRequest
 from oicmsg.time_util import utc_time_sans_frac
 
 sys.path.insert(0, '.')
@@ -63,8 +63,7 @@ class TestClient(object):
         msg = self.client.service['accesstoken'].construct(
             self.client.client_info, request_args=req_args, state='ABCDE')
         assert isinstance(msg, AccessTokenRequest)
-        assert msg.to_dict() == {'client_id': 'client_1',
-                                 'code': 'access_code',
+        assert msg.to_dict() == {'client_id': 'client_1', 'code': 'access_code',
                                  'client_secret': 'abcdefghijklmnop',
                                  'grant_type': 'authorization_code'}
 
@@ -90,5 +89,9 @@ class TestClient(object):
         self.client.client_info.grant_db["ABCDE"].tokens.append(Token(resp))
         _srv = self.client.service['userinfo']
         _srv.endpoint = "https://example.com/userinfo"
-        _info = _srv.request_info(self.client.client_info, state='ABCDE')
+        _info = _srv.do_request_init(self.client.client_info, state='ABCDE')
         assert _info
+        assert _info['body'] is None
+        assert _info['http_args'] == {
+            'headers': {'Authorization': 'Bearer access'}}
+        assert _info['cis'].to_dict() == {}

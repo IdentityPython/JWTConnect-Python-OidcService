@@ -42,17 +42,15 @@ class TestDummyRequest(object):
         assert list(_req.keys()) == ['foo']
 
     def test_construct_cli_info(self):
-        req_args = {'foo': 'bar'}
-        _req = self.req.construct(self.cli_info, request_args=req_args,
-                                  req_str='some string')
+        req_args = {'foo': 'bar', 'req_str': 'some string'}
+        _req = self.req.construct(self.cli_info, request_args=req_args)
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
     def test_request_info(self):
-        req_args = {'foo': 'bar'}
+        req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.req.endpoint = 'https://example.com/authorize'
-        _info = self.req.request_info(self.cli_info, request_args=req_args,
-                                      req_str='some string')
+        _info = self.req.request_info(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
         assert _info['body'] is None
         assert _info['cis'].to_dict() == {'foo': 'bar',
@@ -62,10 +60,9 @@ class TestDummyRequest(object):
         assert msg == _info['cis']
 
     def test_request_init(self):
-        req_args = {'foo': 'bar'}
+        req_args = {'foo': 'bar', 'req_str':'some string'}
         self.req.endpoint = 'https://example.com/authorize'
-        _info = self.req.do_request_init(self.cli_info, request_args=req_args,
-                                         req_str='some string')
+        _info = self.req.do_request_init(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args',
                                      'http_args'}
         assert _info['body'] is None

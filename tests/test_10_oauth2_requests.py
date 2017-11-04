@@ -1,6 +1,7 @@
 import pytest
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
+
 from oiccli.exception import WrongContentType
-from oiccli.grant import GrantDB
 from oiccli.oauth2 import ClientInfo
 from oicmsg.oauth2 import AccessTokenRequest, Message, ASConfigurationResponse
 from oicmsg.oauth2 import AccessTokenResponse
@@ -57,7 +58,7 @@ class TestAuthorizationRequest(object):
         assert msg == _info['cis']
 
     def test_request_init(self):
-        req_args = {'response_type': 'code', 'state':'state'}
+        req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'cis', 'http_args', 'uri', 'algs',
@@ -117,7 +118,8 @@ class TestAuthorizationRequest(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('AccessTokenRequest')
+        self.req = factory('AccessTokenRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
         self.cli_info = ClientInfo(
             None, redirect_uris=['https://example.com/cli/authz_cb'],
             client_id='client_id', client_secret='password')
@@ -137,16 +139,19 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args,
-                                      state='state')
+                                      state='state',
+                                      authn_method='client_secret_basic')
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
-        assert _info['body'] is None
+        assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
-            'client_id': 'client_id', 'client_secret': 'password',
-            'code': 'access_code', 'grant_type': 'authorization_code',
+            'client_id': 'client_id', 'code': 'access_code',
+            'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
-        assert _info['h_args'] == {}
+        assert _info['h_args'] == {
+            'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk',
+                        'Content-Type': 'application/x-www-form-urlencoded'}}
         msg = AccessTokenRequest().from_urlencoded(
-            self.req.get_urlinfo(_info['uri']))
+            self.req.get_urlinfo(_info['body']))
         assert msg == _info['cis']
 
     def test_request_init(self):
@@ -160,11 +165,12 @@ class TestAccessTokenRequest(object):
                                      'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id',
             'code': 'access_code', 'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         assert _info['h_args'] == {
-            'headers': {'Content-Type': 'application/x-www-form-urlencoded'}}
+            'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk',
+                        'Content-Type': 'application/x-www-form-urlencoded'}}
         msg = AccessTokenRequest().from_urlencoded(
             self.req.get_urlinfo(_info['body']))
         assert msg == _info['cis']

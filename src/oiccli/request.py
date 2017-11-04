@@ -24,7 +24,28 @@ RESPONSE2ERROR = {
     "AccessTokenResponse": [TokenErrorResponse]
 }
 
-SPECIAL_ARGS = ['authn_endpoint', 'authn_endpoint', 'algs', 'body_type']
+SPECIAL_ARGS = ['authn_endpoint', 'algs']
+
+"""
+method call structure for Requests:
+
+do_request_init
+    - request_info
+        - construct (*)
+            - _parse_args
+        - init_authentication_method
+        - uri_and_body
+            - _endpoint
+    - update_http_args
+
+request_and_return
+    - parse_request_response
+        - parse_response
+             - get_urlinfo
+             - _post_parse_response (*)
+        - parse_error_mesg
+        
+"""
 
 
 class Request(object):
@@ -35,6 +56,7 @@ class Request(object):
     synchronous = True
     request = ''
     default_authn_method = ''
+    http_method = 'GET'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         self.httplib = httplib
@@ -70,6 +92,9 @@ class Request(object):
 
         return ar_args
 
+    def pre_construct(self, cli_info, request_args, **kwargs):
+        return request_args, {}
+
     def construct(self, cli_info, request_args=None, **kwargs):
         """
         Instantiate the message class instance
@@ -82,14 +107,25 @@ class Request(object):
         if request_args is None:
             request_args = {}
 
+        request_args, post_args = self.pre_construct(cli_info, request_args,
+                                                     **kwargs)
+
+        if 'state' not in self.msg_type.c_param:
+            try:
+                del kwargs['state']
+            except KeyError:
+                pass
+
         # logger.debug("request_args: %s" % sanitize(request_args))
         _args = self._parse_args(cli_info, **request_args)
 
-        if kwargs:
-            _args.update(kwargs)
-
         # logger.debug("kwargs: %s" % sanitize(kwargs))
-        return self.msg_type(**_args)
+        request = self.msg_type(**_args)
+
+        return self.post_construct(cli_info, request, **post_args)
+
+    def post_construct(self, cli_info, request, **kwargs):
+        return request
 
     def _endpoint(self, **kwargs):
         try:
@@ -153,13 +189,16 @@ class Request(object):
             request_args = {}
 
         if authn_method:
-            return self.client_authn_method[authn_method](self).construct(
+            return self.client_authn_method[authn_method]().construct(
                 cis, cli_info, request_args, http_args, **kwargs)
         else:
             return http_args
 
-    def request_info(self, cli_info, method="GET", request_args=None,
-                     lax=False, **kwargs):
+    def request_info(self, cli_info, method="", request_args=None,
+                     body_type='', authn_method='', lax=False, **kwargs):
+
+        if not method:
+            method = self.http_method
 
         if request_args is None:
             request_args = {}
@@ -178,14 +217,10 @@ class Request(object):
         cis.lax = lax
         h_arg = None
 
-        try:
-            _auth_met = kwargs["authn_method"]
-        except KeyError:
-            pass
-        else:
-            if _auth_met:
-                h_arg = self.init_authentication_method(
-                    cis, cli_info, request_args=request_args, **kwargs)
+        if authn_method:
+            h_arg = self.init_authentication_method(
+                cis, cli_info, authn_method, request_args=request_args,
+                **kwargs)
 
         if h_arg:
             if "headers" in kwargs.keys():
@@ -204,8 +239,9 @@ class Request(object):
         info['http_args'] = http_args
         return info
 
-    def do_request_init(self, cli_info, body_type="", method="GET",
-                        request_args=None, http_args=None, **kwargs):
+    def do_request_init(self, cli_info, body_type="", method="",
+                        authn_method='', request_args=None, http_args=None,
+                        **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -218,16 +254,12 @@ class Request(object):
         :return: Dictionary with the necessary information for the HTTP
             request
         """
-        try:
-            authn_method = kwargs['authn_method']
-        except KeyError:
+        if not method:
+            method = self.http_method
+        if not authn_method:
             authn_method = self.default_authn_method
-        else:
-            if not authn_method:
-                authn_method = self.default_authn_method
-            del kwargs['authn_method']
 
-        _info = self.request_info(cli_info, method=method,
+        _info = self.request_info(cli_info, method=method, body_type=body_type,
                                   request_args=request_args,
                                   authn_method=authn_method, **kwargs)
 
@@ -331,7 +363,7 @@ class Request(object):
 
         return resp
 
-    def _parse_error_mesg(self, reqresp, body_type):
+    def parse_error_mesg(self, reqresp, body_type):
         if body_type == 'txt':
             _body_type = 'urlencoded'
         else:
@@ -379,7 +411,7 @@ class Request(object):
         elif 400 <= reqresp.status_code < 500:
             # expecting an error response
             try:
-                err_resp = self._parse_error_mesg(reqresp, value_type)
+                err_resp = self.parse_error_mesg(reqresp, value_type)
             except OicCliError:
                 return reqresp.text
             else:

@@ -7,10 +7,19 @@ from oiccli.exception import Unsupported
 from oiccli.grant import GrantDB
 from oicmsg.key_jar import KeyJar
 
-PARAMMAP = {
-    "sign": "%s_signed_response_alg",
-    "alg": "%s_encrypted_response_alg",
-    "enc": "%s_encrypted_response_enc",
+ATTRMAP = {
+    "userinfo": {
+        "sign": "userinfo_signed_response_alg",
+        "alg": "userinfo_encrypted_response_alg",
+        "enc": "userinfo_encrypted_response_enc"},
+    "id_token": {
+        "sign": "id_token_signed_response_alg",
+        "alg": "id_token_encrypted_response_alg",
+        "enc": "id_token_encrypted_response_enc"},
+    "request": {
+        "sign": "request_object_signing_alg",
+        "alg": "request_object_encryption_alg",
+        "enc": "request_object_encryption_enc"}
 }
 
 
@@ -18,6 +27,7 @@ class ClientInfo(object):
     def __init__(self, keyjar=None, config=None, events=None, **kwargs):
         self.keyjar = keyjar or KeyJar()
         self.grant_db = GrantDB()
+        self.events = events
         self.state2nonce = {}
         self.provider_info = {}
         self.registration_response = {}
@@ -28,13 +38,17 @@ class ClientInfo(object):
         self.config = config or {}
 
         self.base_url = ''
-        self.requestsdir = ''
+        self.requests_dir = ''
         for attr in ['client_id', 'issuer', 'client_secret', 'base_url',
                      'requests_dir']:
             try:
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, '')
+
+        if self.requests_dir:
+            if not os.path.isdir(self.requests_dir):
+                os.makedirs(self.requests_dir)
 
         try:
             self.redirect_uris = config['redirect_uris']
@@ -70,55 +84,29 @@ class ClientInfo(object):
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
-    def filename_from_webname(self, webname, ):
-        if not os.path.isdir(self.requestsdir):
-            os.makedirs(self.requestsdir)
-
+    def filename_from_webname(self, webname):
         assert webname.startswith(self.base_url)
-        return webname[len(self.base_url):]
+        return webname[len(self.base_url) + 1:]
 
     def sign_enc_algs(self, typ):
-        resp = {}
-        for key, val in PARAMMAP.items():
-            try:
-                resp[key] = self.registration_response[val % typ]
-            except (TypeError, KeyError):
-                if key == "sign":
-                    resp[key] = DEF_SIGN_ALG["id_token"]
-        return resp
-
-    def add_code_challenge(self):
         """
-        PKCE RFC 7636 support
 
+        :param typ: 'id_token', 'userinfo' or 'request_object'
         :return:
         """
-        try:
-            cv_len = self.config['code_challenge']['length']
-        except KeyError:
-            cv_len = 64  # Use default
+        resp = {}
+        for key, val in ATTRMAP[typ].items():
+            try:
+                resp[key] = self.registration_response[val]
+            except (TypeError, KeyError):
+                if key == "sign":
+                    try:
+                        resp[key] = DEF_SIGN_ALG[typ]
+                    except KeyError:
+                        pass
+        return resp
 
-        code_verifier = unreserved(cv_len)
-        _cv = code_verifier.encode()
-
-        try:
-            _method = self.config['code_challenge']['method']
-        except KeyError:
-            _method = 'S256'
-
-        try:
-            _h = CC_METHOD[_method](_cv).hexdigest()
-            code_challenge = b64e(_h.encode()).decode()
-        except KeyError:
-            raise Unsupported(
-                'PKCE Transformation method:{}'.format(_method))
-
-        # TODO store code_verifier
-
-        return {"code_challenge": code_challenge,
-                "code_challenge_method": _method}, code_verifier
-
-    def verify_alg_support(self, alg, usage, other):
+    def verify_alg_support(self, alg, usage, typ):
         """
         Verifies that the algorithm to be used are supported by the other side.
 
@@ -129,22 +117,49 @@ class ClientInfo(object):
             - id_token
             - request_object
             - token_endpoint_auth
-        :param other: The identifier for the other side
+        :param typ:
+            - signing_alg
+            - encryption_alg
+            - encryption_enc
         :return: True or False
         """
 
-        try:
-            supported = self.provider_info["%s_algs_supported" % usage]
-        except KeyError:
-            try:
-                supported = getattr(self, "%s_algs_supported" % usage)
-            except AttributeError:
-                supported = None
+        supported = self.provider_info[
+            "{}_{}_values_supported".format(usage, typ)]
 
-        if supported is None:
+        if alg in supported:
             return True
         else:
-            if alg in supported:
-                return True
-            else:
-                return False
+            return False
+
+
+def add_code_challenge(client_info):
+    """
+    PKCE RFC 7636 support
+
+    :return:
+    """
+    try:
+        cv_len = client_info.config['code_challenge']['length']
+    except KeyError:
+        cv_len = 64  # Use default
+
+    code_verifier = unreserved(cv_len)
+    _cv = code_verifier.encode()
+
+    try:
+        _method = client_info.config['code_challenge']['method']
+    except KeyError:
+        _method = 'S256'
+
+    try:
+        _h = CC_METHOD[_method](_cv).hexdigest()
+        code_challenge = b64e(_h.encode()).decode()
+    except KeyError:
+        raise Unsupported(
+            'PKCE Transformation method:{}'.format(_method))
+
+    # TODO store code_verifier
+
+    return {"code_challenge": code_challenge,
+            "code_challenge_method": _method}, code_verifier

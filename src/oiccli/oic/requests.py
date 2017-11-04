@@ -11,7 +11,6 @@ except ImportError:  # Only works for >= 3.5
 else:
     _decode_err = JSONDecodeError
 
-from oiccli import oauth2
 from oiccli import rndstr
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
@@ -70,10 +69,11 @@ class AuthorizationRequest(requests.AuthorizationRequest):
     error_msg = oic.AuthorizationErrorResponse
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        super().__init__(httplib, keyjar, client_authn_method)
+        requests.AuthorizationRequest.__init__(self, httplib, keyjar,
+                                               client_authn_method)
         self.default_request_args = {'scope': ['openid']}
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is not None:
             if "nonce" not in request_args:
                 _rt = request_args["response_type"]
@@ -85,17 +85,32 @@ class AuthorizationRequest(requests.AuthorizationRequest):
         else:  # Never wrong to specify a nonce
             request_args = {"nonce": rndstr(32)}
 
+        post_args = {}
+        for attr in ["request_object_signing_alg", "algorithm", 'sig_kid']:
+            try:
+                post_args[attr] = kwargs[attr]
+            except KeyError:
+                pass
+            else:
+                del kwargs[attr]
+
         if "request_method" in kwargs:
             if kwargs["request_method"] == "file":
-                request_param = "request_uri"
+                post_args['request_param'] = "request_uri"
             else:
-                request_param = "request"
+                post_args['request_param'] = "request"
             del kwargs["request_method"]
 
-        areq = oauth2.requests.AuthorizationRequest.construct(
-            self, cli_info, request_args=request_args, **kwargs)
+        return request_args, post_args
 
-        if 'request_param' in kwargs:
+    def post_construct(self, cli_info, req, **kwargs):
+        try:
+            _request_param = kwargs['request_param']
+        except KeyError:
+            return req
+        else:
+            del kwargs['request_param']
+
             alg = None
             for arg in ["request_object_signing_alg", "algorithm"]:
                 try:  # Trumps everything
@@ -109,7 +124,7 @@ class AuthorizationRequest(requests.AuthorizationRequest):
                 try:
                     alg = cli_info.behaviour["request_object_signing_alg"]
                 except KeyError:
-                    alg = "none"
+                    alg = "RS256"
 
             kwargs["request_object_signing_alg"] = alg
 
@@ -122,13 +137,13 @@ class AuthorizationRequest(requests.AuthorizationRequest):
 
                 kwargs["keys"] = cli_info.keyjar.get_signing_key(_kty, kid=_kid)
 
-            _req = make_openid_request(areq, **kwargs)
+            _req = make_openid_request(req, **kwargs)
 
             # Should the request be encrypted
-            _req = request_object_encryption(_req, **kwargs)
+            _req = request_object_encryption(_req, cli_info, **kwargs)
 
-            if kwargs['request_param'] == "request":
-                areq["request"] = _req
+            if _request_param == "request":
+                req["request"] = _req
             else:
                 try:
                     _webname = cli_info.registration_response['request_uris'][0]
@@ -138,24 +153,24 @@ class AuthorizationRequest(requests.AuthorizationRequest):
                 fid = open(filename, mode="w")
                 fid.write(_req)
                 fid.close()
-                areq["request_uri"] = _webname
+                req["request_uri"] = _webname
 
-        return areq
+        return req
 
-    def do_request_init(self, cli_info, scope="", body_type="json",
-                        method="GET", request_args=None, http_args=None,
-                        authn_method="", **kwargs):
-
-        kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-
-        if 'code_challenge' in cli_info.config:
-            _args, code_verifier = cli_info.add_code_challenge()
-            request_args.update(_args)
-
-        return requests.AuthorizationRequest.do_request_init(
-            self, cli_info, scope=scope, body_type=body_type, method=method,
-            request_args=request_args, http_args=http_args,
-            authn_method=authn_method, **kwargs)
+    # def do_request_init(self, cli_info, scope="", body_type="json",
+    #                     method="GET", request_args=None, http_args=None,
+    #                     authn_method="", **kwargs):
+    #
+    #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
+    #
+    #     if 'code_challenge' in cli_info.config:
+    #         _args, code_verifier = cli_info.add_code_challenge()
+    #         request_args.update(_args)
+    #
+    #     return requests.AuthorizationRequest.do_request_init(
+    #         self, cli_info, scope=scope, body_type=body_type, method=method,
+    #         request_args=request_args, http_args=http_args,
+    #         authn_method=authn_method, **kwargs)
 
 
 class AccessTokenRequest(requests.AccessTokenRequest):
@@ -163,22 +178,14 @@ class AccessTokenRequest(requests.AccessTokenRequest):
     response_cls = oic.AccessTokenResponse
     error_msg = oic.TokenErrorResponse
 
-    def do_request_init(self, cli_info, scope="", body_type="json",
-                        method="POST", request_args=None, http_args=None,
-                        authn_method="", **kwargs):
+    # def pre_construct(self, cli_info, request_args=None, **kwargs):
+    #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
+    #
+    #     if 'code_challenge' in cli_info.config:
+    #         _args, code_verifier = cli_info.add_code_challenge()
+    #         request_args.update(_args)
 
-        kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-
-        if 'code_challenge' in cli_info.config:
-            _args, code_verifier = cli_info.add_code_challenge()
-            request_args.update(_args)
-
-        return requests.AccessTokenRequest.do_request_init(
-            self, cli_info, scope=scope, body_type=body_type, method=method,
-            request_args=request_args, http_args=http_args,
-            authn_method=authn_method, **kwargs)
-
-    def _post_parse_response(self, resp, cli_info, state=''):
+    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
         try:
             _idt = resp['id_token']
         except KeyError:
@@ -207,7 +214,8 @@ class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
         requests.ProviderInfoDiscovery._post_parse_response(self, resp,
                                                             cli_info, **kwargs)
 
-    def match_preferences(self, cli_info, pcr=None, issuer=None):
+    @staticmethod
+    def match_preferences(cli_info, pcr=None, issuer=None):
         """
         Match the clients preferences against what the provider can do.
 
@@ -318,7 +326,7 @@ class RegistrationRequest(Request):
 
         try:
             if cli_info.provider_info[
-                'require_request_uri_registration'] is True:
+                    'require_request_uri_registration'] is True:
                 req['request_uris'] = cli_info.generate_request_uris(
                     cli_info.requests_dir)
         except KeyError:
@@ -364,9 +372,12 @@ class UserInfoRequest(Request):
         if "access_token" in request_args:
             pass
         else:
-            if "scope" not in kwargs:
-                kwargs["scope"] = "openid"
-            token = cli_info.grant_db.get_token(**kwargs)
+            try:
+                _scope = kwargs["scope"]
+            except KeyError:
+                _scope = "openid"
+            token = cli_info.grant_db.get_token(scope=_scope, **kwargs)
+
             if token is None:
                 raise MissingParameter("No valid token available")
 
