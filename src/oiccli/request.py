@@ -24,7 +24,7 @@ RESPONSE2ERROR = {
     "AccessTokenResponse": [TokenErrorResponse]
 }
 
-SPECIAL_ARGS = ['authn_endpoint', 'authn_endpoint']
+SPECIAL_ARGS = ['authn_endpoint', 'authn_endpoint', 'algs', 'body_type']
 
 
 class Request(object):
@@ -34,6 +34,7 @@ class Request(object):
     endpoint_name = ''
     synchronous = True
     request = ''
+    default_authn_method = ''
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         self.httplib = httplib
@@ -132,13 +133,14 @@ class Request(object):
 
         return {'uri': uri, 'body': body, 'h_args': h_args, 'cis': cis}
 
-    def init_authentication_method(self, cis, authn_method, request_args=None,
-                                   http_args=None, **kwargs):
+    def init_authentication_method(self, cis, cli_info, authn_method,
+                                   request_args=None, http_args=None, **kwargs):
         """
         Place the necessary information in the necessary places depending on
         client authentication method.
 
         :param cis: Message class instance
+        :param cli_info: Client information
         :param authn_method: Client authentication method
         :param request_args: Message argument
         :param http_args: HTTP header arguments
@@ -152,7 +154,7 @@ class Request(object):
 
         if authn_method:
             return self.client_authn_method[authn_method](self).construct(
-                cis, request_args, http_args, **kwargs)
+                cis, cli_info, request_args, http_args, **kwargs)
         else:
             return http_args
 
@@ -174,13 +176,16 @@ class Request(object):
         #     self.state2nonce[cis['state']] = cis['nonce']
 
         cis.lax = lax
+        h_arg = None
 
-        if "authn_method" in kwargs:
-            h_arg = self.init_authentication_method(cis,
-                                                    request_args=request_args,
-                                                    **kwargs)
+        try:
+            _auth_met = kwargs["authn_method"]
+        except KeyError:
+            pass
         else:
-            h_arg = None
+            if _auth_met:
+                h_arg = self.init_authentication_method(
+                    cis, cli_info, request_args=request_args, **kwargs)
 
         if h_arg:
             if "headers" in kwargs.keys():
@@ -215,8 +220,12 @@ class Request(object):
         """
         try:
             authn_method = kwargs['authn_method']
-        except:
-            authn_method = ''
+        except KeyError:
+            authn_method = self.default_authn_method
+        else:
+            if not authn_method:
+                authn_method = self.default_authn_method
+            del kwargs['authn_method']
 
         _info = self.request_info(cli_info, method=method,
                                   request_args=request_args,
@@ -238,7 +247,7 @@ class Request(object):
                 info = fragment
         return info
 
-    def _post_parse_response(self, resp, client_info, state=''):
+    def _post_parse_response(self, resp, client_info, state='', **kwargs):
         pass
 
     def parse_response(self, info, client_info, sformat="json", state="",
@@ -292,13 +301,6 @@ class Request(object):
         #     resp = None
         else:
             kwargs["client_id"] = client_info.client_id
-            try:
-                kwargs['iss'] = client_info.provider_info['issuer']
-            except (KeyError, AttributeError):
-                try:
-                    kwargs['iss'] = client_info.issuer
-                except KeyError:
-                    pass
 
             if "key" not in kwargs and "keyjar" not in kwargs:
                 kwargs["keyjar"] = self.keyjar
@@ -386,3 +388,31 @@ class Request(object):
             logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
             raise HttpError("HTTP ERROR: %s [%s] on %s" % (
                 reqresp.text, reqresp.status_code, reqresp.url))
+
+    def request_and_return(self, url, method="GET", body=None,
+                           body_type="json", http_args=None,
+                           client_info=None, **kwargs):
+        """
+        :param url: The URL to which the request should be sent
+        :param response: Response type
+        :param method: Which HTTP method to use
+        :param body: A message body if any
+        :param body_type: The format of the body of the return message
+        :param http_args: Arguments for the HTTP client
+        :return: A cls or ErrorResponse instance or the HTTP response
+            instance if no response body was expected.
+        """
+
+        if http_args is None:
+            http_args = {}
+
+        try:
+            resp = self.httplib(url, method, data=body, **http_args)
+        except Exception:
+            raise
+
+        if "keyjar" not in kwargs:
+            kwargs["keyjar"] = self.keyjar
+
+        return self.parse_request_response(resp, client_info, body_type,
+                                           **kwargs)

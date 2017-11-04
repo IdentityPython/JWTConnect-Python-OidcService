@@ -40,12 +40,12 @@ class TestAuthorizationRequest(object):
             client_id='client_id', client_secret='password')
 
     def test_construct(self):
-        req_args = {'foo': 'bar'}
+        req_args = {'foo': 'bar', 'response_type': 'code'}
         _req = self.req.construct(self.cli_info, request_args=req_args,
                                   state='state')
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
-                                    'redirect_uri', 'state', 'scope'}
+                                    'state', 'scope', 'response_type'}
 
     def test_request_info(self):
         req_args = {'response_type': 'code'}

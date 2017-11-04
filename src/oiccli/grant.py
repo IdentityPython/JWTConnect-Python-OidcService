@@ -197,3 +197,31 @@ class GrantDB(object):
             return token
         else:
             raise TokenError("Token has expired")
+
+    def get_id_token(self, **kwargs):
+        try:
+            return kwargs["id_token"]
+        except KeyError:
+            grant = self[kwargs['state']]
+
+        if grant:
+            try:
+                _scope = kwargs["scope"]
+            except KeyError:
+                _scope = None
+
+            for token in grant.tokens:
+                if token.scope and _scope:
+                    flag = True
+                    for item in _scope:
+                        try:
+                            assert item in token.scope
+                        except AssertionError:
+                            flag = False
+                            break
+                    if not flag:
+                        break
+                if token.id_token:
+                    return token.id_token
+
+        return None

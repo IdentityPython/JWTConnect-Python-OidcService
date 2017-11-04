@@ -1,13 +1,12 @@
 import logging
+import os
 
 from jwkest import b64e
 
-from oiccli import CC_METHOD
-from oiccli import unreserved
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oiccli.client_info import ClientInfo
 from oiccli.exception import OicCliError
 from oiccli.exception import Unsupported
-from oiccli.grant import GrantDB
 from oiccli.http import HTTPLib
 from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
@@ -99,58 +98,6 @@ def compact(qsdict):
 
 # =============================================================================
 
-class ClientInfo(object):
-    def __init__(self, keyjar=None, config=None, events=None, **kwargs):
-        self.keyjar = keyjar or KeyJar()
-        self.grant_db = GrantDB()
-        self.state2nonce = {}
-        self.provider_info = {}
-        self.kid = {"sig": {}, "enc": {}}
-
-        # the OAuth issuer is the URL of the authorization server's
-        # configuration information location
-        self.config = config or {}
-
-        for attr in ['client_id', 'issuer', 'client_secret']:
-            try:
-                setattr(self, attr, config[attr])
-            except:
-                setattr(self, attr, '')
-
-        try:
-            self.redirect_uris = config['redirect_uris']
-        except:
-            self.redirect_uris = [None]
-
-        self.allow = {}
-        self.provider_info = {}
-        self.events = events
-        self.behaviour = {}
-        self.client_prefs = {}
-
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-
-    def get_client_secret(self):
-        return self._c_secret
-
-    def set_client_secret(self, val):
-        if not val:
-            self._c_secret = ""
-        else:
-            self._c_secret = val
-            # client uses it for signing
-            # Server might also use it for signing which means the
-            # client uses it for verifying server signatures
-            if self.keyjar is None:
-                self.keyjar = KeyJar()
-            self.keyjar.add_symmetric("", str(val))
-
-    client_secret = property(get_client_secret, set_client_secret)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-
 
 def build_services(srvs, service_factory, http, keyjar, client_authn_method):
     service = {}
@@ -227,34 +174,3 @@ class Client(object):
             _info['url'], method, _info['body'], body_type,
             http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)
-
-    def add_code_challenge(self):
-        """
-        PKCE RFC 7636 support
-
-        :return:
-        """
-        try:
-            cv_len = self.client_info.config['code_challenge']['length']
-        except KeyError:
-            cv_len = 64  # Use default
-
-        code_verifier = unreserved(cv_len)
-        _cv = code_verifier.encode()
-
-        try:
-            _method = self.client_info.config['code_challenge']['method']
-        except KeyError:
-            _method = 'S256'
-
-        try:
-            _h = CC_METHOD[_method](_cv).hexdigest()
-            code_challenge = b64e(_h.encode()).decode()
-        except KeyError:
-            raise Unsupported(
-                'PKCE Transformation method:{}'.format(_method))
-
-        # TODO store code_verifier
-
-        return {"code_challenge": code_challenge,
-                "code_challenge_method": _method}, code_verifier

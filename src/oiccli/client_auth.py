@@ -155,20 +155,18 @@ class ClientSecretPost(ClientSecretBasic):
 
 
 class BearerHeader(ClientAuthnMethod):
-    def construct(self, cis=None, request_args=None, http_args=None,
+    def construct(self, cis=None, cinfo=None, request_args=None, http_args=None,
                   **kwargs):
         """
         More complicated logic then I would have liked it to be
 
-        :param cli: Client instance
         :param cis: Request class instance
+        :param ci: Client information
         :param request_args: request arguments
         :param http_args: HTTP header arguments
         :param kwargs:
         :return:
         """
-
-        _cinfo = self.cli.client_info
 
         if cis is not None:
             if "access_token" in cis:
@@ -184,7 +182,7 @@ class BearerHeader(ClientAuthnMethod):
                     try:
                         _acc_token = kwargs["access_token"]
                     except KeyError:
-                        _acc_token = _cinfo.grant_db.get_token(
+                        _acc_token = cinfo.grant_db.get_token(
                             **kwargs).access_token
         else:
             try:
