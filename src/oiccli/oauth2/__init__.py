@@ -1,12 +1,8 @@
 import logging
-import os
-
-from jwkest import b64e
 
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.client_info import ClientInfo
 from oiccli.exception import OicCliError
-from oiccli.exception import Unsupported
 from oiccli.http import HTTPLib
 from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
