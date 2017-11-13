@@ -1,6 +1,6 @@
 import pytest
 from oiccli.state import State, ExpiredToken
-from oicmsg.oauth2 import AuthorizationRequest
+from oicmsg.oauth2 import AuthorizationRequest, AccessTokenRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.time_util import utc_time_sans_frac
@@ -10,7 +10,7 @@ ATR = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                           refresh_token="tGzv3JOkF0XG5Qx2TlKWIA",
                           example_parameter="example_value",
                           scope=["inner", "outer"])
-req_args = {'redirect_uri': 'https://example.com/rp/cb',
+REQ_ARGS = {'redirect_uri': 'https://example.com/rp/cb',
             'response_type': "code"}
 
 
@@ -20,29 +20,28 @@ class TestState(object):
         self.state_db = State('client_id', db_name='state')
 
     def test_create_state(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
         assert state
-        for key, val in req_args.items():
+        for key, val in REQ_ARGS.items():
             assert self.state_db[state][key] == val
 
     def test_read_state(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
 
         _info = self.state_db[state]
-        assert _info['iss'] == 'client_id'
+        assert _info['client_id'] == 'client_id'
         assert _info['as'] == 'https://example.org/op'
         assert _info['redirect_uri'] == 'https://example.com/rp/cb'
         assert _info['response_type'] == 'code'
         assert 'iat' in _info
-        assert 'exp' in _info
 
     def test_add_mesg_code(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -54,7 +53,7 @@ class TestState(object):
         assert self.state_db[state]['code'] == 'access grant'
 
     def test_add_mesg_code_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -70,7 +69,7 @@ class TestState(object):
                                                  'token_type': 'Bearer'}
 
     def test_add_mesg_code_id_token_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -87,7 +86,7 @@ class TestState(object):
         assert self.state_db[state]['id_token'] == 'Dummy.JWT.foo'
 
     def test_add_mesg_id_token_token_authz(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -103,7 +102,7 @@ class TestState(object):
         assert self.state_db[state]['id_token'] == 'Dummy.JWT.foo'
 
     def test_add_mesg_id_token_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -127,7 +126,7 @@ class TestState(object):
         assert _now <= self.state_db[state]['token']['exp']
 
     def test_get_valid_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -141,10 +140,10 @@ class TestState(object):
                                     expires_in=600)
         self.state_db.add_message_info(aresp, state=state)
 
-        self.state_db.get_access_token(state)
+        ti = self.state_db.get_token_info(state)
 
     def test_get_expired_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -161,10 +160,10 @@ class TestState(object):
         _now = utc_time_sans_frac() + 900
 
         with pytest.raises(ExpiredToken):
-            self.state_db.get_access_token(state, _now)
+            self.state_db.get_token_info(state, _now)
 
     def test_update_token(self):
-        request = AuthorizationRequest(**req_args)
+        request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
@@ -185,11 +184,24 @@ class TestState(object):
 
         self.state_db.add_message_info(aresp1, state=state)
 
-        _tinfo = self.state_db.get_access_token(state)
+        _tinfo = self.state_db.get_token_info(state)
 
         assert _tinfo['access_token'] == '2nd access token'
 
         _now = utc_time_sans_frac() + 200
 
         with pytest.raises(ExpiredToken):
-            self.state_db.get_access_token(state, _now)
+            self.state_db.get_token_info(state, _now)
+
+    def test_get_access_token_request_args(self):
+        request = AuthorizationRequest(**REQ_ARGS)
+
+        state = self.state_db.create_state(receiver='https://example.org/op',
+                                           request=request)
+        aresp = AuthorizationResponse(state=state, code="access grant")
+
+        self.state_db.add_message_info(aresp)
+
+        req_args = self.state_db.get_request_args(state, AccessTokenRequest)
+
+        assert set(req_args.keys()) == {'code', 'client_id', 'redirect_uri'}

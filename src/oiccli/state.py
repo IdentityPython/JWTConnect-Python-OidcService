@@ -45,8 +45,8 @@ class State(object):
     and to whom it was sent.
     """
 
-    def __init__(self, issuer, db=None, db_name='', lifetime=600):
-        self.issuer = issuer
+    def __init__(self, client_id, db=None, db_name='', lifetime=600):
+        self.client_id = client_id
         self._db = db
         # self._db_name = db_name
         if self._db is None and db_name:
@@ -56,9 +56,7 @@ class State(object):
     def create_state(self, receiver, request):
         _state = rndstr(24)
         _now = utc_time_sans_frac()
-        _info = {'iss': self.issuer, 'as': receiver, 'iat': _now}
-        if self.lifetime:
-            _info['exp'] = _now + self.lifetime
+        _info = {'client_id': self.client_id, 'as': receiver, 'iat': _now}
         if isinstance(request, Message):
             _info.update(request.to_dict())
         else:
@@ -134,16 +132,10 @@ class State(object):
     def nonce_to_state(self, nonce):
         return self._db['nonce_{}'.format(nonce)]
 
-    def get_access_token(self, state, now=0, **kwargs):
-        """
-        If available, will return a dictionary with access token and token type
-        
-        :param state:  
-        :return: 
-        """
-        res = self[state]['token']
+    def get_token_info(self, state, now=0):
+        _tinfo = self[state]['token']
         try:
-            _exp = res['exp']
+            _exp = _tinfo['exp']
         except KeyError:
             pass
         else:
@@ -151,21 +143,37 @@ class State(object):
                 now = utc_time_sans_frac()
             if now > _exp:
                 raise ExpiredToken('Passed best before')
+        return _tinfo
 
-        return {'access_token': res['access_token'],
-                'token_type': res['token_type']}
+    def get_request_args(self, state, request, now=0):
+        """
+
+        :param state:
+        :param request:
+        :param now:
+        :return:
+        """
+        _sinfo = self[state]
+
+        req_args = {}
+        for claim in request.c_param:
+            if claim == 'access_token':
+                try:
+                    tinfo = self.get_token_info(state, now=now)
+                except KeyError:
+                    continue
+                else:
+                    req_args[claim] = tinfo['access_token']
+            else:
+                try:
+                    req_args[claim] = _sinfo[claim]
+                except KeyError:
+                    pass
+
+        return req_args
 
     def get_id_token(self, state):
         return self[state]['id_token']
-
-    def get_refresh_token(self, **kwargs):
-        try:
-            _state = kwargs['state']
-        except KeyError:
-            raise ParameterError('Missing state')
-
-        return {'refresh_token': self[_state]['refresh_token'],
-                'token_type': self[_state]['token']['token_type']}
 
 
 # class StateLess(State):
