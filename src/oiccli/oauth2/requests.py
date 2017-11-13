@@ -1,16 +1,12 @@
 import inspect
 import logging
-
 import sys
-
-from oicmsg.time_util import utc_time_sans_frac
 
 from oiccli import OIDCONF_PATTERN
 from oiccli.exception import OicCliError
 from oiccli.request import Request
 
 from oicmsg import oauth2
-from oicmsg.exception import GrantExpired
 from oicmsg.exception import MissingParameter
 from oicmsg.key_jar import KeyJar
 
@@ -20,21 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def _post_x_parse_response(self, resp, cli_info, state=''):
-    try:
-        _state = resp["state"]
-    except (AttributeError, KeyError):
-        _state = ""
-
-    if not _state:
-        _state = state
-
-    _grant_db = cli_info.grant_db
-    try:
-        _grant_db[_state].update(resp)
-    except KeyError:
-        _grant_db[_state] = _grant_db.grant_class(resp=resp)
-    except Exception as err:
-        raise
+    #_state_db = cli_info.state_db
+    cli_info.state_db.add_message_info(resp, state)
 
 
 def set_state(request_args, kwargs):
@@ -130,16 +113,11 @@ class AccessTokenRequest(Request):
 
         request_args = set_state(request_args, kwargs)
 
-        grant = cli_info.grant_db[request_args['state']]
+        state = cli_info.state_db[request_args['state']]
 
         del request_args['state']
 
-        if not grant.is_valid():
-            raise GrantExpired("Authorization Code to old %s > %s" % (
-                utc_time_sans_frac(),
-                grant.grant_expiration_time))
-
-        request_args["code"] = grant.code
+        request_args["code"] = state['code']
 
         if "grant_type" not in request_args:
             request_args["grant_type"] = "authorization_code"
@@ -161,12 +139,13 @@ class RefreshAccessTokenRequest(Request):
         if request_args is None:
             request_args = {}
 
-        token = cli_info.grant_db.get_token(also_expired=True, **kwargs)
+        token_info = cli_info.state_db.get_access_token(**kwargs)
+        refresh_token_info = cli_info.state_db.get_refresh_token(**kwargs)
 
-        request_args["refresh_token"] = token.refresh_token
-
+        request_args["refresh_token"] = refresh_token_info['refresh_token']
+        request_args['token_type'] = token_info['token_type']
         try:
-            request_args["scope"] = token.scope
+            request_args["scope"] = token_info['scope']
         except AttributeError:
             pass
 

@@ -2,9 +2,10 @@ import os
 
 from jwkest import b64e
 from oiccli import CC_METHOD
-from oiccli import DEF_SIGN_ALG, unreserved
+from oiccli import DEF_SIGN_ALG
+from oiccli import unreserved
 from oiccli.exception import Unsupported
-from oiccli.grant import GrantDB
+from oiccli.state import State
 from oicmsg.key_jar import KeyJar
 
 ATTRMAP = {
@@ -24,11 +25,11 @@ ATTRMAP = {
 
 
 class ClientInfo(object):
-    def __init__(self, keyjar=None, config=None, events=None, **kwargs):
+    def __init__(self, client_id='', keyjar=None, config=None, events=None,
+                 db=None, db_name='', **kwargs):
         self.keyjar = keyjar or KeyJar()
-        self.grant_db = GrantDB()
+        self.state_db = State(client_id, db=db, db_name=db_name)
         self.events = events
-        self.state2nonce = {}
         self.provider_info = {}
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
@@ -45,6 +46,9 @@ class ClientInfo(object):
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, '')
+            else:
+                if attr == 'client_id':
+                    self.state_db.issuer = client_id
 
         if self.requests_dir:
             if not os.path.isdir(self.requests_dir):
