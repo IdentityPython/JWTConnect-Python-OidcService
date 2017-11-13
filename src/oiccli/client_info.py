@@ -56,7 +56,6 @@ class ClientInfo(object):
             self.redirect_uris = [None]
 
         self.allow = {}
-        self.provider_info = {}
         self.events = events
         self.behaviour = {}
         self.client_prefs = {}
