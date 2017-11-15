@@ -49,8 +49,11 @@ class State(object):
         self.client_id = client_id
         self._db = db
         # self._db_name = db_name
-        if self._db is None and db_name:
-            self._db = shelve.open(db_name, writeback=True)
+        if self._db is None:
+            if db_name:
+                self._db = shelve.open(db_name, writeback=True)
+            else:
+                self._db = {}
         self.lifetime = lifetime
 
     def create_state(self, receiver, request):
@@ -77,7 +80,7 @@ class State(object):
         else:
             _tinfo['access_token'] = _token
             try:
-                _exp = msg['expires_in']
+                _exp = int(msg['expires_in'])
             except KeyError:
                 try:
                     _tinfo['exp'] = utc_time_sans_frac() + _tinfo['expires_in']
@@ -126,13 +129,16 @@ class State(object):
     def __getitem__(self, state):
         return self._db['state_{}'.format(state)]
 
+    def __setitem__(self, state, value):
+        self._db['state_{}'.format(state)] = value
+
     def bind_nonce_to_state(self, nonce, state):
         self._db['nonce_{}'.format(nonce)] = state
 
     def nonce_to_state(self, nonce):
         return self._db['nonce_{}'.format(nonce)]
 
-    def get_token_info(self, state, now=0):
+    def get_token_info(self, state, now=0, **kwargs):
         _tinfo = self[state]['token']
         try:
             _exp = _tinfo['exp']
@@ -145,7 +151,7 @@ class State(object):
                 raise ExpiredToken('Passed best before')
         return _tinfo
 
-    def get_request_args(self, state, request, now=0):
+    def get_request_args(self, state, request, now=0, **kwargs):
         """
 
         :param state:

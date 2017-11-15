@@ -129,7 +129,8 @@ class ClientSecretPost(ClientSecretBasic):
     the request body.
     """
 
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None, **kwargs):
+    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
+                  **kwargs):
 
         if "client_secret" not in cis:
             try:
@@ -147,7 +148,8 @@ class ClientSecretPost(ClientSecretBasic):
 
 
 class BearerHeader(ClientAuthnMethod):
-    def construct(self, cis=None, cli_info=None, request_args=None, http_args=None, **kwargs):
+    def construct(self, cis=None, cli_info=None, request_args=None,
+                  http_args=None, **kwargs):
         """
         More complicated logic then I would have liked it to be
 
@@ -173,8 +175,8 @@ class BearerHeader(ClientAuthnMethod):
                     try:
                         _acc_token = kwargs["access_token"]
                     except KeyError:
-                        _acc_token = cli_info.grant_db.get_token(
-                            **kwargs).access_token
+                        _acc_token = cli_info.state_db.get_token_info(
+                            **kwargs)['access_token']
         else:
             try:
                 _acc_token = kwargs["access_token"]
@@ -197,7 +199,8 @@ class BearerHeader(ClientAuthnMethod):
 
 
 class BearerBody(ClientAuthnMethod):
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None, **kwargs):
+    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
+                  **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -214,8 +217,8 @@ class BearerBody(ClientAuthnMethod):
                         raise AuthnFailure("Missing state specification")
                     kwargs["state"] = cli_info.state
 
-                cis["access_token"] = cli_info.grant_db.get_token(
-                    **kwargs).access_token
+                cis["access_token"] = cli_info.state_db.get_token_info(
+                    **kwargs)['access_token']
 
         return http_args
 
@@ -264,7 +267,8 @@ class JWSAuthnMethod(ClientAuthnMethod):
         else:
             raise NoMatchingKey("No key with kid:%s" % kid)
 
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None, **kwargs):
+    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
+                  **kwargs):
         """
         Constructs a client assertion and signs it with a key.
         The request is modified as a side effect.
@@ -280,37 +284,6 @@ class JWSAuthnMethod(ClientAuthnMethod):
         # audience = self.cli._endpoint(REQUEST2ENDPOINT[cis.type()])
         # OR OP identifier
 
-        algorithm = None
-        if kwargs['authn_endpoint'] in ['token', 'refresh']:
-            try:
-                algorithm = cli_info.registration_info[
-                    'token_endpoint_auth_signing_alg']
-            except (KeyError, AttributeError):
-                pass
-            audience = cli_info.provider_info['token_endpoint']
-        else:
-            audience = cli_info.provider_info['issuer']
-
-        if not algorithm:
-            algorithm = self.choose_algorithm(**kwargs)
-
-        ktype = alg2keytype(algorithm)
-        try:
-            if 'kid' in kwargs:
-                signing_key = [self.get_key_by_kid(kwargs["kid"], algorithm,
-                                                   cli_info)]
-            elif ktype in cli_info.kid["sig"]:
-                try:
-                    signing_key = [self.get_key_by_kid(
-                        cli_info.kid["sig"][ktype], algorithm, cli_info)]
-                except KeyError:
-                    signing_key = self.get_signing_key(algorithm, cli_info)
-            else:
-                signing_key = self.get_signing_key(algorithm, cli_info)
-        except NoMatchingKey as err:
-            logger.error("%s" % sanitize(err))
-            raise
-
         if 'client_assertion' in kwargs:
             cis["client_assertion"] = kwargs['client_assertion']
             if 'client_assertion_type' in kwargs:
@@ -321,6 +294,37 @@ class JWSAuthnMethod(ClientAuthnMethod):
             if 'client_assertion_type' not in cis:
                 cis["client_assertion_type"] = JWT_BEARER
         else:
+            algorithm = None
+            if kwargs['authn_endpoint'] in ['token', 'refresh']:
+                try:
+                    algorithm = cli_info.registration_info[
+                        'token_endpoint_auth_signing_alg']
+                except (KeyError, AttributeError):
+                    pass
+                audience = cli_info.provider_info['token_endpoint']
+            else:
+                audience = cli_info.provider_info['issuer']
+
+            if not algorithm:
+                algorithm = self.choose_algorithm(**kwargs)
+
+            ktype = alg2keytype(algorithm)
+            try:
+                if 'kid' in kwargs:
+                    signing_key = [self.get_key_by_kid(kwargs["kid"], algorithm,
+                                                       cli_info)]
+                elif ktype in cli_info.kid["sig"]:
+                    try:
+                        signing_key = [self.get_key_by_kid(
+                            cli_info.kid["sig"][ktype], algorithm, cli_info)]
+                    except KeyError:
+                        signing_key = self.get_signing_key(algorithm, cli_info)
+                else:
+                    signing_key = self.get_signing_key(algorithm, cli_info)
+            except NoMatchingKey as err:
+                logger.error("%s" % sanitize(err))
+                raise
+
             try:
                 _args = {'lifetime': kwargs['lifetime']}
             except KeyError:
@@ -395,64 +399,66 @@ def valid_client_info(cinfo, when=0):
     return True
 
 
-def get_client_id(cdb, req, authn):
-    """
-    Verify the client and return the client id
-
-    :param req: The request
-    :param authn: Authentication information from the HTTP header
-    :return:
-    """
-
-    logger.debug("REQ: %s" % sanitize(req.to_dict()))
-    if authn:
-        if authn.startswith("Basic "):
-            logger.debug("Basic auth")
-            (_id, _secret) = base64.b64decode(
-                authn[6:].encode("utf-8")).decode("utf-8").split(":")
-
-            _bid = as_bytes(_id)
-            _cinfo = None
-            try:
-                _cinfo = cdb[_id]
-            except KeyError:
-                try:
-                    _cinfo[_bid]
-                except AttributeError:
-                    pass
-
-            if not _cinfo:
-                logger.debug("Unknown client_id")
-                raise FailedAuthentication("Unknown client_id")
-            else:
-                if not valid_client_info(_cinfo):
-                    logger.debug("Invalid Client info")
-                    raise FailedAuthentication("Invalid Client")
-
-                if _secret != _cinfo["client_secret"]:
-                    logger.debug("Incorrect secret")
-                    raise FailedAuthentication("Incorrect secret")
-        else:
-            if authn[:6].lower() == "bearer":
-                logger.debug("Bearer auth")
-                _token = authn[7:]
-            else:
-                raise FailedAuthentication("AuthZ type I don't know")
-
-            try:
-                _id = cdb[_token]
-            except KeyError:
-                logger.debug("Unknown access token")
-                raise FailedAuthentication("Unknown access token")
-    else:
-        try:
-            _id = str(req["client_id"])
-            if _id not in cdb:
-                logger.debug("Unknown client_id")
-                raise FailedAuthentication("Unknown client_id")
-            if not valid_client_info(cdb[_id]):
-                raise FailedAuthentication("Invalid client_id")
-        except KeyError:
-            raise FailedAuthentication("Missing client_id")
-
-    return _id
+# This is server side
+# def get_client_id(cdb, req, authn):
+#     """
+#     Verify the client and return the client id
+#
+#     :param cdb: Client database
+#     :param req: The request
+#     :param authn: Authentication information from the HTTP header
+#     :return:
+#     """
+#
+#     logger.debug("REQ: %s" % sanitize(req.to_dict()))
+#     if authn:
+#         if authn.startswith("Basic "):
+#             logger.debug("Basic auth")
+#             (_id, _secret) = base64.b64decode(
+#                 authn[6:].encode("utf-8")).decode("utf-8").split(":")
+#
+#             _bid = as_bytes(_id)
+#             _cinfo = None
+#             try:
+#                 _cinfo = cdb[_id]
+#             except KeyError:
+#                 try:
+#                     _cinfo[_bid]
+#                 except AttributeError:
+#                     pass
+#
+#             if not _cinfo:
+#                 logger.debug("Unknown client_id")
+#                 raise FailedAuthentication("Unknown client_id")
+#             else:
+#                 if not valid_client_info(_cinfo):
+#                     logger.debug("Invalid Client info")
+#                     raise FailedAuthentication("Invalid Client")
+#
+#                 if _secret != _cinfo["client_secret"]:
+#                     logger.debug("Incorrect secret")
+#                     raise FailedAuthentication("Incorrect secret")
+#         else:
+#             if authn[:6].lower() == "bearer":
+#                 logger.debug("Bearer auth")
+#                 _token = authn[7:]
+#             else:
+#                 raise FailedAuthentication("AuthZ type I don't know")
+#
+#             try:
+#                 _id = cdb[_token]
+#             except KeyError:
+#                 logger.debug("Unknown access token")
+#                 raise FailedAuthentication("Unknown access token")
+#     else:
+#         try:
+#             _id = str(req["client_id"])
+#             if _id not in cdb:
+#                 logger.debug("Unknown client_id")
+#                 raise FailedAuthentication("Unknown client_id")
+#             if not valid_client_info(cdb[_id]):
+#                 raise FailedAuthentication("Invalid client_id")
+#         except KeyError:
+#             raise FailedAuthentication("Missing client_id")
+#
+#     return _id

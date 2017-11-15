@@ -7,16 +7,11 @@ except ImportError:  # Only works for >= 3.5
 else:
     _decode_err = JSONDecodeError
 
-from oiccli import grant
 from oiccli import oauth2
 
 from oiccli.oic import requests
-from oiccli.grant import Token
 from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import WebFinger
-
-from oicmsg.oic import AuthorizationResponse
-from oicmsg.oic import AccessTokenResponse
 
 __author__ = 'Roland Hedberg'
 
@@ -30,43 +25,6 @@ DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
 
 # This should probably be part of the configuration
 MAX_AUTHENTICATION_AGE = 86400
-
-# -----------------------------------------------------------------------------
-# ACR_LISTS = [
-#     ["0", "1", "2", "3", "4"],
-# ]
-#
-#
-# def verify_acr_level(req, level):
-#     if req is None:
-#         return level
-#     elif "values" in req:
-#         for _r in req["values"]:
-#             for alist in ACR_LISTS:
-#                 try:
-#                     if alist.index(_r) <= alist.index(level):
-#                         return level
-#                 except ValueError:
-#                     pass
-#     else:  # Required or Optional
-#         return level
-#
-#     raise AccessDenied("", req)
-
-
-class Grant(grant.Grant):
-    _authz_resp = AuthorizationResponse
-    _acc_resp = AccessTokenResponse
-    _token_class = Token
-
-    def add_token(self, resp):
-        tok = self._token_class(resp)
-        if tok.access_token:
-            self.tokens.append(tok)
-        else:
-            _tmp = getattr(tok, "id_token", None)
-            if _tmp:
-                self.tokens.append(tok)
 
 
 PREFERENCE2PROVIDER = {

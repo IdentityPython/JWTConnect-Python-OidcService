@@ -32,8 +32,9 @@ class TestDummyRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.req = DummyRequest()
-        self.cli_info = ClientInfo(None, client_id='client_id',
+        self.cli_info = ClientInfo(client_id='client_id',
                                    issuer='https://www.example.org/as')
+        self.cli_info.state_db['state'] = {}
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -75,19 +76,22 @@ class TestDummyRequest(object):
 
     def test_parse_request_response_urlencoded(self):
         req_resp = Response(200, Message(foo='bar').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info)
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               state='state')
         assert isinstance(resp, Message)
         assert set(resp.keys()) == {'foo'}
 
     def test_parse_request_response_200_error(self):
         req_resp = Response(200, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info)
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               state='state')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
     def test_parse_request_response_400_error(self):
         req_resp = Response(400, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info)
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               state='state')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
@@ -95,7 +99,8 @@ class TestDummyRequest(object):
         req_resp = Response(200, Message(foo='bar').to_json(),
                             headers={'content-type': 'application/json'})
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               body_type='json',
+                                               state='state')
         assert isinstance(resp, Message)
         assert set(resp.keys()) == {'foo'}
 
@@ -104,7 +109,8 @@ class TestDummyRequest(object):
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   body_type='json',
+                                                   state='state')
 
 
 class TestRequest(object):

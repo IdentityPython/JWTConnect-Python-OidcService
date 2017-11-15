@@ -1,7 +1,13 @@
+import os
+
 import pytest
+from jwkest.jws import JWS
+from oicmsg.jwt import JWT
 from oicmsg.key_jar import build_keyjar
 
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oiccli.exception import ConfigurationError
+from oiccli.exception import ParameterError
 from oiccli.exception import WrongContentType
 from oiccli.oauth2 import build_services
 from oiccli.oauth2 import ClientInfo
@@ -15,7 +21,11 @@ from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
+from oicmsg.oic import CheckIDRequest, OpenIDSchema
+from oicmsg.oic import CheckSessionRequest
+from oicmsg.oic import EndSessionRequest
 from oicmsg.oic import ProviderConfigurationResponse
+from oicmsg.oic import RegistrationRequest
 
 
 class Response(object):
@@ -23,6 +33,7 @@ class Response(object):
         self.status_code = status_code
         self.text = text
         self.headers = headers or {"content-type": "text/plain"}
+
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
@@ -43,20 +54,38 @@ class TestAuthorizationRequest(object):
     def create_request(self):
         self.req = factory('AuthorizationRequest',
                            client_authn_method=CLIENT_AUTHN_METHOD)
-        self.cli_info = ClientInfo(
-            keyjar, redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb']}
+        self.cli_info = ClientInfo(keyjar, config=client_config)
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'response_type': 'code',
                     'state': 'state'}
         _req = self.req.construct(self.cli_info, request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
-        assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
                                     'response_type', 'scope', 'state'}
 
+    def test_construct_token(self):
+        req_args = {'foo': 'bar', 'response_type': 'token',
+                    'state': 'state'}
+        _req = self.req.construct(self.cli_info, request_args=req_args)
+        assert isinstance(_req, AuthorizationRequest)
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
+                                    'response_type', 'scope', 'state',
+                                    'nonce'}
+
+    def test_construct_token_nonce(self):
+        req_args = {'foo': 'bar', 'response_type': 'token', 'nonce': 'nonce',
+                    'state': 'state'}
+        _req = self.req.construct(self.cli_info, request_args=req_args)
+        assert isinstance(_req, AuthorizationRequest)
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
+                                    'response_type', 'scope', 'state', 'nonce'}
+        assert _req['nonce'] == 'nonce'
+
     def test_request_info(self):
-        req_args = {'response_type': 'code', 'state':'state'}
+        req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
@@ -105,6 +134,7 @@ class TestAuthorizationRequest(object):
         assert msg == _info['cis']
 
     def test_parse_request_response_urlencoded(self):
+        self.cli_info.state_db['state'] = {}
         req_resp = Response(
             200,
             AuthorizationResponse(
@@ -129,6 +159,7 @@ class TestAuthorizationRequest(object):
         assert set(resp.keys()) == {'error'}
 
     def test_parse_request_response_json(self):
+        self.cli_info.state_db['state'] = {}
         req_resp = Response(
             200,
             AuthorizationResponse(code='access_code', state='state',
@@ -140,6 +171,7 @@ class TestAuthorizationRequest(object):
         assert set(resp.keys()) == {'code', 'state', 'scope'}
 
     def test_parse_request_response_wrong_content_type(self):
+        self.cli_info.state_db['state'] = {}
         req_resp = Response(
             200,
             AuthorizationResponse(code='access_code', state='state',
@@ -149,22 +181,37 @@ class TestAuthorizationRequest(object):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
                                                    body_type='json')
 
+    def test_request_param(self):
+        req_args = {'response_type': 'code', 'state': 'state'}
+        self.req.endpoint = 'https://example.com/authorize'
+        self.cli_info.registration_response = {
+            'redirect_uris': ['https://example.com/cb'],
+            'request_uris': ['https://example.com/request123456.json']
+        }
+        self.cli_info.base_url = 'https://example.com/'
+        _info = self.req.do_request_init(self.cli_info, request_args=req_args,
+                                         request_method='reference')
+        assert _info['cis'][
+                   'request_uri'] == 'https://example.com/request123456.json'
+
+        assert os.path.isfile('request123456.json')
+
 
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.req = factory('AccessTokenRequest',
                            client_authn_method=CLIENT_AUTHN_METHOD)
-        self.cli_info = ClientInfo(
-            None, redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
-        self.cli_info.grant_db['state'] = self.cli_info.grant_db.grant_class(
-            resp=AuthorizationResponse(code='access_code'))
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb']}
+        self.cli_info = ClientInfo(keyjar, config=client_config)
+        self.cli_info.state_db['state'] = {'code': 'access_code'}
 
     def test_construct(self):
-        req_args = {'foo': 'bar', 'state': 'state'}
+        req_args = {'foo': 'bar'}
 
-        _req = self.req.construct(self.cli_info, request_args=req_args)
+        _req = self.req.construct(self.cli_info, request_args=req_args,
+                                  state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code'}
@@ -251,6 +298,14 @@ class TestAccessTokenRequest(object):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
                                                    body_type='json')
 
+    def test_id_token_nonce_match(self):
+        self.cli_info.state_db.bind_nonce_to_state('nonce', 'state')
+        resp = AccessTokenResponse(id_token={'nonce': 'nonce'})
+        self.req._post_parse_response(resp, self.cli_info, state='state')
+        self.cli_info.state_db.bind_nonce_to_state('nonce2', 'state2')
+        with pytest.raises(ParameterError):
+            self.req._post_parse_response(resp, self.cli_info, state='state2')
+
 
 class TestProviderInfoRequest(object):
     @pytest.fixture(autouse=True)
@@ -258,10 +313,14 @@ class TestProviderInfoRequest(object):
         self.req = factory('ProviderInfoDiscovery',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
-        self.cli_info = ClientInfo(
-            None, config={'issuer': self._iss},
-            redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss,
+                         'client_prefs': {
+                             'id_token_signed_response_alg': 'RS384',
+                             'userinfo_signed_response_alg': 'RS384'
+                         }}
+        self.cli_info = ClientInfo(config=client_config)
         self.cli_info.service = build_services(DEFAULT_SERVICES,
                                                factory, None, None,
                                                CLIENT_AUTHN_METHOD)
@@ -277,7 +336,7 @@ class TestProviderInfoRequest(object):
         assert _info['uri'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
 
-    def test_parse_request_response(self):
+    def test_parse_request_response_1(self):
         req_resp = Response(
             200,
             ProviderConfigurationResponse(
@@ -285,9 +344,12 @@ class TestProviderInfoRequest(object):
                 grant_types_supported=['Bearer'],
                 subject_types_supported=['pairwise'],
                 authorization_endpoint='https://example.com/op/authz',
-                id_token_signing_alg_values_supported=['RS256'],
                 jwks_uri='https://example.com/op/jwks.json',
-                token_endpoint='https://example.com/op/token'
+                token_endpoint='https://example.com/op/token',
+                id_token_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512'],
+                userinfo_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512']
             ).to_json(),
             headers={'content-type': "application/json"}
         )
@@ -302,4 +364,321 @@ class TestProviderInfoRequest(object):
             'request_uri_parameter_supported', 'request_parameter_supported',
             'claims_parameter_supported', 'token_endpoint',
             'token_endpoint_auth_methods_supported',
-            'require_request_uri_registration'}
+            'require_request_uri_registration',
+            'userinfo_signing_alg_values_supported'}
+        assert self.cli_info.behaviour == {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384'}
+
+    def test_parse_request_response_2(self):
+        req_resp = Response(
+            200,
+            ProviderConfigurationResponse(
+                issuer=self._iss, response_types_supported=['code'],
+                grant_types_supported=['Bearer'],
+                subject_types_supported=['pairwise'],
+                authorization_endpoint='https://example.com/op/authz',
+                jwks_uri='https://example.com/op/jwks.json',
+                token_endpoint='https://example.com/op/token',
+                id_token_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512'],
+                userinfo_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512']
+            ).to_json(),
+            headers={'content-type': "application/json"}
+        )
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               body_type='json')
+        assert isinstance(resp, ProviderConfigurationResponse)
+        assert set(resp.keys()) == {
+            'issuer', 'response_types_supported', 'version',
+            'grant_types_supported', 'subject_types_supported',
+            'authorization_endpoint', 'jwks_uri',
+            'id_token_signing_alg_values_supported',
+            'request_uri_parameter_supported', 'request_parameter_supported',
+            'claims_parameter_supported', 'token_endpoint',
+            'token_endpoint_auth_methods_supported',
+            'require_request_uri_registration',
+            'userinfo_signing_alg_values_supported'}
+        assert self.cli_info.behaviour == {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384',
+            'token_endpoint_auth_method': 'client_secret_basic'}
+
+    def test_parse_request_response_added_default(self):
+        req_resp = Response(
+            200,
+            ProviderConfigurationResponse(
+                issuer=self._iss, response_types_supported=['code'],
+                subject_types_supported=['pairwise'],
+                authorization_endpoint='https://example.com/op/authz',
+                jwks_uri='https://example.com/op/jwks.json',
+                token_endpoint='https://example.com/op/token',
+                id_token_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512'],
+                userinfo_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512']
+            ).to_json(),
+            headers={'content-type': "application/json"}
+        )
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs['grant_types'] = ['authorization_code']
+
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               body_type='json')
+        assert isinstance(resp, ProviderConfigurationResponse)
+        assert set(resp.keys()) == {
+            'issuer', 'response_types_supported', 'version',
+            'grant_types_supported', 'subject_types_supported',
+            'authorization_endpoint', 'jwks_uri',
+            'id_token_signing_alg_values_supported',
+            'request_uri_parameter_supported', 'request_parameter_supported',
+            'claims_parameter_supported', 'token_endpoint',
+            'token_endpoint_auth_methods_supported',
+            'require_request_uri_registration',
+            'userinfo_signing_alg_values_supported'}
+        assert self.cli_info.behaviour == {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384',
+            'token_endpoint_auth_method': 'client_secret_basic',
+            'grant_types': ['authorization_code']}
+
+    def test_parse_request_response_no_match(self):
+        req_resp = Response(
+            200,
+            ProviderConfigurationResponse(
+                issuer=self._iss, response_types_supported=['code'],
+                subject_types_supported=['pairwise'],
+                authorization_endpoint='https://example.com/op/authz',
+                jwks_uri='https://example.com/op/jwks.json',
+                token_endpoint='https://example.com/op/token',
+                id_token_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512'],
+                userinfo_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512']
+            ).to_json(),
+            headers={'content-type': "application/json"}
+        )
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs['grant_types'] = ['authorization_code']
+        self.cli_info.client_prefs['request_object_signing_alg'] = ['ES256']
+
+        resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                               body_type='json')
+        assert isinstance(resp, ProviderConfigurationResponse)
+        assert set(resp.keys()) == {
+            'issuer', 'response_types_supported', 'version',
+            'grant_types_supported', 'subject_types_supported',
+            'authorization_endpoint', 'jwks_uri',
+            'id_token_signing_alg_values_supported',
+            'request_uri_parameter_supported', 'request_parameter_supported',
+            'claims_parameter_supported', 'token_endpoint',
+            'token_endpoint_auth_methods_supported',
+            'require_request_uri_registration',
+            'userinfo_signing_alg_values_supported'}
+        assert self.cli_info.behaviour == {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384',
+            'token_endpoint_auth_method': 'client_secret_basic',
+            'grant_types': ['authorization_code'],
+            'request_object_signing_alg': 'ES256'}
+
+    def test_parse_request_response_no_match_strict(self):
+        req_resp = Response(
+            200,
+            ProviderConfigurationResponse(
+                issuer=self._iss, response_types_supported=['code'],
+                subject_types_supported=['pairwise'],
+                authorization_endpoint='https://example.com/op/authz',
+                jwks_uri='https://example.com/op/jwks.json',
+                token_endpoint='https://example.com/op/token',
+                id_token_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512'],
+                userinfo_signing_alg_values_supported=['RS256', 'RS384',
+                                                       'RS512']
+            ).to_json(),
+            headers={'content-type': "application/json"}
+        )
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs[
+            'token_endpoint_auth_method'] = 'client_secret_basic'
+        self.cli_info.client_prefs['grant_types'] = ['authorization_code']
+        self.cli_info.client_prefs['request_object_signing_alg'] = ['ES256']
+        self.cli_info.strict_on_preferences = True
+
+        with pytest.raises(ConfigurationError):
+            resp = self.req.parse_request_response(req_resp, self.cli_info,
+                                                   body_type='json')
+
+
+class TestRegistrationRequest(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('RegistrationRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        self._iss = 'https://example.com/as'
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss, 'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_construct(self):
+        _req = self.req.construct(self.cli_info)
+        assert isinstance(_req, RegistrationRequest)
+        assert len(_req) == 3
+
+    def test_config_with_post_logout(self):
+        self.cli_info.post_logout_redirect_uris = [
+            'https://example.com/post_logout']
+        _req = self.req.construct(self.cli_info)
+        assert isinstance(_req, RegistrationRequest)
+        assert len(_req) == 4
+        assert 'post_logout_redirect_uris' in _req
+
+    def test_config_with_required_request_uri(self):
+        self.cli_info.provider_info['require_request_uri_registration'] = True
+        _req = self.req.construct(self.cli_info)
+        assert isinstance(_req, RegistrationRequest)
+        assert len(_req) == 4
+        assert 'request_uris' in _req
+
+
+class TestUserInfoRequest(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('UserInfoRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        self._iss = 'https://example.com/as'
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss, 'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_construct(self):
+        self.cli_info.state_db['abcde'] = {
+            'id_token': 'a.signed.jwt',
+            'token': {'access_token': 'access_token'}}
+        _req = self.req.construct(self.cli_info, state='abcde')
+        assert isinstance(_req, Message)
+        assert len(_req) == 1
+        assert 'access_token' in _req
+
+    def test_unpack_simple_response(self):
+        resp = OpenIDSchema(sub='diana', given_name='Diana',
+                            family_name='krall')
+        _resp = self.req.parse_response(resp.to_json(), self.cli_info)
+        assert _resp
+
+    def test_unpack_aggregated_response(self):
+        claims = {
+            "address": {
+                "street_address": "1234 Hollywood Blvd.",
+                "locality": "Los Angeles",
+                "region": "CA",
+                "postal_code": "90210",
+                "country": "US"},
+            "phone_number": "+1 (555) 123-4567"
+        }
+
+        _keyjar = build_keyjar(KEYSPEC)[1]
+
+        srv = JWT(_keyjar, iss='https://example.org/op/', sign_alg='ES256')
+        _jwt = srv.pack(payload=claims)
+
+        resp = OpenIDSchema(sub='diana', given_name='Diana',
+                            family_name='krall',
+                            _claim_names={'address': 'src1',
+                                         'phone_number': 'src1'},
+                            _claim_sources={'src1': {'JWT':_jwt}})
+
+        for kb in _keyjar['']:
+            self.cli_info.keyjar.add_kb('https://example.org/op/', kb)
+
+        _resp = self.req.parse_response(resp.to_json(), self.cli_info)
+        assert set(_resp.keys()) == {'sub','given_name','family_name',
+                                     '_claim_names', '_claim_sources',
+                                     'address', 'phone_number'}
+
+
+class TestCheckSessionRequest(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('CheckSessionRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        self._iss = 'https://example.com/as'
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss, 'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_construct(self):
+        self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
+        _req = self.req.construct(self.cli_info, state='abcde')
+        assert isinstance(_req, CheckSessionRequest)
+        assert len(_req) == 1
+
+
+class TestCheckIDRequest(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('CheckIDRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        self._iss = 'https://example.com/as'
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss, 'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_construct(self):
+        self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
+        _req = self.req.construct(self.cli_info, state='abcde')
+        assert isinstance(_req, CheckIDRequest)
+        assert len(_req) == 1
+
+
+class TestEndSessionRequest(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('EndSessionRequest',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        self._iss = 'https://example.com/as'
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss, 'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_construct(self):
+        self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
+        _req = self.req.construct(self.cli_info, state='abcde')
+        assert isinstance(_req, EndSessionRequest)
+        assert len(_req) == 1

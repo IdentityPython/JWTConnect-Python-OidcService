@@ -3,11 +3,13 @@ from oiccli.client_auth import CLIENT_AUTHN_METHOD
 
 from oiccli.exception import WrongContentType
 from oiccli.oauth2 import ClientInfo
-from oicmsg.oauth2 import AccessTokenRequest, Message, ASConfigurationResponse
+from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
+from oicmsg.oauth2 import ASConfigurationResponse
 from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
+from oicmsg.oauth2 import Message
 from oiccli.oauth2.requests import factory
 from oiccli.request import Request
 
@@ -29,9 +31,10 @@ class TestAuthorizationRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.req = factory('AuthorizationRequest')
-        self.cli_info = ClientInfo(
-            None, redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
+        client_config = {'client_id':'client_id', 'client_secret':'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb']}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.state_db['state'] = {}
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -120,16 +123,26 @@ class TestAccessTokenRequest(object):
     def create_request(self):
         self.req = factory('AccessTokenRequest',
                            client_authn_method=CLIENT_AUTHN_METHOD)
-        self.cli_info = ClientInfo(
-            None, redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
-        self.cli_info.grant_db['state'] = self.cli_info.grant_db.grant_class(
-            resp=AuthorizationResponse(code='access_code'))
+        client_config = {'client_id':'client_id', 'client_secret':'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb']}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.state_db['state'] = {'code':'access_code'}
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'state': 'state'}
 
         _req = self.req.construct(self.cli_info, request_args=req_args)
+        assert isinstance(_req, AccessTokenRequest)
+        assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
+                                    'client_secret', 'code', 'state'}
+
+    def test_construct_2(self):
+        # Note that state as a argument means it will not end up in the
+        # request
+        req_args = {'foo': 'bar'}
+
+        _req = self.req.construct(self.cli_info, request_args=req_args,
+                                  state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code'}
@@ -222,10 +235,10 @@ class TestProviderInfoRequest(object):
     def create_request(self):
         self.req = factory('ProviderInfoDiscovery')
         self._iss = 'https://example.com/as'
-        self.cli_info = ClientInfo(
-            None, config={'issuer': self._iss},
-            redirect_uris=['https://example.com/cli/authz_cb'],
-            client_id='client_id', client_secret='password')
+        client_config = {'client_id':'client_id', 'client_secret':'password',
+                         'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'issuer': self._iss}
+        self.cli_info = ClientInfo(config=client_config)
 
     def test_construct(self):
         _req = self.req.construct(self.cli_info)

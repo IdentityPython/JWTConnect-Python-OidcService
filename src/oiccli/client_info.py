@@ -1,6 +1,7 @@
+import hashlib
 import os
 
-from jwkest import b64e
+from jwkest import b64e, as_bytes
 from oiccli import CC_METHOD
 from oiccli import DEF_SIGN_ALG
 from oiccli import unreserved
@@ -25,21 +26,30 @@ ATTRMAP = {
 
 
 class ClientInfo(object):
-    def __init__(self, client_id='', keyjar=None, config=None, events=None,
-                 db=None, db_name='', **kwargs):
+    def __init__(self, keyjar=None, config=None, events=None,
+                 db=None, db_name='', strict_on_preferences=False, **kwargs):
         self.keyjar = keyjar or KeyJar()
-        self.state_db = State(client_id, db=db, db_name=db_name)
+        self.state_db = State('', db=db, db_name=db_name)
         self.events = events
+        self.strict_on_preferences = strict_on_preferences
         self.provider_info = {}
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
 
-        # the OAuth issuer is the URL of the authorization server's
-        # configuration information location
         self.config = config or {}
-
+        # Below so my IDE won't complain
         self.base_url = ''
         self.requests_dir = ''
+        self.allow = {}
+        self.behaviour = {}
+        self.client_prefs = {}
+        self._c_id = ''
+        self._c_secret = ''
+        self.issuer = ''
+
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+
         for attr in ['client_id', 'issuer', 'client_secret', 'base_url',
                      'requests_dir']:
             try:
@@ -48,7 +58,13 @@ class ClientInfo(object):
                 setattr(self, attr, '')
             else:
                 if attr == 'client_id':
-                    self.state_db.issuer = client_id
+                    self.state_db.client_id = config[attr]
+
+        for attr in ['allow', 'client_prefs', 'behaviour']:
+            try:
+                setattr(self, attr, config[attr])
+            except:
+                setattr(self, attr, {})
 
         if self.requests_dir:
             if not os.path.isdir(self.requests_dir):
@@ -58,14 +74,6 @@ class ClientInfo(object):
             self.redirect_uris = config['redirect_uris']
         except:
             self.redirect_uris = [None]
-
-        self.allow = {}
-        self.events = events
-        self.behaviour = {}
-        self.client_prefs = {}
-
-        for key, val in kwargs.items():
-            setattr(self, key, val)
 
     def get_client_secret(self):
         return self._c_secret
@@ -84,12 +92,25 @@ class ClientInfo(object):
 
     client_secret = property(get_client_secret, set_client_secret)
 
+    def get_client_id(self):
+        return self._c_id
+
+    def set_client_id(self, client_id):
+        self._c_id = client_id
+        self.state_db.client_id = client_id
+
+    client_id = property(get_client_id, set_client_id)
+
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
     def filename_from_webname(self, webname):
         assert webname.startswith(self.base_url)
-        return webname[len(self.base_url) + 1:]
+        _name = webname[len(self.base_url):]
+        if _name.startswith('/'):
+            return _name[1:]
+        else:
+            return _name
 
     def sign_enc_algs(self, typ):
         """
@@ -134,6 +155,20 @@ class ClientInfo(object):
             return True
         else:
             return False
+
+    def generate_request_uris(self, request_dir):
+        """
+        Need to generate a path that is unique for the OP/RP combo
+
+        :return: A list of one unique URL
+        """
+        m = hashlib.sha256()
+        try:
+            m.update(as_bytes(self.provider_info['issuer']))
+        except KeyError:
+            m.update(as_bytes(self.issuer))
+        m.update(as_bytes(self.base_url))
+        return ['{}{}/{}'.format(self.base_url, request_dir, m.hexdigest())]
 
 
 def add_code_challenge(client_info):

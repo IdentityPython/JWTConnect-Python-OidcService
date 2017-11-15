@@ -9,6 +9,8 @@ from oiccli.request import Request
 from oicmsg import oauth2
 from oicmsg.exception import MissingParameter
 from oicmsg.key_jar import KeyJar
+from oicmsg.oauth2 import AccessTokenResponse
+from oicmsg.oauth2 import AuthorizationResponse
 
 __author__ = 'Roland Hedberg'
 
@@ -16,23 +18,20 @@ logger = logging.getLogger(__name__)
 
 
 def _post_x_parse_response(self, resp, cli_info, state=''):
-    #_state_db = cli_info.state_db
-    cli_info.state_db.add_message_info(resp, state)
+    if isinstance(resp, (AuthorizationResponse, AccessTokenResponse)):
+        cli_info.state_db.add_message_info(resp, state)
 
 
-def set_state(request_args, kwargs):
+def get_state(request_args, kwargs):
     try:
         _state = kwargs['state']
     except KeyError:
         try:
-            request_args['state']
+            _state = request_args['state']
         except KeyError:
             raise MissingParameter('state')
-    else:
-        del kwargs['state']
-        request_args['state'] = _state
 
-    return request_args
+    return _state
 
 
 class AuthorizationRequest(Request):
@@ -90,7 +89,8 @@ class AuthorizationRequest(Request):
         else:
             request_args = {}
 
-        return set_state(request_args, kwargs), {}
+        request_args['state'] = get_state(request_args, kwargs)
+        return request_args, {}
 
 
 class AccessTokenRequest(Request):
@@ -107,17 +107,13 @@ class AccessTokenRequest(Request):
         _post_x_parse_response(self, resp, cli_info, state='')
 
     def pre_construct(self, cli_info, request_args=None, **kwargs):
+        _state = get_state(request_args, kwargs)
+        req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
+
         if request_args is None:
-            request_args = {}
-        # if request is not ROPCAccessTokenRequest:
-
-        request_args = set_state(request_args, kwargs)
-
-        state = cli_info.state_db[request_args['state']]
-
-        del request_args['state']
-
-        request_args["code"] = state['code']
+            request_args = req_args
+        else:
+            request_args.update(req_args)
 
         if "grant_type" not in request_args:
             request_args["grant_type"] = "authorization_code"
@@ -136,18 +132,13 @@ class RefreshAccessTokenRequest(Request):
     http_method = 'POST'
 
     def pre_construct(self, cli_info, request_args=None, **kwargs):
+        _state = get_state(request_args, kwargs)
+        req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
+
         if request_args is None:
-            request_args = {}
-
-        token_info = cli_info.state_db.get_access_token(**kwargs)
-        refresh_token_info = cli_info.state_db.get_refresh_token(**kwargs)
-
-        request_args["refresh_token"] = refresh_token_info['refresh_token']
-        request_args['token_type'] = token_info['token_type']
-        try:
-            request_args["scope"] = token_info['scope']
-        except AttributeError:
-            pass
+            request_args = req_args
+        else:
+            request_args.update(req_args)
 
         return request_args, {}
 

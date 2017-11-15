@@ -1,8 +1,6 @@
 from future.backports.http.cookies import SimpleCookie
-from future.backports.urllib.parse import quote
 
 import base64
-import cgi
 import hashlib
 import hmac
 import logging
@@ -213,51 +211,6 @@ def factory(code, message, **kwargs):
     return R2C[code](message, **kwargs)
 
 
-def extract(environ, empty=False, err=False):
-    """Extracts strings in form data and returns a dict.
-
-    :param environ: WSGI environ
-    :param empty: Stops on empty fields (default: Fault)
-    :param err: Stops on errors in fields (default: Fault)
-    """
-    formdata = cgi.parse(environ['wsgi.input'], environ, empty, err)
-    # Remove single entries from lists
-    for key, value in formdata.iteritems():
-        if len(value) == 1:
-            formdata[key] = value[0]
-    return formdata
-
-
-def geturl(environ, query=True, path=True):
-    """Rebuilds a request URL (from PEP 333).
-
-    :param query: Is QUERY_STRING included in URI (default: True)
-    :param path: Is path included in URI (default: True)
-    """
-    url = [environ['wsgi.url_scheme'] + '://']
-    if environ.get('HTTP_HOST'):
-        url.append(environ['HTTP_HOST'])
-    else:
-        url.append(environ['SERVER_NAME'])
-        if environ['wsgi.url_scheme'] == 'https':
-            if environ['SERVER_PORT'] != '443':
-                url.append(':' + environ['SERVER_PORT'])
-        else:
-            if environ['SERVER_PORT'] != '80':
-                url.append(':' + environ['SERVER_PORT'])
-    if path:
-        url.append(getpath(environ))
-    if query and environ.get('QUERY_STRING'):
-        url.append('?' + environ['QUERY_STRING'])
-    return ''.join(url)
-
-
-def getpath(environ):
-    """Builds a path."""
-    return ''.join([quote(environ.get('SCRIPT_NAME', '')),
-                    quote(environ.get('PATH_INFO', ''))])
-
-
 def _expiration(timeout, time_format=None):
     if timeout == "now":
         return time_util.instant(time_format)
@@ -459,24 +412,6 @@ def cookie_parts(name, kaka):
         return morsel.value.split("|")
     else:
         return None
-
-
-def get_post(environ):
-    # the environment variable CONTENT_LENGTH may be empty or missing
-    try:
-        request_body_size = int(environ.get('CONTENT_LENGTH', 0))
-    except ValueError:
-        request_body_size = 0
-
-    # When the method is POST the query string will be sent
-    # in the HTTP request body which is passed by the WSGI server
-    # in the file like wsgi.input environment variable.
-    text = environ['wsgi.input'].read(request_body_size)
-    try:
-        text = text.decode("utf-8")
-    except AttributeError:
-        pass
-    return text
 
 
 class CookieDealer(object):

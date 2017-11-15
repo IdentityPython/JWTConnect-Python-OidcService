@@ -48,18 +48,20 @@ def request_object_encryption(msg, client_info, **kwargs):
     return _jwe.encrypt(_keys)
 
 
-def construct_redirect_uri(**kwargs):
+def construct_redirect_uri(local_dir, base_path, **kwargs):
     """
     Contructs a special redirect_uri to be used when communicating with
     one OP. Each OP should get their own redirect_uris.
     
+    :param local_dir: Local directory in which to place the file
+    :param base_path: Base URL to start with
     :param kwargs: 
     :return: 2-tuple with (filename, url) 
     """
-    _filedir = kwargs["local_dir"]
+    _filedir = local_dir
     if not os.path.isdir(_filedir):
         os.makedirs(_filedir)
-    _webpath = kwargs["base_path"]
+    _webpath = base_path
     _name = rndstr(10) + ".jwt"
     filename = os.path.join(_filedir, _name)
     while os.path.exists(filename):

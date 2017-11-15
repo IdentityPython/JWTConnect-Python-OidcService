@@ -31,7 +31,7 @@ class ExpiredToken(OicCliError):
 
 # =============================================================================
 
-def error_response(error, descr=None, status="400 Bad Request"):
+def error_response(error, descr='', status="400 Bad Request"):
     response = ErrorResponse(error=error, error_description=descr)
     return Response(response.to_json(), content="application/json",
                     status=status)
@@ -46,9 +46,9 @@ def authz_error(error, descr=None, status_code=400):
     response = AuthorizationErrorResponse(error=error)
     if descr:
         response["error_description"] = descr
-
+    stat_txt = R2C[status_code]._status
     return Response(response.to_json(), content="application/json",
-                    status="400 Bad Request")
+                    status=stat_txt)
 
 
 def redirect_authz_error(error, redirect_uri, descr=None, state="",
@@ -66,30 +66,16 @@ def redirect_authz_error(error, redirect_uri, descr=None, state="",
 
 
 def exception_to_error_mesg(excep):
-    if isinstance(excep, OicCliError):
-        if excep.content_type:
-            if isinstance(excep.args, tuple):
-                resp = BadRequest(excep.args[0], content=excep.content_type)
-            else:
-                resp = BadRequest(excep.args, content=excep.content_type)
-        else:
-            resp = BadRequest()
+    if isinstance(excep.args, tuple):
+        _msg = excep.args[0]
     else:
-        err = ErrorResponse(error='service_error',
-                            error_description='{}:{}'.format(
-                                excep.__class__.__name__, excep.args))
-        resp = BadRequest(err.to_json(), content='application/json')
+        _msg = ', '.join(excep.args)
+
+    err = ErrorResponse(error='service_error',
+                        error_description='{}: {}'.format(
+                            excep.__class__.__name__, _msg))
+    resp = BadRequest(err.to_json(), content='application/json')
     return resp
-
-
-def compact(qsdict):
-    res = {}
-    for key, val in qsdict.items():
-        if len(val) == 1:
-            res[key] = val[0]
-        else:
-            res[key] = val
-    return res
 
 
 # =============================================================================
@@ -114,7 +100,6 @@ class Client(object):
                  httplib=None, services=None, service_factory=None):
         """
 
-        :param client_id: The client identifier
         :param ca_certs: Certificates used to verify HTTPS certificates
         :param client_authn_method: Methods that this client can use to
             authenticate itself. It's a dictionary with method names as
@@ -133,7 +118,8 @@ class Client(object):
 
         self.events = None
         self.client_info = ClientInfo(keyjar, config=config)
-
+        if self.client_info.client_id:
+            self.client_id = self.client_info.client_id
         _cam = client_authn_method or CLIENT_AUTHN_METHOD
         self.service_factory = service_factory or requests.factory
         _srvs = services or DEFAULT_SERVICES
@@ -170,3 +156,7 @@ class Client(object):
             _info['url'], method, _info['body'], body_type,
             http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)
+
+    def set_client_id(self, client_id):
+        self.client_id = client_id
+        self.client_info.client_id = client_id

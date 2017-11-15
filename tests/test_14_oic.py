@@ -5,13 +5,11 @@ import time
 import sys
 from jwkest.jwk import rsa_load
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.grant import Token
 from oiccli.client_info import ClientInfo
 from oicmsg.key_bundle import KeyBundle
 from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import RefreshAccessTokenRequest
 from oiccli.oic import Client
 from oicmsg.oic import IdToken, UserInfoRequest
@@ -43,9 +41,7 @@ class TestClient(object):
             'client_secret': 'abcdefghijklmnop',
         }
         self.client.client_info = ClientInfo(config=conf)
-        _gdb = self.client.client_info.grant_db
-        _gdb['ABCDE'] = _gdb.grant_class(
-            resp=AuthorizationResponse(code='access_code'))
+        self.client.client_info.state_db['ABCDE'] = {'code': 'access_code'}
 
     def test_construct_authorization_request(self):
         req_args = {'state': 'ABCDE',
@@ -72,7 +68,7 @@ class TestClient(object):
         # Bind token to state
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.client_info.grant_db["ABCDE"].tokens.append(Token(resp))
+        self.client.client_info.state_db.add_message_info(resp, "ABCDE")
 
         req_args = {}
         msg = self.client.service['refresh_token'].construct(
@@ -86,7 +82,8 @@ class TestClient(object):
     def test_do_userinfo_request_init(self):
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.client_info.grant_db["ABCDE"].tokens.append(Token(resp))
+        self.client.client_info.state_db.add_message_info(resp, "ABCDE")
+
         _srv = self.client.service['userinfo']
         _srv.endpoint = "https://example.com/userinfo"
         _info = _srv.do_request_init(self.client.client_info, state='ABCDE')

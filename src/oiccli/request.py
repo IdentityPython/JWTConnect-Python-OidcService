@@ -32,7 +32,9 @@ method call structure for Requests:
 do_request_init
     - request_info
         - construct (*)
+            - pre_construct
             - _parse_args
+            - post_construct
         - init_authentication_method
         - uri_and_body
             - _endpoint

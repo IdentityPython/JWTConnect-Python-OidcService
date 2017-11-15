@@ -3,6 +3,7 @@ import logging
 import sys
 import six
 from jwkest import jws
+from oiccli.oauth2.requests import get_state
 
 try:
     from json import JSONDecodeError
@@ -75,13 +76,10 @@ class AuthorizationRequest(requests.AuthorizationRequest):
 
     def pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is not None:
-            if "nonce" not in request_args:
-                _rt = request_args["response_type"]
-                if "token" in _rt or "id_token" in _rt:
+            _rt = request_args["response_type"]
+            if "token" in _rt or "id_token" in _rt:
+                if "nonce" not in request_args:
                     request_args["nonce"] = rndstr(32)
-        elif "response_type" in kwargs:
-            if "token" in kwargs["response_type"]:
-                request_args = {"nonce": rndstr(32)}
         else:  # Never wrong to specify a nonce
             request_args = {"nonce": rndstr(32)}
 
@@ -95,7 +93,7 @@ class AuthorizationRequest(requests.AuthorizationRequest):
                 del kwargs[attr]
 
         if "request_method" in kwargs:
-            if kwargs["request_method"] == "file":
+            if kwargs["request_method"] == "reference":
                 post_args['request_param'] = "request_uri"
             else:
                 post_args['request_param'] = "request"
@@ -157,20 +155,21 @@ class AuthorizationRequest(requests.AuthorizationRequest):
 
         return req
 
-    # def do_request_init(self, cli_info, scope="", body_type="json",
-    #                     method="GET", request_args=None, http_args=None,
-    #                     authn_method="", **kwargs):
-    #
-    #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-    #
-    #     if 'code_challenge' in cli_info.config:
-    #         _args, code_verifier = cli_info.add_code_challenge()
-    #         request_args.update(_args)
-    #
-    #     return requests.AuthorizationRequest.do_request_init(
-    #         self, cli_info, scope=scope, body_type=body_type, method=method,
-    #         request_args=request_args, http_args=http_args,
-    #         authn_method=authn_method, **kwargs)
+        # def do_request_init(self, cli_info, scope="", body_type="json",
+        #                     method="GET", request_args=None, http_args=None,
+        #                     authn_method="", **kwargs):
+        #
+        #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
+        #
+        #     if 'code_challenge' in cli_info.config:
+        #         _args, code_verifier = cli_info.add_code_challenge()
+        #         request_args.update(_args)
+        #
+        #     return requests.AuthorizationRequest.do_request_init(
+        #         self, cli_info, scope=scope, body_type=body_type,
+        # method=method,
+        #         request_args=request_args, http_args=http_args,
+        #         authn_method=authn_method, **kwargs)
 
 
 class AccessTokenRequest(requests.AccessTokenRequest):
@@ -192,7 +191,7 @@ class AccessTokenRequest(requests.AccessTokenRequest):
             pass
         else:
             try:
-                if cli_info.state2nonce[state] != _idt['nonce']:
+                if cli_info.state_db.nonce_to_state(_idt['nonce']) != state:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 pass
@@ -218,6 +217,12 @@ class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
     def match_preferences(cli_info, pcr=None, issuer=None):
         """
         Match the clients preferences against what the provider can do.
+        This is to prepare for later client registration and or what 
+        functionality the client actually will use.
+        In the client configuration the client preferences are expressed.
+        These are then compared with the Provider Configuration information.
+        If the Provider has left some claims out, defaults specified in the
+        standard will be used.
 
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
@@ -237,14 +242,20 @@ class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
                 _pvals = pcr[_prov]
             except KeyError:
                 try:
-                    cli_info.behaviour[_pref] = PROVIDER_DEFAULT[_pref]
+                    # If the provider have not specified use what the
+                    # standard says is mandatory if at all.
+                    _pvals = PROVIDER_DEFAULT[_pref]
                 except KeyError:
-                    # cli_info.behaviour[_pref]= vals[0]
-                    if isinstance(pcr.c_param[_prov][0], list):
-                        cli_info.behaviour[_pref] = []
+                    logger.info(
+                        'No info from provider on {} and no default'.format(
+                            _pref))
+                    # Don't know what the right thing to do here
+                    # Fail or hope for the best, made it configurable
+                    if cli_info.strict_on_preferences:
+                        raise ConfigurationError(
+                            "OP couldn't match preference:%s" % _pref, pcr)
                     else:
-                        cli_info.behaviour[_pref] = None
-                continue
+                        _pvals = vals
 
             if isinstance(vals, six.string_types):
                 if vals in _pvals:
@@ -292,47 +303,44 @@ class RegistrationRequest(Request):
     synchronous = True
     request = 'registration'
 
-    def create_registration_request(self, cli_info, **kwargs):
+    def pre_construct(self, cli_info, request_args, **kwargs):
         """
         Create a registration request
 
         :param kwargs: parameters to the registration request
         :return:
         """
-        req = oic.RegistrationRequest()
-
-        for prop in req.parameters():
+        for prop in self.msg_type.c_param.keys():
+            if prop in request_args:
+                continue
             try:
-                req[prop] = kwargs[prop]
+                request_args[prop] = cli_info.behaviour[prop]
             except KeyError:
-                try:
-                    req[prop] = cli_info.behaviour[prop]
-                except KeyError:
-                    pass
+                pass
 
-        if "post_logout_redirect_uris" not in req:
+        if "post_logout_redirect_uris" not in request_args:
             try:
-                req[
+                request_args[
                     "post_logout_redirect_uris"] = \
                     cli_info.post_logout_redirect_uris
             except AttributeError:
                 pass
 
-        if "redirect_uris" not in req:
+        if "redirect_uris" not in request_args:
             try:
-                req["redirect_uris"] = cli_info.redirect_uris
+                request_args["redirect_uris"] = cli_info.redirect_uris
             except AttributeError:
-                raise MissingRequiredAttribute("redirect_uris", req)
+                raise MissingRequiredAttribute("redirect_uris", request_args)
 
         try:
             if cli_info.provider_info[
                     'require_request_uri_registration'] is True:
-                req['request_uris'] = cli_info.generate_request_uris(
+                request_args['request_uris'] = cli_info.generate_request_uris(
                     cli_info.requests_dir)
         except KeyError:
             pass
 
-        return req
+        return request_args, {}
 
     def _post_parse_response(self, resp, cli_info, **kwargs):
         cli_info.registration_response = resp
@@ -365,83 +373,77 @@ class UserInfoRequest(Request):
     request = 'userinfo'
     default_authn_method = 'bearer_header'
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
         if "access_token" in request_args:
             pass
         else:
-            try:
-                _scope = kwargs["scope"]
-            except KeyError:
-                _scope = "openid"
-            token = cli_info.grant_db.get_token(scope=_scope, **kwargs)
+            _tinfo = cli_info.state_db.get_token_info(**kwargs)
+            request_args["access_token"] = _tinfo['access_token']
 
-            if token is None:
-                raise MissingParameter("No valid token available")
-
-            request_args["access_token"] = token.access_token
-
-        return Request.construct(self, cli_info, request_args, **kwargs)
+        return request_args, {}
 
     def _post_parse_response(self, resp, client_info, **kwargs):
         self.unpack_aggregated_claims(resp, client_info)
         self.fetch_distributed_claims(resp, client_info)
 
     def unpack_aggregated_claims(self, userinfo, cli_info):
-        if userinfo["_claim_sources"]:
-            for csrc, spec in userinfo["_claim_sources"].items():
+        try:
+            _csrc = userinfo["_claim_sources"]
+        except KeyError:
+            pass
+        else:
+            for csrc, spec in _csrc.items():
                 if "JWT" in spec:
                     aggregated_claims = Message().from_jwt(
                         spec["JWT"].encode("utf-8"),
-                        keyjar=cli_info.keyjar, sender=csrc)
+                        keyjar=cli_info.keyjar)
                     claims = [value for value, src in
                               userinfo["_claim_names"].items() if
                               src == csrc]
 
-                    if set(claims) != set(list(aggregated_claims.keys())):
-                        logger.warning(
-                            "Claims from claim source doesn't match "
-                            "what's in "
-                            "the userinfo")
-
-                    for key, vals in aggregated_claims.items():
-                        userinfo[key] = vals
+                    for key in claims:
+                        userinfo[key] = aggregated_claims[key]
 
         return userinfo
 
     def fetch_distributed_claims(self, userinfo, cli_info, callback=None):
-        for csrc, spec in userinfo["_claim_sources"].items():
-            if "endpoint" in spec:
-                if "access_token" in spec:
-                    _uinfo = self.request_and_return(spec["endpoint"],
-                                                     method='GET',
-                                                     token=spec["access_token"],
-                                                     client_info=cli_info)
-                else:
-                    if callback:
+        try:
+            _csrc = userinfo["_claim_sources"]
+        except KeyError:
+            pass
+        else:
+            for csrc, spec in _csrc.items():
+                if "endpoint" in spec:
+                    if "access_token" in spec:
                         _uinfo = self.request_and_return(
-                            spec["endpoint"],
-                            method='GET',
-                            token=callback(spec['endpoint']),
-                            client_info=cli_info)
+                            spec["endpoint"], method='GET',
+                            token=spec["access_token"], client_info=cli_info)
                     else:
-                        _uinfo = self.request_and_return(
-                            spec["endpoint"],
-                            method='GET',
-                            client_info=cli_info)
+                        if callback:
+                            _uinfo = self.request_and_return(
+                                spec["endpoint"],
+                                method='GET',
+                                token=callback(spec['endpoint']),
+                                client_info=cli_info)
+                        else:
+                            _uinfo = self.request_and_return(
+                                spec["endpoint"],
+                                method='GET',
+                                client_info=cli_info)
 
-                claims = [value for value, src in
-                          userinfo["_claim_names"].items() if src == csrc]
+                    claims = [value for value, src in
+                              userinfo["_claim_names"].items() if src == csrc]
 
-                if set(claims) != set(list(_uinfo.keys())):
-                    logger.warning(
-                        "Claims from claim source doesn't match what's in "
-                        "the userinfo")
+                    if set(claims) != set(list(_uinfo.keys())):
+                        logger.warning(
+                            "Claims from claim source doesn't match what's in "
+                            "the userinfo")
 
-                for key, vals in _uinfo.items():
-                    userinfo[key] = vals
+                    for key, vals in _uinfo.items():
+                        userinfo[key] = vals
 
         return userinfo
 
@@ -458,7 +460,8 @@ def set_id_token(cli_info, request_args, **kwargs):
     if _prop in request_args:
         pass
     else:
-        id_token = cli_info._get_id_token(**kwargs)
+        _state = get_state(request_args, kwargs)
+        id_token = cli_info.state_db.get_id_token(_state)
         if id_token is None:
             raise MissingParameter("No valid id token available")
 
@@ -474,9 +477,9 @@ class CheckSessionRequest(Request):
     synchronous = True
     request = 'check_session'
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
-        return Request.construct(self, cli_info, request_args, **kwargs)
+        return request_args, {}
 
 
 class CheckIDRequest(Request):
@@ -487,9 +490,9 @@ class CheckIDRequest(Request):
     synchronous = True
     request = 'check_id'
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
-        return Request.construct(self, cli_info, request_args, **kwargs)
+        return request_args, {}
 
 
 class EndSessionRequest(Request):
@@ -500,9 +503,9 @@ class EndSessionRequest(Request):
     synchronous = True
     request = 'end_session'
 
-    def construct(self, cli_info, request_args=None, **kwargs):
+    def pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
-        return Request.construct(self, cli_info, request_args, **kwargs)
+        return request_args, {}
 
 
 def factory(req_name, **kwargs):
