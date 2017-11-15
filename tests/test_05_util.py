@@ -5,11 +5,13 @@ from future.backports.urllib.parse import parse_qs
 from future.backports.urllib.parse import urlparse
 
 import pytest
+from oiccli.exception import WrongContentType
 
-from oic.exception import UnSupported
-from oic.oauth2 import util
-from oic.oic import AuthorizationRequest
-from oic.oic.message import AccessTokenRequest
+from oiccli import util
+
+from oicmsg.exception import UnSupported
+from oicmsg.oic import AuthorizationRequest
+from oicmsg.oic import AccessTokenRequest
 
 __author__ = 'DIRG'
 
@@ -175,7 +177,7 @@ def test_verify_header():
     assert util.verify_header(FakeResponse(plain_text_header),
                               "urlencoded") == "urlencoded"
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(WrongContentType):
         util.verify_header(FakeResponse(json_header), "urlencoded")
         util.verify_header(FakeResponse(jwt_header), "urlencoded")
         util.verify_header(FakeResponse(default_header), "json")

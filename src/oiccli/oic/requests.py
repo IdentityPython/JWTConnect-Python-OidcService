@@ -16,7 +16,7 @@ from oiccli import rndstr
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
 from oiccli.oauth2 import requests
-from oiccli.oic.utils import construct_redirect_uri
+from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
 from oiccli.request import Request
 from oicmsg import oic
@@ -147,7 +147,7 @@ class AuthorizationRequest(requests.AuthorizationRequest):
                     _webname = cli_info.registration_response['request_uris'][0]
                     filename = cli_info.filename_from_webname(_webname)
                 except KeyError:
-                    filename, _webname = construct_redirect_uri(**kwargs)
+                    filename, _webname = construct_request_uri(**kwargs)
                 fid = open(filename, mode="w")
                 fid.write(_req)
                 fid.close()

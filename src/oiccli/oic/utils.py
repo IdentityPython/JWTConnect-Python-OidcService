@@ -48,7 +48,7 @@ def request_object_encryption(msg, client_info, **kwargs):
     return _jwe.encrypt(_keys)
 
 
-def construct_redirect_uri(local_dir, base_path, **kwargs):
+def construct_request_uri(local_dir, base_path, **kwargs):
     """
     Contructs a special redirect_uri to be used when communicating with
     one OP. Each OP should get their own redirect_uris.
@@ -71,13 +71,13 @@ def construct_redirect_uri(local_dir, base_path, **kwargs):
     return filename, _webname
 
 
-def generate_request_uris(client_info, request_dir):
-    """
-    Need to generate a path that is unique for the OP combo
-
-    :return: A list of uris
-    """
-    m = hashlib.sha256()
-    m.update(as_bytes(client_info.provider_info['issuer']))
-    m.update(as_bytes(client_info.base_url))
-    return '{}{}/{}'.format(client_info.base_url, request_dir, m.hexdigest())
+# def generate_request_uris(client_info, request_dir):
+#     """
+#     Need to generate a path that is unique for the OP combo
+#
+#     :return: A list of uris
+#     """
+#     m = hashlib.sha256()
+#     m.update(as_bytes(client_info.provider_info['issuer']))
+#     m.update(as_bytes(client_info.base_url))
+#     return '{}{}/{}'.format(client_info.base_url, request_dir, m.hexdigest())
