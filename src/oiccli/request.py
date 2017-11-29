@@ -31,10 +31,10 @@ method call structure for Requests:
 
 do_request_init
     - request_info
-        - construct (*)
-            - pre_construct
+        - construct 
+            - pre_construct (*)
             - _parse_args
-            - post_construct
+            - post_construct (*)
         - init_authentication_method
         - uri_and_body
             - _endpoint
@@ -44,7 +44,7 @@ request_and_return
     - parse_request_response
         - parse_response
              - get_urlinfo
-             - _post_parse_response (*)
+             - post_parse_response (*)
         - parse_error_mesg
         
 """
@@ -67,6 +67,12 @@ class Request(object):
         self.events = None
         self.endpoint = ''
         self.default_request_args = {}
+
+        # pull in all the modifiers
+        self.pre_construct = []
+        self.post_construct = []
+        self.post_parse_response = []
+        self.setup()
 
     def _parse_args(self, cli_info, **kwargs):
         """
@@ -94,8 +100,26 @@ class Request(object):
 
         return ar_args
 
-    def pre_construct(self, cli_info, request_args, **kwargs):
-        return request_args, {}
+    def do_pre_construct(self, cli_info, request_args, **kwargs):
+        post_args = {}
+        for meth in self.pre_construct:
+            request_args, _post_args = meth(cli_info, request_args, **kwargs)
+            post_args.update(_post_args)
+
+        return request_args, post_args
+
+    def do_post_construct(self, cli_info, request_args, **post_args):
+        for meth in self.post_construct:
+            request_args = meth(cli_info, request_args, **post_args)
+
+        return request_args
+
+    def do_post_parse_response(self, resp, cli_info, state='', **kwargs):
+        for meth in self.post_parse_response:
+            meth(resp, cli_info, state='', **kwargs)
+
+    def setup(self):
+        pass
 
     def construct(self, cli_info, request_args=None, **kwargs):
         """
@@ -109,8 +133,8 @@ class Request(object):
         if request_args is None:
             request_args = {}
 
-        request_args, post_args = self.pre_construct(cli_info, request_args,
-                                                     **kwargs)
+        request_args, post_args = self.do_pre_construct(cli_info, request_args,
+                                                        **kwargs)
 
         if 'state' not in self.msg_type.c_param:
             try:
@@ -124,10 +148,7 @@ class Request(object):
         # logger.debug("kwargs: %s" % sanitize(kwargs))
         request = self.msg_type(**_args)
 
-        return self.post_construct(cli_info, request, **post_args)
-
-    def post_construct(self, cli_info, request, **kwargs):
-        return request
+        return self.do_post_construct(cli_info, request, **post_args)
 
     def _endpoint(self, **kwargs):
         try:
@@ -359,7 +380,7 @@ class Request(object):
             raise ResponseError("Missing or faulty response")
 
         try:
-            self._post_parse_response(resp, client_info, state=state)
+            self.do_post_parse_response(resp, client_info, state=state)
         except Exception as err:
             raise
 

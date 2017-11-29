@@ -17,7 +17,7 @@ __author__ = 'Roland Hedberg'
 logger = logging.getLogger(__name__)
 
 
-def _post_x_parse_response(self, resp, cli_info, state=''):
+def _post_x_parse_response(resp, cli_info, state=''):
     if isinstance(resp, (AuthorizationResponse, AccessTokenResponse)):
         cli_info.state_db.add_message_info(resp, state)
 
@@ -42,6 +42,12 @@ class AuthorizationRequest(Request):
     synchronous = False
     request = 'authorization'
 
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct.append(self.oauth_pre_construct)
+        self.post_parse_response.append(_post_x_parse_response)
+
     def _parse_args(self, cli_info, **kwargs):
         ar_args = Request._parse_args(self, cli_info, **kwargs)
 
@@ -52,9 +58,6 @@ class AuthorizationRequest(Request):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
-
-    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
-        _post_x_parse_response(self, resp, cli_info, state='')
 
     def do_request_init(self, cli_info, body_type="", method="GET",
                         authn_method='', request_args=None, http_args=None,
@@ -77,7 +80,7 @@ class AuthorizationRequest(Request):
         _info['algs'] = _algs
         return _info
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -103,10 +106,13 @@ class AccessTokenRequest(Request):
     default_authn_method = 'client_secret_basic'
     http_method = 'POST'
 
-    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
-        _post_x_parse_response(self, resp, cli_info, state='')
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct.append(self.oauth_pre_construct)
+        self.post_parse_response.append(_post_x_parse_response)
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
         req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
 
@@ -131,7 +137,12 @@ class RefreshAccessTokenRequest(Request):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct.append(self.oauth_pre_construct)
+
+    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
         req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
 
@@ -151,6 +162,11 @@ class ProviderInfoDiscovery(Request):
     request = 'provider_info'
     http_method = 'GET'
 
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.post_parse_response.append(self.oauth_post_parse_response)
+
     def request_info(self, cli_info, method="GET", request_args=None,
                      lax=False, **kwargs):
 
@@ -163,7 +179,7 @@ class ProviderInfoDiscovery(Request):
 
         return {'uri': OIDCONF_PATTERN % _issuer}
 
-    def _post_parse_response(self, resp, cli_info, **kwargs):
+    def oauth_post_parse_response(self, resp, cli_info, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response

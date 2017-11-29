@@ -3,7 +3,6 @@ import logging
 import sys
 import six
 from jwkest import jws
-from oiccli.oauth2.requests import get_state
 
 try:
     from json import JSONDecodeError
@@ -16,6 +15,7 @@ from oiccli import rndstr
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
 from oiccli.oauth2 import requests
+from oiccli.oauth2.requests import get_state
 from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
 from oiccli.request import Request
@@ -73,8 +73,10 @@ class AuthorizationRequest(requests.AuthorizationRequest):
         requests.AuthorizationRequest.__init__(self, httplib, keyjar,
                                                client_authn_method)
         self.default_request_args = {'scope': ['openid']}
+        self.pre_construct = [self.oic_pre_construct]
+        self.post_construct = [self.oic_post_construct]
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is not None:
             _rt = request_args["response_type"]
             if "token" in _rt or "id_token" in _rt:
@@ -101,7 +103,7 @@ class AuthorizationRequest(requests.AuthorizationRequest):
 
         return request_args, post_args
 
-    def post_construct(self, cli_info, req, **kwargs):
+    def oic_post_construct(self, cli_info, req, **kwargs):
         try:
             _request_param = kwargs['request_param']
         except KeyError:
@@ -177,14 +179,13 @@ class AccessTokenRequest(requests.AccessTokenRequest):
     response_cls = oic.AccessTokenResponse
     error_msg = oic.TokenErrorResponse
 
-    # def pre_construct(self, cli_info, request_args=None, **kwargs):
-    #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-    #
-    #     if 'code_challenge' in cli_info.config:
-    #         _args, code_verifier = cli_info.add_code_challenge()
-    #         request_args.update(_args)
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        requests.AccessTokenRequest.__init__(
+            self, httplib=httplib, keyjar=keyjar,
+            client_authn_method=client_authn_method)
+        self.post_parse_response = [self.oic_post_parse_response]
 
-    def _post_parse_response(self, resp, cli_info, state='', **kwargs):
+    def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
         try:
             _idt = resp['id_token']
         except KeyError:
@@ -208,10 +209,15 @@ class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
     response_cls = oic.ProviderConfigurationResponse
     error_msg = ErrorResponse
 
-    def _post_parse_response(self, resp, cli_info, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        requests.ProviderInfoDiscovery.__init__(
+            self, httplib=httplib, keyjar=keyjar,
+            client_authn_method=client_authn_method)
+        # Should be done before any other
+        self.post_parse_response.insert(0, self.oic_post_parse_response)
+
+    def oic_post_parse_response(self, resp, cli_info, **kwargs):
         self.match_preferences(cli_info, resp, cli_info.issuer)
-        requests.ProviderInfoDiscovery._post_parse_response(self, resp,
-                                                            cli_info, **kwargs)
 
     @staticmethod
     def match_preferences(cli_info, pcr=None, issuer=None):
@@ -303,7 +309,13 @@ class RegistrationRequest(Request):
     synchronous = True
     request = 'registration'
 
-    def pre_construct(self, cli_info, request_args, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct = [self.oic_pre_construct]
+        self.post_parse_response.append(self.oic_post_parse_response)
+
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         """
         Create a registration request
 
@@ -342,7 +354,7 @@ class RegistrationRequest(Request):
 
         return request_args, {}
 
-    def _post_parse_response(self, resp, cli_info, **kwargs):
+    def oic_post_parse_response(self, resp, cli_info, **kwargs):
         cli_info.registration_response = resp
         if "token_endpoint_auth_method" not in cli_info.registration_response:
             cli_info.registration_response[
@@ -373,7 +385,13 @@ class UserInfoRequest(Request):
     request = 'userinfo'
     default_authn_method = 'bearer_header'
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct = [self.oic_pre_construct]
+        self.post_parse_response.insert(0, self.oic_post_parse_response)
+
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -385,9 +403,9 @@ class UserInfoRequest(Request):
 
         return request_args, {}
 
-    def _post_parse_response(self, resp, client_info, **kwargs):
-        self.unpack_aggregated_claims(resp, client_info)
-        self.fetch_distributed_claims(resp, client_info)
+    def oic_post_parse_response(self, resp, client_info, **kwargs):
+        resp = self.unpack_aggregated_claims(resp, client_info)
+        return self.fetch_distributed_claims(resp, client_info)
 
     def unpack_aggregated_claims(self, userinfo, cli_info):
         try:
@@ -477,7 +495,12 @@ class CheckSessionRequest(Request):
     synchronous = True
     request = 'check_session'
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct = [self.oic_pre_construct]
+
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 
@@ -490,7 +513,12 @@ class CheckIDRequest(Request):
     synchronous = True
     request = 'check_id'
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct = [self.oic_pre_construct]
+
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 
@@ -503,7 +531,12 @@ class EndSessionRequest(Request):
     synchronous = True
     request = 'end_session'
 
-    def pre_construct(self, cli_info, request_args=None, **kwargs):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.pre_construct = [self.oic_pre_construct]
+
+    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 

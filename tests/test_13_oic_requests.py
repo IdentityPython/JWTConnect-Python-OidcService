@@ -304,7 +304,7 @@ class TestAccessTokenRequest(object):
         self.req._post_parse_response(resp, self.cli_info, state='state')
         self.cli_info.state_db.bind_nonce_to_state('nonce2', 'state2')
         with pytest.raises(ParameterError):
-            self.req._post_parse_response(resp, self.cli_info, state='state2')
+            self.req.do_post_parse_response(resp, self.cli_info, state='state2')
 
 
 class TestProviderInfoRequest(object):
