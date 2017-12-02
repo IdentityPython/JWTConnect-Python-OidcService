@@ -7,6 +7,7 @@ from oiccli.exception import OicCliError
 from oiccli.exception import ParseError
 from oiccli.exception import ResponseError
 from oiccli.util import get_or_post
+from oiccli.util import JSON_ENCODED
 from oiccli.util import verify_header
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
@@ -59,6 +60,7 @@ class Request(object):
     request = ''
     default_authn_method = ''
     http_method = 'GET'
+    body_type = 'urlencoded'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         self.httplib = httplib
@@ -116,7 +118,7 @@ class Request(object):
 
     def do_post_parse_response(self, resp, cli_info, state='', **kwargs):
         for meth in self.post_parse_response:
-            meth(resp, cli_info, state='', **kwargs)
+            meth(resp, cli_info, state=state, **kwargs)
 
     def setup(self):
         pass
@@ -251,6 +253,9 @@ class Request(object):
             else:
                 kwargs["headers"] = h_arg["headers"]
 
+        if body_type == 'json':
+            kwargs['content_type'] = JSON_ENCODED
+
         return self.uri_and_body(cis, method, request_args, **kwargs)
 
     def update_http_args(self, http_args, info):
@@ -281,6 +286,8 @@ class Request(object):
             method = self.http_method
         if not authn_method:
             authn_method = self.default_authn_method
+        if not body_type:
+            body_type = self.body_type
 
         _info = self.request_info(cli_info, method=method, body_type=body_type,
                                   request_args=request_args,
