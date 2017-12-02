@@ -176,8 +176,15 @@ def verify_header(reqresp, body_type):
     logger.debug("resp.headers: %s" % (sanitize(reqresp.headers),))
     logger.debug("resp.txt: %s" % (sanitize(reqresp.text),))
 
-    if body_type == "":
+    try:
         _ctype = reqresp.headers["content-type"]
+    except KeyError:
+        if body_type:
+            return body_type
+        else:
+            return 'txt'  # reasonable default ??
+
+    if body_type == "":
         if match_to_("application/json", _ctype):
             body_type = 'json'
         elif match_to_("application/jwt", _ctype):
@@ -187,22 +194,20 @@ def verify_header(reqresp, body_type):
         else:
             body_type = 'txt'  # reasonable default ??
     elif body_type == "json":
-        if match_to_("application/json", reqresp.headers["content-type"]):
+        if match_to_("application/json", _ctype):
             pass
-        else:
-            if match_to_("application/jwt", reqresp.headers["content-type"]):
+        elif match_to_("application/jwt", _ctype):
                 body_type = "jwt"
-            else:
-                raise WrongContentType(reqresp.headers["content-type"])
+        else:
+            raise WrongContentType(_ctype)
     elif body_type == "jwt":
-        if not match_to_("application/jwt", reqresp.headers["content-type"]):
-            raise WrongContentType(reqresp.headers["content-type"])
+        if not match_to_("application/jwt", _ctype):
+            raise WrongContentType(_ctype)
     elif body_type == "urlencoded":
-        if not match_to_(DEFAULT_POST_CONTENT_TYPE,
-                         reqresp.headers["content-type"]):
+        if not match_to_(DEFAULT_POST_CONTENT_TYPE, _ctype):
             # I can live with text/plain
-            if not match_to_("text/plain", reqresp.headers["content-type"]):
-                raise WrongContentType(reqresp.headers["content-type"])
+            if not match_to_("text/plain", _ctype):
+                raise WrongContentType(_ctype)
     else:
         raise ValueError("Unknown return format: %s" % body_type)
 
