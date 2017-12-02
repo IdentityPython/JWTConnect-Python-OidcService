@@ -308,6 +308,8 @@ class RegistrationRequest(Request):
     endpoint_name = 'registration_endpoint'
     synchronous = True
     request = 'registration'
+    body_type= 'json'
+    http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         Request.__init__(self, httplib=httplib, keyjar=keyjar,
