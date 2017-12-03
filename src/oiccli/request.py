@@ -427,6 +427,7 @@ class Request(object):
             value_type = 'urlencoded'
 
         if reqresp.status_code in SUCCESSFUL:
+            logger.debug('Successful response: {}'.format(reqresp.text))
             try:
                 return self.parse_response(reqresp.text, client_info,
                                            value_type, state, **kwargs)
@@ -439,6 +440,8 @@ class Request(object):
             logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
             raise ParseError("ERROR: Something went wrong: %s" % reqresp.text)
         elif 400 <= reqresp.status_code < 500:
+            logger.error('Error response ({}): {}'.format(reqresp.status_code,
+                                                          reqresp.text))
             # expecting an error response
             try:
                 err_resp = self.parse_error_mesg(reqresp, value_type)
@@ -447,7 +450,8 @@ class Request(object):
             else:
                 return err_resp
         else:
-            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
+            logger.error('Error response ({}): {}'.format(reqresp.status_code,
+                                                          reqresp.text))
             raise HttpError("HTTP ERROR: %s [%s] on %s" % (
                 reqresp.text, reqresp.status_code, reqresp.url))
 
