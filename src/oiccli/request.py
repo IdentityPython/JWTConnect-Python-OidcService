@@ -50,6 +50,8 @@ request_and_return
         
 """
 
+REQUEST_INFO='Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
+
 
 class Request(object):
     msg_type = Message
@@ -332,7 +334,11 @@ class Request(object):
         if self.events:
             self.events.store('Response', info)
 
-        resp = self.response_cls().deserialize(info, sformat, **kwargs)
+        try:
+            resp = self.response_cls().deserialize(info, sformat, **kwargs)
+        except Exception as err:
+            logger.error('Error while deserializing: {}'.format(err))
+            raise
 
         msg = 'Initial response parsing => "{}"'
         logger.debug(msg.format(resp.to_dict()))
@@ -359,8 +365,8 @@ class Request(object):
                         resp = None
             except KeyError:
                 pass
-        # elif resp.only_extras():
-        #     resp = None
+
+            logger.debug('Error response: {}'.format(resp))
         else:
             kwargs["client_id"] = client_info.client_id
 
@@ -389,6 +395,8 @@ class Request(object):
         try:
             self.do_post_parse_response(resp, client_info, state=state)
         except Exception as err:
+            logger.error(
+                'Got exception on do_post_parse_result: {}'.format(err))
             raise
 
         return resp
@@ -472,9 +480,12 @@ class Request(object):
         if http_args is None:
             http_args = {}
 
+        logger.debug(REQUEST_INFO.format(url, method, body, http_args))
+
         try:
             resp = self.httplib(url, method, data=body, **http_args)
-        except Exception:
+        except Exception as err:
+            logger.error('Exception on request: {}'.format(err))
             raise
 
         if "keyjar" not in kwargs:
