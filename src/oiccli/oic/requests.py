@@ -69,9 +69,10 @@ class AuthorizationRequest(requests.AuthorizationRequest):
     response_cls = oic.AuthorizationResponse
     error_msg = oic.AuthorizationErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 **kwargs):
         requests.AuthorizationRequest.__init__(self, httplib, keyjar,
-                                               client_authn_method)
+                                               client_authn_method, **kwargs)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oic_pre_construct]
         self.post_construct = [self.oic_post_construct]
@@ -187,7 +188,7 @@ class AccessTokenRequest(requests.AccessTokenRequest):
 
     def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
         try:
-            _idt = resp['id_token']
+            _idt = resp['verified_id_token']
         except KeyError:
             pass
         else:
@@ -438,18 +439,18 @@ class UserInfoRequest(Request):
             for csrc, spec in _csrc.items():
                 if "endpoint" in spec:
                     if "access_token" in spec:
-                        _uinfo = self.request_and_return(
+                        _uinfo = self.service_request(
                             spec["endpoint"], method='GET',
                             token=spec["access_token"], client_info=cli_info)
                     else:
                         if callback:
-                            _uinfo = self.request_and_return(
+                            _uinfo = self.service_request(
                                 spec["endpoint"],
                                 method='GET',
                                 token=callback(spec['endpoint']),
                                 client_info=cli_info)
                         else:
-                            _uinfo = self.request_and_return(
+                            _uinfo = self.service_request(
                                 spec["endpoint"],
                                 method='GET',
                                 client_info=cli_info)

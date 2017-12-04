@@ -152,7 +152,7 @@ class Client(object):
             request_args=request_args, extra_args=extra_args,
             authn_method=authn_method, http_args=http_args, **kwargs)
 
-        return _srv.request_and_return(
+        return _srv.service_request(
             _info['uri'], method, _info['body'], body_type,
             http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)

@@ -60,7 +60,7 @@ class ClientInfo(object):
                 if attr == 'client_id':
                     self.state_db.client_id = config[attr]
 
-        for attr in ['allow', 'client_prefs', 'behaviour']:
+        for attr in ['allow', 'client_prefs', 'behaviour', 'provider_info']:
             try:
                 setattr(self, attr, config[attr])
             except:

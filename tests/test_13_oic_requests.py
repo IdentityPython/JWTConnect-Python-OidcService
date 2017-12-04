@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from jwkest.jws import JWS
 from oicmsg.jwt import JWT
 from oicmsg.key_jar import build_keyjar
 
