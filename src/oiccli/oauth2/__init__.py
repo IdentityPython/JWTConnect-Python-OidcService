@@ -142,10 +142,12 @@ class Client(object):
         return met(self.client_info, request_args, extra_args, **kwargs)
 
     def do_request(self, request_type, scope="", body_type="json",
-                   method="POST", request_args=None, extra_args=None,
+                   method="", request_args=None, extra_args=None,
                    http_args=None, authn_method="", **kwargs):
 
         _srv = self.service[request_type]
+        if not method:
+            method = _srv.http_method
 
         _info = _srv.do_request_init(
             self.client_info, method=method, scope=scope,

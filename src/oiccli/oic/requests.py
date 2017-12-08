@@ -387,6 +387,7 @@ class UserInfoRequest(Request):
     synchronous = True
     request = 'userinfo'
     default_authn_method = 'bearer_header'
+    http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         Request.__init__(self, httplib=httplib, keyjar=keyjar,
