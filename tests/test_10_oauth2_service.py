@@ -10,8 +10,8 @@ from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import AuthorizationResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
-from oiccli.oauth2.requests import factory
-from oiccli.request import Request
+from oiccli.oauth2.service import factory
+from oiccli.service import Service
 
 
 class Response(object):
@@ -21,16 +21,16 @@ class Response(object):
         self.headers = headers or {"content-type": "text/plain"}
 
 
-def test_request_factory():
-    req = factory('Request', httplib=None, keyjar=None,
+def test_service_factory():
+    req = factory('Service', httplib=None, keyjar=None,
                   client_authn_method=None)
-    assert isinstance(req, Request)
+    assert isinstance(req, Service)
 
 
-class TestAuthorizationRequest(object):
+class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('AuthorizationRequest')
+        self.req = factory('Authorization')
         client_config = {'client_id':'client_id', 'client_secret':'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         self.cli_info = ClientInfo(config=client_config)
@@ -121,7 +121,7 @@ class TestAuthorizationRequest(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('AccessTokenRequest',
+        self.req = factory('AccessToken',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id':'client_id', 'client_secret':'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
@@ -230,7 +230,7 @@ class TestAccessTokenRequest(object):
                                                    body_type='json')
 
 
-class TestProviderInfoRequest(object):
+class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.req = factory('ProviderInfoDiscovery')

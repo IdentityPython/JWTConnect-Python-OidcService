@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from jwkest.jws import JWS
 from oicmsg.jwt import JWT
 from oicmsg.key_jar import build_keyjar
 
@@ -12,8 +11,8 @@ from oiccli.exception import WrongContentType
 from oiccli.oauth2 import build_services
 from oiccli.oauth2 import ClientInfo
 from oiccli.oauth2 import DEFAULT_SERVICES
-from oiccli.oic.requests import factory
-from oiccli.request import Request
+from oiccli.oic.service import factory
+from oiccli.service import Service
 
 from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
@@ -44,15 +43,15 @@ keyjar = build_keyjar(KEYSPEC)[1]
 
 
 def test_request_factory():
-    req = factory('Request', httplib=None, keyjar=None,
+    req = factory('Service', httplib=None, keyjar=None,
                   client_authn_method=None)
-    assert isinstance(req, Request)
+    assert isinstance(req, Service)
 
 
-class TestAuthorizationRequest(object):
+class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('AuthorizationRequest',
+        self.req = factory('Authorization',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
@@ -200,7 +199,7 @@ class TestAuthorizationRequest(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('AccessTokenRequest',
+        self.req = factory('AccessToken',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
@@ -307,7 +306,7 @@ class TestAccessTokenRequest(object):
             self.req.do_post_parse_response(resp, self.cli_info, state='state2')
 
 
-class TestProviderInfoRequest(object):
+class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.req = factory('ProviderInfoDiscovery',
@@ -521,10 +520,10 @@ class TestProviderInfoRequest(object):
                                                    body_type='json')
 
 
-class TestRegistrationRequest(object):
+class TestRegistration(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('RegistrationRequest',
+        self.req = factory('Registration',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
@@ -557,10 +556,10 @@ class TestRegistrationRequest(object):
         assert 'request_uris' in _req
 
 
-class TestUserInfoRequest(object):
+class TestUserInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('UserInfoRequest',
+        self.req = factory('UserInfo',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
@@ -618,10 +617,10 @@ class TestUserInfoRequest(object):
                                      'address', 'phone_number'}
 
 
-class TestCheckSessionRequest(object):
+class TestCheckSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('CheckSessionRequest',
+        self.req = factory('CheckSession',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
@@ -640,10 +639,10 @@ class TestCheckSessionRequest(object):
         assert len(_req) == 1
 
 
-class TestCheckIDRequest(object):
+class TestCheckID(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('CheckIDRequest',
+        self.req = factory('CheckID',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
@@ -662,10 +661,10 @@ class TestCheckIDRequest(object):
         assert len(_req) == 1
 
 
-class TestEndSessionRequest(object):
+class TestEndSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = factory('EndSessionRequest',
+        self.req = factory('EndSession',
                            client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',

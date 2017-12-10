@@ -4,7 +4,7 @@ import sys
 
 from oiccli import OIDCONF_PATTERN
 from oiccli.exception import OicCliError
-from oiccli.request import Request
+from oiccli.service import Service
 
 from oicmsg import oauth2
 from oicmsg.exception import MissingParameter
@@ -34,7 +34,7 @@ def get_state(request_args, kwargs):
     return _state
 
 
-class AuthorizationRequest(Request):
+class Authorization(Service):
     msg_type = oauth2.AuthorizationRequest
     response_cls = oauth2.AuthorizationResponse
     error_msg = oauth2.AuthorizationErrorResponse
@@ -43,13 +43,13 @@ class AuthorizationRequest(Request):
     request = 'authorization'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
     def _parse_args(self, cli_info, **kwargs):
-        ar_args = Request._parse_args(self, cli_info, **kwargs)
+        ar_args = Service._parse_args(self, cli_info, **kwargs)
 
         if 'redirect_uri' not in ar_args:
             try:
@@ -70,7 +70,7 @@ class AuthorizationRequest(Request):
         else:
             del kwargs['algs']
 
-        _info = Request.do_request_init(self, cli_info, body_type=body_type,
+        _info = Service.do_request_init(self, cli_info, body_type=body_type,
                                         method=method,
                                         authn_method=authn_method,
                                         request_args=request_args,
@@ -96,7 +96,7 @@ class AuthorizationRequest(Request):
         return request_args, {}
 
 
-class AccessTokenRequest(Request):
+class AccessToken(Service):
     msg_type = oauth2.AccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
     error_msg = oauth2.TokenErrorResponse
@@ -107,7 +107,7 @@ class AccessTokenRequest(Request):
     http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
@@ -127,7 +127,7 @@ class AccessTokenRequest(Request):
         return request_args, {}
 
 
-class RefreshAccessTokenRequest(Request):
+class RefreshAccessToken(Service):
     msg_type = oauth2.RefreshAccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
     error_msg = oauth2.TokenErrorResponse
@@ -138,7 +138,7 @@ class RefreshAccessTokenRequest(Request):
     http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct.append(self.oauth_pre_construct)
 
@@ -154,7 +154,7 @@ class RefreshAccessTokenRequest(Request):
         return request_args, {}
 
 
-class ProviderInfoDiscovery(Request):
+class ProviderInfoDiscovery(Service):
     msg_type = oauth2.Message
     response_cls = oauth2.ASConfigurationResponse
     error_msg = oauth2.ErrorResponse
@@ -163,7 +163,7 @@ class ProviderInfoDiscovery(Request):
     http_method = 'GET'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.post_parse_response.append(self.oauth_post_parse_response)
 
@@ -233,7 +233,7 @@ class ProviderInfoDiscovery(Request):
 
 def factory(req_name, **kwargs):
     for name, obj in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isclass(obj) and issubclass(obj, Request):
+        if inspect.isclass(obj) and issubclass(obj, Service):
             try:
                 if obj.__name__ == req_name:
                     return obj(**kwargs)

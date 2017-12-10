@@ -28,7 +28,7 @@ RESPONSE2ERROR = {
 SPECIAL_ARGS = ['authn_endpoint', 'algs']
 
 """
-method call structure for Requests:
+method call structure for Services:
 
 do_request_init
     - request_info
@@ -53,7 +53,7 @@ request_and_return
 REQUEST_INFO='Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 
-class Request(object):
+class Service(object):
     msg_type = Message
     response_cls = Message
     error_msg = ErrorResponse

@@ -14,11 +14,11 @@ else:
 from oiccli import rndstr
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
-from oiccli.oauth2 import requests
-from oiccli.oauth2.requests import get_state
+from oiccli.oauth2 import service
+from oiccli.oauth2.service import get_state
 from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
-from oiccli.request import Request
+from oiccli.service import Service
 from oicmsg import oic
 from oicmsg.exception import MissingParameter
 from oicmsg.exception import MissingRequiredAttribute
@@ -64,13 +64,13 @@ PROVIDER_DEFAULT = {
 }
 
 
-class AuthorizationRequest(requests.AuthorizationRequest):
+class Authorization(service.Authorization):
     msg_type = oic.AuthorizationRequest
     response_cls = oic.AuthorizationResponse
     error_msg = oic.AuthorizationErrorResponse
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        requests.AuthorizationRequest.__init__(self, httplib, keyjar,
+        service.Authorization.__init__(self, httplib, keyjar,
                                                client_authn_method)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oic_pre_construct]
@@ -157,30 +157,14 @@ class AuthorizationRequest(requests.AuthorizationRequest):
 
         return req
 
-        # def do_request_init(self, cli_info, scope="", body_type="json",
-        #                     method="GET", request_args=None, http_args=None,
-        #                     authn_method="", **kwargs):
-        #
-        #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-        #
-        #     if 'code_challenge' in cli_info.config:
-        #         _args, code_verifier = cli_info.add_code_challenge()
-        #         request_args.update(_args)
-        #
-        #     return requests.AuthorizationRequest.do_request_init(
-        #         self, cli_info, scope=scope, body_type=body_type,
-        # method=method,
-        #         request_args=request_args, http_args=http_args,
-        #         authn_method=authn_method, **kwargs)
 
-
-class AccessTokenRequest(requests.AccessTokenRequest):
+class AccessToken(service.AccessToken):
     msg_type = oic.AccessTokenRequest
     response_cls = oic.AccessTokenResponse
     error_msg = oic.TokenErrorResponse
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        requests.AccessTokenRequest.__init__(
+        service.AccessToken.__init__(
             self, httplib=httplib, keyjar=keyjar,
             client_authn_method=client_authn_method)
         self.post_parse_response = [self.oic_post_parse_response]
@@ -198,19 +182,19 @@ class AccessTokenRequest(requests.AccessTokenRequest):
                 pass
 
 
-class RefreshAccessTokenRequest(requests.RefreshAccessTokenRequest):
+class RefreshAccessToken(service.RefreshAccessToken):
     msg_type = oic.RefreshAccessTokenRequest
     response_cls = oic.AccessTokenResponse
     error_msg = oic.TokenErrorResponse
 
 
-class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
+class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oic.Message
     response_cls = oic.ProviderConfigurationResponse
     error_msg = ErrorResponse
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        requests.ProviderInfoDiscovery.__init__(
+        service.ProviderInfoDiscovery.__init__(
             self, httplib=httplib, keyjar=keyjar,
             client_authn_method=client_authn_method)
         # Should be done before any other
@@ -301,7 +285,7 @@ class ProviderInfoDiscovery(requests.ProviderInfoDiscovery):
                 cli_info.behaviour[key] = val
 
 
-class RegistrationRequest(Request):
+class Registration(Service):
     msg_type = oic.RegistrationRequest
     response_cls = oic.RegistrationResponse
     error_msg = ErrorResponse
@@ -312,7 +296,7 @@ class RegistrationRequest(Request):
     http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct = [self.oic_pre_construct]
         self.post_parse_response.append(self.oic_post_parse_response)
@@ -378,7 +362,7 @@ class RegistrationRequest(Request):
             pass
 
 
-class UserInfoRequest(Request):
+class UserInfo(Service):
     msg_type = Message
     response_cls = oic.OpenIDSchema
     error_msg = oic.UserInfoErrorResponse
@@ -388,7 +372,7 @@ class UserInfoRequest(Request):
     default_authn_method = 'bearer_header'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct = [self.oic_pre_construct]
         self.post_parse_response.insert(0, self.oic_post_parse_response)
@@ -489,7 +473,7 @@ def set_id_token(cli_info, request_args, **kwargs):
     return request_args
 
 
-class CheckSessionRequest(Request):
+class CheckSession(Service):
     msg_type = oic.CheckSessionRequest
     response_cls = Message
     error_msg = ErrorResponse
@@ -498,7 +482,7 @@ class CheckSessionRequest(Request):
     request = 'check_session'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct = [self.oic_pre_construct]
 
@@ -507,7 +491,7 @@ class CheckSessionRequest(Request):
         return request_args, {}
 
 
-class CheckIDRequest(Request):
+class CheckID(Service):
     msg_type = oic.CheckIDRequest
     response_cls = Message
     error_msg = ErrorResponse
@@ -516,7 +500,7 @@ class CheckIDRequest(Request):
     request = 'check_id'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct = [self.oic_pre_construct]
 
@@ -525,7 +509,7 @@ class CheckIDRequest(Request):
         return request_args, {}
 
 
-class EndSessionRequest(Request):
+class EndSession(Service):
     msg_type = oic.EndSessionRequest
     response_cls = Message
     error_msg = ErrorResponse
@@ -534,7 +518,7 @@ class EndSessionRequest(Request):
     request = 'end_session'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
-        Request.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
         self.pre_construct = [self.oic_pre_construct]
 
@@ -545,11 +529,11 @@ class EndSessionRequest(Request):
 
 def factory(req_name, **kwargs):
     for name, obj in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isclass(obj) and issubclass(obj, Request):
+        if inspect.isclass(obj) and issubclass(obj, Service):
             try:
                 if obj.__name__ == req_name:
                     return obj(**kwargs)
             except AttributeError:
                 pass
 
-    return requests.factory(req_name, **kwargs)
+    return service.factory(req_name, **kwargs)

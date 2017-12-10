@@ -6,7 +6,7 @@ from oicmsg.oauth2 import Message
 from oicmsg.oauth2 import SINGLE_OPTIONAL_INT
 from oicmsg.oauth2 import SINGLE_OPTIONAL_STRING
 from oicmsg.oauth2 import SINGLE_REQUIRED_STRING
-from oiccli.request import Request
+from oiccli.service import Service
 
 
 class DummyMessage(Message):
@@ -24,7 +24,7 @@ class Response(object):
         self.headers = headers or {"content-type": "text/plain"}
 
 
-class DummyRequest(Request):
+class DummyRequest(Service):
     msg_type = DummyMessage
 
 
@@ -116,7 +116,7 @@ class TestDummyRequest(object):
 class TestRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.req = Request(httplib=None, keyjar=None, client_authn_method=None)
+        self.req = Service(httplib=None, keyjar=None, client_authn_method=None)
         self.cli_info = ClientInfo(None)
 
     def test_construct(self):

@@ -8,12 +8,13 @@ from oiccli.http_util import BadRequest
 from oiccli.http_util import Response
 from oiccli.http_util import R2C
 from oiccli.http_util import SeeOther
-from oiccli.oauth2 import requests
-from oiccli.request import Request
+from oiccli.oauth2 import service
 
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.key_jar import KeyJar
+
+from oiccli.service import Service
 
 __author__ = 'Roland Hedberg'
 
@@ -21,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 Version = "2.0"
 
-DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
-                    'RefreshAccessTokenRequest', 'ProviderInfoDiscovery']
+DEFAULT_SERVICES = ['Authorization', 'AccessToken',
+                    'RefreshAccessToken', 'ProviderInfoDiscovery']
 
 
 class ExpiredToken(OicCliError):
@@ -89,7 +90,7 @@ def build_services(srvs, service_factory, http, keyjar, client_authn_method):
         service[_srv.request] = _srv
 
     # For any unspecified service
-    service['any'] = Request(httplib=http, keyjar=keyjar,
+    service['any'] = Service(httplib=http, keyjar=keyjar,
                              client_authn_method=client_authn_method)
     return service
 
@@ -121,7 +122,7 @@ class Client(object):
         if self.client_info.client_id:
             self.client_id = self.client_info.client_id
         _cam = client_authn_method or CLIENT_AUTHN_METHOD
-        self.service_factory = service_factory or requests.factory
+        self.service_factory = service_factory or service.factory
         _srvs = services or DEFAULT_SERVICES
 
         self.service = build_services(_srvs, self.service_factory, self.http,

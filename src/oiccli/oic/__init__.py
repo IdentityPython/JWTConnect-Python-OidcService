@@ -9,7 +9,7 @@ else:
 
 from oiccli import oauth2
 
-from oiccli.oic import requests
+from oiccli.oic import service
 from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import WebFinger
 
@@ -17,9 +17,8 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVICES = ['AuthorizationRequest', 'AccessTokenRequest',
-                    'RefreshAccessTokenRequest', 'ProviderInfoDiscovery',
-                    'UserInfoRequest', 'RegistrationRequest']
+DEFAULT_SERVICES = ['Authorization', 'AccessToken', 'RefreshAccessToken',
+                    'ProviderInfoDiscovery', 'UserInfo', 'Registration']
 
 # -----------------------------------------------------------------------------
 
@@ -67,7 +66,7 @@ class Client(oauth2.Client):
                  services=None, service_factory=None):
 
         _srvs = services or DEFAULT_SERVICES
-        service_factory = service_factory or requests.factory
+        service_factory = service_factory or service.factory
         oauth2.Client.__init__(self, ca_certs,
                                client_authn_method=client_authn_method,
                                keyjar=keyjar, verify_ssl=verify_ssl,
@@ -77,89 +76,3 @@ class Client(oauth2.Client):
 
         self.wf = WebFinger(OIC_ISSUER)
         self.wf.httpd = self.http
-
-    # ------------------------------------------------------------------------
-
-    # def user_info_request(self, method="GET", state="", scope="", **kwargs):
-    #     uir = UserInfoRequest()
-    #     logger.debug("[user_info_request]: kwargs:%s" % (sanitize(kwargs),))
-    #     token = None
-    #     if "token" in kwargs:
-    #         if kwargs["token"]:
-    #             uir["access_token"] = kwargs["token"]
-    #             token = Token()
-    #             token.token_type = "Bearer"
-    #             token.access_token = kwargs["token"]
-    #             kwargs["behavior"] = "use_authorization_header"
-    #         else:
-    #             # What to do ? Need a callback
-    #             pass
-    #     elif "access_token" in kwargs and kwargs["access_token"]:
-    #         uir["access_token"] = kwargs["access_token"]
-    #         del kwargs["access_token"]
-    #     elif state:
-    #         token = self.grant[state].get_token(scope)
-    #
-    #         if token.is_valid():
-    #             uir["access_token"] = token.access_token
-    #             if token.token_type and token.token_type.lower() == "bearer" \
-    #                     and method == "GET":
-    #                 kwargs["behavior"] = "use_authorization_header"
-    #         else:
-    #             # raise oauth2.OldAccessToken
-    #             if self.log:
-    #                 self.log.info("do access token refresh")
-    #             try:
-    #                 self.do_access_token_refresh(token=token)
-    #                 token = self.grant[state].get_token(scope)
-    #                 uir["access_token"] = token.access_token
-    #             except Exception:
-    #                 raise
-    #
-    #     uri = self._endpoint("userinfo_endpoint", **kwargs)
-    #     # If access token is a bearer token it might be sent in the
-    #     # authorization header
-    #     # 4 ways of sending the access_token:
-    #     # - POST with token in authorization header
-    #     # - POST with token in message body
-    #     # - GET with token in authorization header
-    #     # - GET with token as query parameter
-    #     if "behavior" in kwargs:
-    #         _behav = kwargs["behavior"]
-    #         _token = uir["access_token"]
-    #         _ttype = ''
-    #         try:
-    #             _ttype = kwargs["token_type"]
-    #         except KeyError:
-    #             if token:
-    #                 try:
-    #                     _ttype = token.token_type
-    #                 except AttributeError:
-    #                     raise MissingParameter("Unspecified token type")
-    #
-    #         if 'as_query_parameter' == _behav:
-    #             method = 'GET'
-    #         elif token:
-    #             # use_authorization_header, token_in_message_body
-    #             if "use_authorization_header" in _behav:
-    #                 token_header = "{type} {token}".format(
-    #                     type=_ttype.capitalize(),
-    #                     token=_token)
-    #                 if "headers" in kwargs:
-    #                     kwargs["headers"].update(
-    #                         {"Authorization": token_header})
-    #                 else:
-    #                     kwargs["headers"] = {"Authorization": token_header}
-    #
-    #             if "token_in_message_body" not in _behav:
-    #                 # remove the token from the request
-    #                 del uir["access_token"]
-    #
-    #     path, body, kwargs = get_or_post(uri, method, uir, **kwargs)
-    #
-    #     h_args = dict([(k, v) for k, v in kwargs.items() if k in HTTP_ARGS])
-    #
-    #     return path, body, method, h_args
-
-
-
