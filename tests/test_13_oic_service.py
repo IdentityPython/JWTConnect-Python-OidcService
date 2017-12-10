@@ -299,8 +299,7 @@ class TestAccessTokenRequest(object):
 
     def test_id_token_nonce_match(self):
         self.cli_info.state_db.bind_nonce_to_state('nonce', 'state')
-        resp = AccessTokenResponse(id_token={'nonce': 'nonce'})
-        self.req._post_parse_response(resp, self.cli_info, state='state')
+        resp = AccessTokenResponse(verified_id_token={'nonce': 'nonce'})
         self.cli_info.state_db.bind_nonce_to_state('nonce2', 'state2')
         with pytest.raises(ParameterError):
             self.req.do_post_parse_response(resp, self.cli_info, state='state2')

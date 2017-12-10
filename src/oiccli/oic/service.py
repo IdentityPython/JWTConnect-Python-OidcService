@@ -157,6 +157,21 @@ class Authorization(service.Authorization):
 
         return req
 
+        # def do_request_init(self, cli_info, scope="", body_type="json",
+        #                     method="GET", request_args=None, http_args=None,
+        #                     authn_method="", **kwargs):
+        #
+        #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
+        #
+        #     if 'code_challenge' in cli_info.config:
+        #         _args, code_verifier = cli_info.add_code_challenge()
+        #         request_args.update(_args)
+        #
+        #     return requests.AuthorizationRequest.do_request_init(
+        #         self, cli_info, scope=scope, body_type=body_type,
+        # method=method,
+        #         request_args=request_args, http_args=http_args,
+        #         authn_method=authn_method, **kwargs)
 
 class AccessToken(service.AccessToken):
     msg_type = oic.AccessTokenRequest
@@ -171,7 +186,7 @@ class AccessToken(service.AccessToken):
 
     def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
         try:
-            _idt = resp['id_token']
+            _idt = resp['verified_id_token']
         except KeyError:
             pass
         else:
@@ -370,6 +385,7 @@ class UserInfo(Service):
     synchronous = True
     request = 'userinfo'
     default_authn_method = 'bearer_header'
+    http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
@@ -422,18 +438,18 @@ class UserInfo(Service):
             for csrc, spec in _csrc.items():
                 if "endpoint" in spec:
                     if "access_token" in spec:
-                        _uinfo = self.request_and_return(
+                        _uinfo = self.service_request(
                             spec["endpoint"], method='GET',
                             token=spec["access_token"], client_info=cli_info)
                     else:
                         if callback:
-                            _uinfo = self.request_and_return(
+                            _uinfo = self.service_request(
                                 spec["endpoint"],
                                 method='GET',
                                 token=callback(spec['endpoint']),
                                 client_info=cli_info)
                         else:
-                            _uinfo = self.request_and_return(
+                            _uinfo = self.service_request(
                                 spec["endpoint"],
                                 method='GET',
                                 client_info=cli_info)

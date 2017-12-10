@@ -41,7 +41,7 @@ do_request_init
             - _endpoint
     - update_http_args
 
-request_and_return
+service_request
     - parse_request_response
         - parse_response
              - get_urlinfo
@@ -64,7 +64,8 @@ class Service(object):
     http_method = 'GET'
     body_type = 'urlencoded'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 **kwargs):
         self.httplib = httplib
         self.keyjar = keyjar
         self.client_authn_method = client_authn_method
@@ -369,6 +370,7 @@ class Service(object):
             logger.debug('Error response: {}'.format(resp))
         else:
             kwargs["client_id"] = client_info.client_id
+            kwargs['iss'] = client_info.issuer
 
             if "key" not in kwargs and "keyjar" not in kwargs:
                 kwargs["keyjar"] = self.keyjar
@@ -415,6 +417,12 @@ class Service(object):
         else:
             return err
 
+    def get_value_type(self, reqresp, body_type):
+        if body_type:
+            return verify_header(reqresp, body_type)
+        else:
+            return 'urlencoded'
+
     def parse_request_response(self, reqresp, client_info, body_type='',
                                state="", **kwargs):
         """
@@ -429,12 +437,9 @@ class Service(object):
         :return: 
         """
 
-        if body_type:
-            value_type = verify_header(reqresp, body_type)
-        else:
-            value_type = 'urlencoded'
-
         if reqresp.status_code in SUCCESSFUL:
+            value_type = self.get_value_type(reqresp, body_type)
+
             logger.debug('Successful response: {}'.format(reqresp.text))
             try:
                 return self.parse_response(reqresp.text, client_info,
@@ -451,6 +456,8 @@ class Service(object):
             logger.error('Error response ({}): {}'.format(reqresp.status_code,
                                                           reqresp.text))
             # expecting an error response
+            value_type = self.get_value_type(reqresp, body_type)
+
             try:
                 err_resp = self.parse_error_mesg(reqresp, value_type)
             except OicCliError:
@@ -463,9 +470,8 @@ class Service(object):
             raise HttpError("HTTP ERROR: %s [%s] on %s" % (
                 reqresp.text, reqresp.status_code, reqresp.url))
 
-    def request_and_return(self, url, method="GET", body=None,
-                           body_type="json", http_args=None,
-                           client_info=None, **kwargs):
+    def service_request(self, url, method="GET", body=None, body_type="json",
+                        http_args=None, client_info=None, **kwargs):
         """
         :param url: The URL to which the request should be sent
         :param response: Response type
@@ -493,4 +499,3 @@ class Service(object):
 
         return self.parse_request_response(resp, client_info, body_type,
                                            **kwargs)
-

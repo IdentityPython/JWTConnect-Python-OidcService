@@ -27,6 +27,18 @@ class TestState(object):
         for key, val in REQ_ARGS.items():
             assert self.state_db[state][key] == val
 
+    def test_add_mesg_code(self):
+        request = AuthorizationRequest(**REQ_ARGS)
+
+        state = self.state_db.create_state(receiver='https://example.org/op',
+                                           request=request)
+
+        aresp = AuthorizationResponse(code="access grant", state=state)
+
+        self.state_db.add_message_info(aresp)
+
+        assert self.state_db[state]['code'] == 'access grant'
+
     def test_read_state(self):
         request = AuthorizationRequest(**REQ_ARGS)
 
@@ -39,18 +51,6 @@ class TestState(object):
         assert _info['redirect_uri'] == 'https://example.com/rp/cb'
         assert _info['response_type'] == 'code'
         assert 'iat' in _info
-
-    def test_add_mesg_code(self):
-        request = AuthorizationRequest(**REQ_ARGS)
-
-        state = self.state_db.create_state(receiver='https://example.org/op',
-                                           request=request)
-
-        aresp = AuthorizationResponse(code="access grant", state=state)
-
-        self.state_db.add_message_info(aresp)
-
-        assert self.state_db[state]['code'] == 'access grant'
 
     def test_add_mesg_code_token(self):
         request = AuthorizationRequest(**REQ_ARGS)
