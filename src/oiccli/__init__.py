@@ -29,6 +29,7 @@ HTTP_ARGS = ["headers", "redirections", "connection_type"]
 JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 SAML2_BEARER_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:saml2-bearer"
 
+
 def rndstr(size=16):
     """
     Returns a string of random ascii characters or digits

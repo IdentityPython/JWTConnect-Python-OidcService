@@ -173,6 +173,7 @@ class Authorization(service.Authorization):
         #         request_args=request_args, http_args=http_args,
         #         authn_method=authn_method, **kwargs)
 
+
 class AccessToken(service.AccessToken):
     msg_type = oic.AccessTokenRequest
     response_cls = oic.AccessTokenResponse
