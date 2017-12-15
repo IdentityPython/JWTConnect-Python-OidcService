@@ -184,6 +184,8 @@ def verify_header(reqresp, body_type):
         else:
             return 'txt'  # reasonable default ??
 
+    logger.debug('Expected body type: "{}"'.format(body_type))
+
     if body_type == "":
         if match_to_("application/json", _ctype):
             body_type = 'json'
@@ -211,6 +213,7 @@ def verify_header(reqresp, body_type):
     else:
         raise ValueError("Unknown return format: %s" % body_type)
 
+    logger.debug('Got body type: "{}"'.format(body_type))
     return body_type
 
 
