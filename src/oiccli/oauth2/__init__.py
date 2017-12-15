@@ -158,6 +158,8 @@ class Client(object):
         if not response_body_type:
             response_body_type = _srv.response_body_type
 
+        logger.debug('do_request info: {}'.format(_info))
+
         return _srv.service_request(
             _info['uri'], method, _info['body'], response_body_type,
             http_args=_info['http_args'], client_info=self.client_info,
