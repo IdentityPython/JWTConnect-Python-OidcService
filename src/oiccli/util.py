@@ -212,3 +212,20 @@ def verify_header(reqresp, body_type):
         raise ValueError("Unknown return format: %s" % body_type)
 
     return body_type
+
+
+SORT_ORDER = {'RS': 0, 'ES': 1, 'HS': 2, 'PS': 3, 'no': 4}
+
+
+def sort_sign_alg(alg1, alg2):
+    if SORT_ORDER[alg1[0:2]] < SORT_ORDER[alg2[0:2]]:
+        return -1
+    elif SORT_ORDER[alg1[0:2]] > SORT_ORDER[alg2[0:2]]:
+        return 1
+    else:
+        if alg1 < alg2:
+            return -1
+        elif alg1 > alg2:
+            return 1
+        else:
+            return 0
