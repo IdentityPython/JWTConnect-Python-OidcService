@@ -63,6 +63,7 @@ class Service(object):
     default_authn_method = ''
     http_method = 'GET'
     body_type = 'urlencoded'
+    response_body_type = 'json'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
                  **kwargs):

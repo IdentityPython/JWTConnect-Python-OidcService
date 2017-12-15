@@ -142,7 +142,7 @@ class Client(object):
         met = getattr(self, 'construct_{}_request'.format(request_type))
         return met(self.client_info, request_args, extra_args, **kwargs)
 
-    def do_request(self, request_type, scope="", body_type="json",
+    def do_request(self, request_type, scope="", response_body_type="",
                    method="", request_args=None, extra_args=None,
                    http_args=None, authn_method="", **kwargs):
 
@@ -155,8 +155,11 @@ class Client(object):
             request_args=request_args, extra_args=extra_args,
             authn_method=authn_method, http_args=http_args, **kwargs)
 
+        if not response_body_type:
+            response_body_type = _srv.response_body_type
+
         return _srv.service_request(
-            _info['uri'], method, _info['body'], body_type,
+            _info['uri'], method, _info['body'], response_body_type,
             http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)
 
