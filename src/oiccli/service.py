@@ -424,14 +424,14 @@ class Service(object):
         else:
             return 'urlencoded'
 
-    def parse_request_response(self, reqresp, client_info, body_type='',
+    def parse_request_response(self, reqresp, client_info, response_body_type='',
                                state="", **kwargs):
         """
         Deal with a request response
          
         :param reqresp: The HTTP request response
         :param client_info: Information about the client/server session
-        :param body_type: If response in body one of 'json', 'jwt' or 
+        :param response_body_type: If response in body one of 'json', 'jwt' or
             'urlencoded'
         :param state: Session identifier
         :param kwargs: Extra keyword arguments
@@ -439,7 +439,7 @@ class Service(object):
         """
 
         if reqresp.status_code in SUCCESSFUL:
-            value_type = self.get_value_type(reqresp, body_type)
+            value_type = self.get_value_type(reqresp, response_body_type)
 
             logger.debug('Successful response: {}'.format(reqresp.text))
             try:
@@ -457,7 +457,7 @@ class Service(object):
             logger.error('Error response ({}): {}'.format(reqresp.status_code,
                                                           reqresp.text))
             # expecting an error response
-            value_type = self.get_value_type(reqresp, body_type)
+            value_type = self.get_value_type(reqresp, response_body_type)
 
             try:
                 err_resp = self.parse_error_mesg(reqresp, value_type)
@@ -471,8 +471,9 @@ class Service(object):
             raise HttpError("HTTP ERROR: %s [%s] on %s" % (
                 reqresp.text, reqresp.status_code, reqresp.url))
 
-    def service_request(self, url, method="GET", body=None, body_type="json",
-                        http_args=None, client_info=None, **kwargs):
+    def service_request(self, url, method="GET", body=None,
+                        response_body_type="", http_args=None, client_info=None,
+                        **kwargs):
         """
         :param url: The URL to which the request should be sent
         :param response: Response type
@@ -498,5 +499,5 @@ class Service(object):
         if "keyjar" not in kwargs:
             kwargs["keyjar"] = self.keyjar
 
-        return self.parse_request_response(resp, client_info, body_type,
-                                           **kwargs)
+        return self.parse_request_response(resp, client_info,
+                                           response_body_type, **kwargs)
