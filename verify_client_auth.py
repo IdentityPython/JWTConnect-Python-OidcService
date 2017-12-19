@@ -1,16 +1,16 @@
 import base64
 import logging
-
 import six
-from jwkest import as_bytes
-from jwkest import Invalid
-from jwkest import MissingKey
-from jwkest.jws import alg2keytype
 
+from cryptojwt import as_bytes
+from cryptojwt.exception import Invalid
+from cryptojwt.exception import MissingKey
+from cryptojwt.jws import alg2keytype
+
+from oiccli import JWT_BEARER
 from oiccli import rndstr
 from oiccli import sanitize
 from oiccli.client_auth import AuthnFailure
-from oiccli.oic import JWT_BEARER
 from oicmsg.exception import FailedAuthentication
 from oicmsg.exception import NotForMe
 from oicmsg.exception import UnknownAssertionType

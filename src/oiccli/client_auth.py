@@ -1,14 +1,12 @@
 import base64
 import logging
 
-from jwkest import as_bytes
-from jwkest.jws import alg2keytype
+from cryptojwt.jws import alg2keytype
 
 from oiccli import rndstr
 from oiccli import sanitize
 from oiccli import DEF_SIGN_ALG
 from oiccli import JWT_BEARER
-from oicmsg.exception import FailedAuthentication
 from oicmsg.message import VREQUIRED
 from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import SINGLE_OPTIONAL_STRING

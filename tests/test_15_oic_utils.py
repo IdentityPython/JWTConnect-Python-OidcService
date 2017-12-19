@@ -5,7 +5,7 @@ from oiccli.oic.utils import request_object_encryption
 from oicmsg.key_jar import build_keyjar
 from oicmsg.oic import AuthorizationRequest
 
-from jwkest.jwe import factory
+from cryptojwt.jwe import factory
 
 
 KEYSPEC = [

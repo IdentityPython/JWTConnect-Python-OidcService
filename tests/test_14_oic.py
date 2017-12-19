@@ -3,7 +3,7 @@ import pytest
 import time
 
 import sys
-from jwkest.jwk import rsa_load
+from cryptojwt.jwk import rsa_load
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.client_info import ClientInfo
 from oicmsg.key_bundle import KeyBundle

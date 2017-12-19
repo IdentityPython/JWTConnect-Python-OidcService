@@ -2,7 +2,7 @@ import inspect
 import logging
 import sys
 import six
-from jwkest import jws
+from cryptojwt import jws
 
 try:
     from json import JSONDecodeError

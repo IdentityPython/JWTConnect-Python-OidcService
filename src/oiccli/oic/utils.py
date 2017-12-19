@@ -1,8 +1,8 @@
 import hashlib
 import os
 
-from jwkest import jwe, as_bytes
-from jwkest.jwe import JWE
+from cryptojwt import jwe, as_bytes
+from cryptojwt.jwe import JWE
 from oiccli import rndstr
 from oicmsg.exception import MissingRequiredAttribute
 

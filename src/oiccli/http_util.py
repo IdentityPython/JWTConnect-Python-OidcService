@@ -11,8 +11,8 @@ from six import PY2
 from six import binary_type
 from six import text_type
 
-from jwkest import as_unicode
-from jwkest import safe_str_cmp
+from cryptojwt import as_unicode
+from cryptojwt import safe_str_cmp
 
 from oiccli import rndstr
 from oiccli.aes import AEAD

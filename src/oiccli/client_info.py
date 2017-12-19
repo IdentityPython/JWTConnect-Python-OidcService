@@ -1,7 +1,8 @@
 import hashlib
 import os
 
-from jwkest import b64e, as_bytes
+from cryptojwt import as_bytes
+from cryptojwt import b64e
 from oiccli import CC_METHOD
 from oiccli import DEF_SIGN_ALG
 from oiccli import unreserved

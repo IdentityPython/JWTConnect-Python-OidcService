@@ -4,12 +4,12 @@ import base64
 import os
 
 import pytest
-from jwkest import as_bytes
-from jwkest import b64e
-from jwkest.jwk import SYMKey
-from jwkest.jwk import rsa_load
-from jwkest.jws import JWS
-from jwkest.jwt import JWT
+from cryptojwt import as_bytes
+from cryptojwt import b64e
+from cryptojwt.jwk import SYMKey
+from cryptojwt.jwk import rsa_load
+from cryptojwt.jws import JWS
+from cryptojwt.jwt import JWT
 
 from oiccli import JWT_BEARER
 from oiccli.client_auth import assertion_jwt
