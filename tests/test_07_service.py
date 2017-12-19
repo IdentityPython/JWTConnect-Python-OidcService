@@ -99,7 +99,7 @@ class TestDummyRequest(object):
         req_resp = Response(200, Message(foo='bar').to_json(),
                             headers={'content-type': 'application/json'})
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json',
+                                               response_body_type='json',
                                                state='state')
         assert isinstance(resp, Message)
         assert set(resp.keys()) == {'foo'}
@@ -109,7 +109,7 @@ class TestDummyRequest(object):
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json',
+                                                   response_body_type='json',
                                                    state='state')
 
 

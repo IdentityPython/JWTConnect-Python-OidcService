@@ -3,10 +3,10 @@ from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
 
 from oicmsg.key_jar import build_keyjar
+from oicmsg.key_jar import public_keys_keyjar
 from oicmsg.oic import AuthorizationRequest
 
 from cryptojwt.jwe import factory
-
 
 KEYSPEC = [
     {"type": "RSA", "use": ["enc"]},
@@ -16,7 +16,10 @@ KEYSPEC = [
 RECEIVER = 'https://example.org/op'
 
 keyjar = build_keyjar(KEYSPEC)[1]
-keyjar[RECEIVER] = keyjar['']
+
+
+# reading and writing to the same KeyJAr instance
+public_keys_keyjar(keyjar, '', keyjar, RECEIVER)
 
 
 def test_request_object_encryption():
@@ -32,6 +35,7 @@ def test_request_object_encryption():
     client_info = ClientInfo(keyjar=keyjar, config=conf)
     client_info.behaviour["request_object_encryption_alg"] = 'RSA1_5'
     client_info.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
+
     _jwe = request_object_encryption(msg.to_json(), client_info,
                                      target=RECEIVER)
     assert _jwe
@@ -47,5 +51,5 @@ def test_construct_request_uri():
     base_path = 'https://example.com/'
     a, b = construct_request_uri(local_dir, base_path)
     assert a.startswith('home') and a.endswith('.jwt')
-    d,f = a.split('/')
+    d, f = a.split('/')
     assert b == '{}{}'.format(base_path, f)

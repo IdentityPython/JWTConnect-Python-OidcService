@@ -105,7 +105,7 @@ class TestAuthorization(object):
                                                        state='state').to_json(),
                             headers={'content-type': 'application/json'})
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, AuthorizationResponse)
         assert set(resp.keys()) == {'code', 'state'}
 
@@ -115,7 +115,7 @@ class TestAuthorization(object):
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   response_body_type='json')
 
 
 class TestAccessTokenRequest(object):
@@ -197,7 +197,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, AccessTokenResponse)
         assert set(resp.keys()) == {'access_token', 'token_type', 'state'}
 
@@ -207,7 +207,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
@@ -217,7 +217,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
@@ -227,7 +227,7 @@ class TestAccessTokenRequest(object):
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   response_body_type='json')
 
 
 class TestProviderInfo(object):
@@ -261,7 +261,7 @@ class TestProviderInfo(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ASConfigurationResponse)
         assert set(resp.keys()) == {'issuer', 'response_types_supported',
                                     'version', 'grant_types_supported'}

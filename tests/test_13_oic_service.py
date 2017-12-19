@@ -3,6 +3,7 @@ import os
 import pytest
 from oicmsg.jwt import JWT
 from oicmsg.key_jar import build_keyjar
+from oicmsg.key_jar import public_keys_keyjar
 
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.exception import ConfigurationError
@@ -165,7 +166,7 @@ class TestAuthorization(object):
                                   scope=['openid']).to_json(),
             headers={'content-type': 'application/json'})
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, AuthorizationResponse)
         assert set(resp.keys()) == {'code', 'state', 'scope'}
 
@@ -178,7 +179,7 @@ class TestAuthorization(object):
             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   response_body_type='json')
 
     def test_request_param(self):
         req_args = {'response_type': 'code', 'state': 'state'}
@@ -265,7 +266,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, AccessTokenResponse)
         assert set(resp.keys()) == {'access_token', 'token_type', 'state'}
 
@@ -275,7 +276,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
@@ -285,7 +286,7 @@ class TestAccessTokenRequest(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
@@ -295,7 +296,7 @@ class TestAccessTokenRequest(object):
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   response_body_type='json')
 
     def test_id_token_nonce_match(self):
         self.cli_info.state_db.bind_nonce_to_state('nonce', 'state')
@@ -352,7 +353,7 @@ class TestProviderInfo(object):
             headers={'content-type': "application/json"}
         )
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ProviderConfigurationResponse)
         assert set(resp.keys()) == {
             'issuer', 'response_types_supported', 'version',
@@ -389,7 +390,7 @@ class TestProviderInfo(object):
             'token_endpoint_auth_method'] = 'client_secret_basic'
 
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ProviderConfigurationResponse)
         assert set(resp.keys()) == {
             'issuer', 'response_types_supported', 'version',
@@ -429,7 +430,7 @@ class TestProviderInfo(object):
         self.cli_info.client_prefs['grant_types'] = ['authorization_code']
 
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ProviderConfigurationResponse)
         assert set(resp.keys()) == {
             'issuer', 'response_types_supported', 'version',
@@ -471,7 +472,7 @@ class TestProviderInfo(object):
         self.cli_info.client_prefs['request_object_signing_alg'] = ['ES256']
 
         resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               body_type='json')
+                                               response_body_type='json')
         assert isinstance(resp, ProviderConfigurationResponse)
         assert set(resp.keys()) == {
             'issuer', 'response_types_supported', 'version',
@@ -516,7 +517,7 @@ class TestProviderInfo(object):
 
         with pytest.raises(ConfigurationError):
             resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   body_type='json')
+                                                   response_body_type='json')
 
 
 class TestRegistration(object):
@@ -604,14 +605,14 @@ class TestUserInfo(object):
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall',
                             _claim_names={'address': 'src1',
-                                         'phone_number': 'src1'},
-                            _claim_sources={'src1': {'JWT':_jwt}})
+                                          'phone_number': 'src1'},
+                            _claim_sources={'src1': {'JWT': _jwt}})
 
-        for kb in _keyjar['']:
-            self.cli_info.keyjar.add_kb('https://example.org/op/', kb)
+        public_keys_keyjar(_keyjar, '', self.cli_info.keyjar,
+                           'https://example.org/op/')
 
         _resp = self.req.parse_response(resp.to_json(), self.cli_info)
-        assert set(_resp.keys()) == {'sub','given_name','family_name',
+        assert set(_resp.keys()) == {'sub', 'given_name', 'family_name',
                                      '_claim_names', '_claim_sources',
                                      'address', 'phone_number'}
 

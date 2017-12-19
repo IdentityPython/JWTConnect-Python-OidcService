@@ -23,6 +23,7 @@ from oiccli.client_auth import PrivateKeyJWT
 from oiccli.client_auth import valid_client_info
 from oiccli.oauth2 import Client
 from oicmsg.key_bundle import KeyBundle
+from oicmsg.key_jar import KeyJar
 from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationResponse
@@ -224,10 +225,14 @@ class TestPrivateKeyJWT(object):
                                   authn_endpoint='token')
         assert http_args == {}
         cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
+
+        pub_kb = KeyBundle(
+            [{"key": _key.public_key(), "kty": "RSA", "use": "ver"},
+             {"key": _key.public_key(), "kty": "RSA", "use": "sig"}])
+
+        jso = JWT(rec_keys={client.client_id: pub_kb.get('RSA')}).unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'RS256'}
+        #assert _jwt.headers == {'alg': 'RS256'}
         assert jso['aud'] == [
             client.client_info.provider_info['token_endpoint']]
 
@@ -261,14 +266,13 @@ class TestClientSecretJWT_TE(object):
         assert cis["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in cis
         cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
-        assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'HS256'}
+
+        _skey =  [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
+        jso = JWT(rec_keys={client.client_id: _skey}).unpack(cas)
+        assert _eq(jso.keys(), ["aud", "iss", "sub", "exp", "iat", 'jti'])
 
         _rj = JWS()
-        info = _rj.verify_compact(
-            cas, [SYMKey(k=b64e(as_bytes(_ci.client_secret)))])
+        info = _rj.verify_compact(cas, _skey)
 
         assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
         assert info['aud'] == [_ci.provider_info['token_endpoint']]
@@ -289,10 +293,10 @@ class TestClientSecretJWT_UI(object):
         assert cis["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in cis
         cas = cis["client_assertion"]
-        _jwt = JWT().unpack(cas)
-        jso = _jwt.payload()
+
+        _skey =  [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
+        jso = JWT(rec_keys={client.client_id: _skey}).unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert _jwt.headers == {'alg': 'HS256'}
 
         _rj = JWS()
         info = _rj.verify_compact(cas,
