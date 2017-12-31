@@ -43,26 +43,32 @@ def test_get_or_post():
     method = 'GET'
     values = {'acr_values': u'PASSWORD',
               'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
-              'redirect_uri': 'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
+              'redirect_uri':
+                  'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
               'response_type': 'code', 'client_id': u'ok8tx7ulVlNV',
               'scope': 'openid profile email address phone'}
     request = AuthorizationRequest(**values)
 
-    path, body, ret_kwargs = util.get_or_post(uri, method, request)
+    resp = util.get_or_post(uri, method, request)
 
-    assert url_compare(path,
-                       u"https://localhost:8092/authorization?acr_values=PASSWORD&state=urn%3A"
+    assert url_compare(resp['uri'],
+                       u"https://localhost:8092/authorization?acr_values"
+                       u"=PASSWORD&state=urn%3A"
                        "uuid%3A92d81fb3-72e8-4e6c-9173-c360b782148a&"
-                       "redirect_uri=https%3A%2F%2Flocalhost%3A8666%2F919D3F697FDAAF138124B83E09ECB0B7&"
-                       "response_type=code&client_id=ok8tx7ulVlNV&scope=openid+profile+email+address+phone")
-    assert not body
-    assert not ret_kwargs
+                       "redirect_uri=https%3A%2F%2Flocalhost%3A8666"
+                       "%2F919D3F697FDAAF138124B83E09ECB0B7&"
+                       "response_type=code&client_id=ok8tx7ulVlNV&scope"
+                       "=openid+profile+email+address+phone")
+    assert 'body' not in resp
+    assert 'kwargs' not in resp
 
     method = 'POST'
     uri = u'https://localhost:8092/token'
     values = {
-        'redirect_uri': 'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
-        'code': 'Je1iKfPN1vCiN7L43GiXAuAWGAnm0mzA7QIjl/YLBBZDB9wefNExQlLDUIIDM2rT'
+        'redirect_uri':
+            'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
+        'code': 'Je1iKfPN1vCiN7L43GiXAuAWGAnm0mzA7QIjl'
+                '/YLBBZDB9wefNExQlLDUIIDM2rT'
                 '2t+gwuoRoapEXJyY2wrvg9cWTW2vxsZU+SuWzZlMDXc=',
         'grant_type': 'authorization_code'}
     request = AccessTokenRequest(**values)
@@ -70,24 +76,29 @@ def test_get_or_post():
               'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
               'authn_method': 'client_secret_basic', 'key': [],
               'headers': {
-                  'Authorization': 'Basic b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJk'
+                  'Authorization': 'Basic '
+                                   'b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJk'
                                    'YjU4ZjU5YWU3MmFlMGM5NDM4YTY1ZmU0N2IxMDA3OTM1'}
               }
 
-    path, body, ret_kwargs = util.get_or_post(uri, method, request, **kwargs)
+    resp = util.get_or_post(uri, method, request, **kwargs)
 
-    assert path == u'https://localhost:8092/token'
-    assert url_compare("http://test/#{}".format(body),
+    assert resp['uri'] == u'https://localhost:8092/token'
+    assert url_compare("http://test/#{}".format(resp['body']),
                        'http://test/#code=Je1iKfPN1vCiN7L43GiXAuAWGAnm0mzA7QIjl%2FYLBBZDB9wefNExQlLDUIIDM2rT2t%2BgwuoR'
-                       'oapEXJyY2wrvg9cWTW2vxsZU%2BSuWzZlMDXc%3D&grant_type=authorization_code&redirect_uri=https%3A%2'
+                       'oapEXJyY2wrvg9cWTW2vxsZU%2BSuWzZlMDXc%3D&grant_type'
+                       '=authorization_code&redirect_uri=https%3A%2'
                        'F%2Flocalhost%3A8666%2F919D3F697FDAAF138124B83E09ECB0B7')
-    assert ret_kwargs == {'scope': '',
-                          'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
-                          'authn_method': 'client_secret_basic', 'key': [],
-                          'headers': {
-                              'Content-Type': 'application/x-www-form-urlencoded',
-                              'Authorization': 'Basic b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJkYjU4ZjU5YWU3MmFl'
-                                               'MGM5NDM4YTY1ZmU0N2IxMDA3OTM1'}}
+    assert resp['kwargs'] == {'scope': '',
+                              'state':
+                                  'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
+                              'authn_method': 'client_secret_basic', 'key': [],
+                              'headers': {
+                                  'Content-Type':
+                                      'application/x-www-form-urlencoded',
+                                  'Authorization': 'Basic '
+                                                   'b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJkYjU4ZjU5YWU3MmFl'
+                                                   'MGM5NDM4YTY1ZmU0N2IxMDA3OTM1'}}
 
     method = 'UNSUPORTED'
     with pytest.raises(UnSupported):
@@ -120,8 +131,10 @@ def test_set_cookie():
     c_2 = cookies[""][""]["value_2"]
 
     assert not (c_2.domain_specified and c_2.path_specified)
-    assert c_1.domain_specified and not c_1.domain_initial_dot and not c_1.path_specified
-    assert c_0.domain_specified and c_0.domain_initial_dot and c_0.path_specified
+    assert c_1.domain_specified and not c_1.domain_initial_dot and not \
+        c_1.path_specified
+    assert c_0.domain_specified and c_0.domain_initial_dot and \
+           c_0.path_specified
 
     assert c_0.expires == expires
     assert c_0.domain == domain_0

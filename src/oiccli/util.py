@@ -45,28 +45,32 @@ ATTRS = {"version": None,
 def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
                 accept=None, **kwargs):
     """
+    Create the information pieces necessary for sending a request.
 
-    :param uri:
-    :param method:
-    :param req:
-    :param content_type:
-    :param accept:
-    :param kwargs:
+    :param uri: The URL pointing to where the request should be sent
+    :param method: Which method that should be used to send the request
+    :param req: The request as a :py:class:`oicmsg.message.Message` instance
+    :param content_type: Which content type to use for the body
+    :param accept: Whether an Accept header should be added to the HTTP request
+    :param kwargs: Extra keyword arguments.
     :return:
     """
+    resp = {}
     if method in ["GET", "DELETE"]:
         _qp = req.to_urlencoded()
         if _qp:
-            path = uri + '?' + _qp
+            if '?' in _qp:
+                resp['uri'] = uri + '&' + _qp
+            else:
+                resp['uri'] = uri + '?' + _qp
         else:
-            path = uri
-        body = None
+            resp['uri'] = uri
     elif method in ["POST", "PUT"]:
-        path = uri
+        resp['uri'] = uri
         if content_type == URL_ENCODED:
-            body = req.to_urlencoded()
+            resp['body'] = req.to_urlencoded()
         elif content_type == JSON_ENCODED:
-            body = req.to_json()
+            resp['body'] = req.to_json()
         else:
             raise UnSupported(
                 "Unsupported content type: '%s'" % content_type)
@@ -79,10 +83,11 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
             kwargs["headers"].update(header_ext)
         else:
             kwargs["headers"] = header_ext
+        resp['kwargs'] = kwargs
     else:
         raise UnSupported("Unsupported HTTP method: '%s'" % method)
 
-    return path, body, kwargs
+    return resp
 
 
 def set_cookie(cookiejar, kaka):

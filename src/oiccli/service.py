@@ -18,23 +18,15 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
-
-RESPONSE2ERROR = {
-    "AuthorizationResponse": [AuthorizationErrorResponse, TokenErrorResponse],
-    "AccessTokenResponse": [TokenErrorResponse]
-}
-
-SPECIAL_ARGS = ['authn_endpoint', 'algs']
-
 """
+
 method call structure for Services:
 
 do_request_init
     - request_info
         - construct 
             - pre_construct (*)
-            - _parse_args
+            - parse_args
             - post_construct (*)
         - init_authentication_method
         - uri_and_body
@@ -47,8 +39,21 @@ service_request
              - get_urlinfo
              - post_parse_response (*)
         - parse_error_mesg
-        
+
+The methods marked with (*) are where service specific
+behaviour is implemented.
+
 """
+
+SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
+
+RESPONSE2ERROR = {
+    "AuthorizationResponse": [AuthorizationErrorResponse, TokenErrorResponse],
+    "AccessTokenResponse": [TokenErrorResponse]
+}
+
+SPECIAL_ARGS = ['authn_endpoint', 'algs']
+
 
 REQUEST_INFO='Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
@@ -80,7 +85,7 @@ class Service(object):
         self.post_parse_response = []
         self.setup()
 
-    def _parse_args(self, cli_info, **kwargs):
+    def parse_args(self, cli_info, **kwargs):
         """
         Go through the attributes that the message class can contain and
         add values if they are missing and exists in the client info or
@@ -107,6 +112,16 @@ class Service(object):
         return ar_args
 
     def do_pre_construct(self, cli_info, request_args, **kwargs):
+        """
+        Will run the pre_construct methods one at the time in order.
+
+        :param cli_info: Client Information as a :py:class:`oiccli.Client`
+            instance.
+        :param request_args: Request arguments
+        :param kwargs: Extra key word arguments
+        :return: A tuple of request_args and post_args. post_args are to be
+            used by the post_construct methods.
+        """
         post_args = {}
         for meth in self.pre_construct:
             request_args, _post_args = meth(cli_info, request_args, **kwargs)
@@ -115,12 +130,30 @@ class Service(object):
         return request_args, post_args
 
     def do_post_construct(self, cli_info, request_args, **post_args):
+        """
+        Will run the post_construct methods one at the time in order.
+
+        :param cli_info: Client Information as a :py:class:`oiccli.Client`
+            instance.
+        :param request_args: Request arguments
+        :param kwargs: Extra key word arguments
+        :return: request_args.
+        """
         for meth in self.post_construct:
             request_args = meth(cli_info, request_args, **post_args)
 
         return request_args
 
     def do_post_parse_response(self, resp, cli_info, state='', **kwargs):
+        """
+        A method run after the response has been parsed and verified.
+
+        :param resp: The response as a :py:class:`oicmsg.Message` instance
+        :param cli_info: Client Information as a :py:class:`oiccli.Client`
+            instance.
+        :param state: state value
+        :param kwargs: Extra key word arguments
+        """
         for meth in self.post_parse_response:
             meth(resp, cli_info, state=state, **kwargs)
 
@@ -129,7 +162,7 @@ class Service(object):
 
     def construct(self, cli_info, request_args=None, **kwargs):
         """
-        Instantiate the message class instance
+        Instantiate the request as a message class instance
 
         :param cli_info: Information about the client
         :param request_args:
@@ -149,7 +182,7 @@ class Service(object):
                 pass
 
         # logger.debug("request_args: %s" % sanitize(request_args))
-        _args = self._parse_args(cli_info, **request_args)
+        _args = self.parse_args(cli_info, **request_args)
 
         # logger.debug("kwargs: %s" % sanitize(kwargs))
         request = self.msg_type(**_args)
@@ -186,17 +219,18 @@ class Service(object):
         :param method: HTTP method
         :param request_args: Message arguments
         :param kwargs: Extra keyword argument
-        :return: Dictionary
+        :return: Dictionary with 'uri' and possibly also 'body' and 'kwargs'
         """
         uri = self._endpoint(**request_args)
 
-        uri, body, kwargs = get_or_post(uri, method, cis, **kwargs)
+        resp = get_or_post(uri, method, cis, **kwargs)
+        resp['cis'] = cis
         try:
-            h_args = {"headers": kwargs["headers"]}
+            resp['h_args'] = {"headers": resp["headers"]}
         except KeyError:
-            h_args = {}
+            pass
 
-        return {'uri': uri, 'body': body, 'h_args': h_args, 'cis': cis}
+        return resp
 
     def init_authentication_method(self, cis, cli_info, authn_method,
                                    request_args=None, http_args=None, **kwargs):
@@ -225,7 +259,24 @@ class Service(object):
 
     def request_info(self, cli_info, method="", request_args=None,
                      body_type='', authn_method='', lax=False, **kwargs):
+        """
+        The method where everything is setup for sending the request.
+        The request information is gathered and the where and how of sending the
+        request is decided.
 
+        :param cli_info: Client information as a :py:class:`oiccli.Client`
+            instance
+        :param method: The HTTP method to be used.
+        :param request_args: Initial request arguments
+        :param body_type: If the request is sent in the HTTP body this
+            decides the encoding of the request
+        :param authn_method: The client authentication method
+        :param lax: If it should be allowed to send a request that doesn't
+            completely conform to the standard.
+        :param kwargs: Extra keyword arguments
+        :return: A dictionary with the keys 'uri' and possibly 'body', 'kwargs',
+            'cis' and 'ht_args'.
+        """
         if not method:
             method = self.http_method
 
@@ -263,6 +314,14 @@ class Service(object):
         return self.uri_and_body(cis, method, request_args, **kwargs)
 
     def update_http_args(self, http_args, info):
+        """
+        Extending the header with information gathered during the request
+        setup.
+
+        :param http_args: Original HTTP header arguments
+        :param info: Request info
+        :return: Updated request info
+        """
         if http_args is None:
             http_args = info['h_args']
         else:
@@ -405,6 +464,13 @@ class Service(object):
         return resp
 
     def parse_error_mesg(self, reqresp, body_type):
+        """
+        Parse an error message.
+
+        :param reqresp: The response
+        :param body_type: How the body is encoded
+        :return: A :py:class:`oicmsg.message.Message` instance
+        """
         if body_type == 'txt':
             _body_type = 'urlencoded'
         else:
@@ -419,6 +485,13 @@ class Service(object):
             return err
 
     def get_value_type(self, reqresp, body_type):
+        """
+        Get the encoding of the response.
+
+        :param reqresp: The response
+        :param body_type: Assumed body type
+        :return: The calculated body type
+        """
         if body_type:
             return verify_header(reqresp, body_type)
         else:
@@ -475,11 +548,16 @@ class Service(object):
                         response_body_type="", http_args=None, client_info=None,
                         **kwargs):
         """
+        The uppermost method that does the request setup, sends the request
+        and handles the response returned. This assumes a synchronous
+        request-response exchange.
+
         :param url: The URL to which the request should be sent
         :param response: Response type
         :param method: Which HTTP method to use
         :param body: A message body if any
-        :param body_type: The format of the body of the return message
+        :param response_body_type: The expected format of the body of the
+            return message
         :param http_args: Arguments for the HTTP client
         :return: A cls or ErrorResponse instance or the HTTP response
             instance if no response body was expected.
