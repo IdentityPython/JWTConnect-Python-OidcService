@@ -322,8 +322,13 @@ class Service(object):
         :param info: Request info
         :return: Updated request info
         """
+        try:
+            h_args = info['h_args']
+        except KeyError:
+            h_args = {}
+
         if http_args is None:
-            http_args = info['h_args']
+            http_args = h_args
         else:
             http_args.update(info['h_args'])
 
