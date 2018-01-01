@@ -101,6 +101,14 @@ class Authorization(service.Authorization):
                 post_args['request_param'] = "request"
             del kwargs["request_method"]
 
+        try:
+            response_mod = cli_info.behaviour['response_mode']
+        except KeyError:
+            pass
+        else:
+            if response_mod == 'form_post':
+                request_args['response_mode'] = response_mod
+
         return request_args, post_args
 
     def oic_post_construct(self, cli_info, req, **kwargs):
