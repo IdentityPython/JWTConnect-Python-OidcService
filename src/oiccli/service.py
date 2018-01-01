@@ -515,6 +515,7 @@ class Service(object):
         """
 
         if reqresp.status_code in SUCCESSFUL:
+            logger.debug('response_body_type: "{}"'.format(response_body_type))
             value_type = self.get_value_type(reqresp, response_body_type)
 
             logger.debug('Successful response: {}'.format(reqresp.text))
@@ -578,6 +579,8 @@ class Service(object):
 
         if "keyjar" not in kwargs:
             kwargs["keyjar"] = self.keyjar
+        if not response_body_type:
+            response_body_type = self.response_body_type
 
         return self.parse_request_response(resp, client_info,
                                            response_body_type, **kwargs)
