@@ -548,9 +548,8 @@ class Service(object):
                         response_body_type="", http_args=None, client_info=None,
                         **kwargs):
         """
-        The uppermost method that does the request setup, sends the request
-        and handles the response returned. This assumes a synchronous
-        request-response exchange.
+        The method that sends the request and handles the response returned.
+        This assumes a synchronous request-response exchange.
 
         :param url: The URL to which the request should be sent
         :param response: Response type

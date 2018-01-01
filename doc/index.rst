@@ -9,11 +9,18 @@ Welcome to oiccli's documentation!
 This is the package that implements the request-response pattern in
 the OAuth2/OpenID Connect protocols.
 
+It's the middle layer between low level oicmsg which deals with simple messages
+and their serialization and deserialization and the upper layer oicrp which
+provides the API that most service implementers should use.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-   oiccli/index
+   howto/index
+   modules
+   oiccli.rst
+   oiccli.oauth2
+   oiccli.oic
 
 
 Indices and tables
