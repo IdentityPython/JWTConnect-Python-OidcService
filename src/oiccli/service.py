@@ -389,6 +389,8 @@ class Service(object):
         :return: The parsed and to some extend verified response
         """
 
+        logger.debug('response format: {}'.format(sformat))
+
         if sformat == "urlencoded":
             info = self.get_urlinfo(info)
 
