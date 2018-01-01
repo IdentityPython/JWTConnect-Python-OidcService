@@ -395,6 +395,7 @@ class Service(object):
         if self.events:
             self.events.store('Response', info)
 
+        logger.debug('response_cls: {}'.format(self.response_cls.__name__))
         try:
             resp = self.response_cls().deserialize(info, sformat, **kwargs)
         except Exception as err:

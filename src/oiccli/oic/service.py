@@ -157,22 +157,6 @@ class Authorization(service.Authorization):
 
         return req
 
-        # def do_request_init(self, cli_info, scope="", body_type="json",
-        #                     method="GET", request_args=None, http_args=None,
-        #                     authn_method="", **kwargs):
-        #
-        #     kwargs['algs'] = cli_info.sign_enc_algs("id_token")
-        #
-        #     if 'code_challenge' in cli_info.config:
-        #         _args, code_verifier = cli_info.add_code_challenge()
-        #         request_args.update(_args)
-        #
-        #     return requests.AuthorizationRequest.do_request_init(
-        #         self, cli_info, scope=scope, body_type=body_type,
-        # method=method,
-        #         request_args=request_args, http_args=http_args,
-        #         authn_method=authn_method, **kwargs)
-
 
 class AccessToken(service.AccessToken):
     msg_type = oic.AccessTokenRequest
@@ -230,6 +214,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         If the Provider has left some claims out, defaults specified in the
         standard will be used.
 
+        :param cli_info: :py:class:`oiccli.client_info.ClientInfo' instance
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
         """
@@ -299,6 +284,8 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                 pass
             if key not in PREFERENCE2PROVIDER:
                 cli_info.behaviour[key] = val
+
+        logger.debug('cli_info behaviour: {}'.format(cli_info.behaviour))
 
 
 class Registration(Service):
