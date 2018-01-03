@@ -83,4 +83,6 @@ The call sequence for the Service methods is this:
 Most of these methods you should not touch, that is rewrite your own version of.
 The ones marked with (#) are the ones you should concentrate on.
 As you can see these are placed before and after gathering attributes used to
-construct a request and after a response has been parsed.
+construct a request and after a response has been parsed. So you should be
+able to tailor your subclass to your content by hooking in specialised methods
+in those places.
