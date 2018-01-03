@@ -49,13 +49,11 @@ class TestAuthorization(object):
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args,
                                       state='state')
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
-        assert _info['body'] is None
+        assert set(_info.keys()) == {'uri', 'cis'}
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
             'response_type': 'code', 'state': 'state'}
-        assert _info['h_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
@@ -64,14 +62,11 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'body', 'cis', 'http_args', 'uri', 'algs',
-                                     'h_args'}
-        assert _info['body'] is None
+        assert set(_info.keys()) == {'cis', 'http_args', 'uri', 'algs'}
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
             'response_type': 'code', 'state': 'state'}
-        assert _info['h_args'] == {}
         assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
@@ -154,15 +149,12 @@ class TestAccessTokenRequest(object):
         _info = self.req.request_info(self.cli_info, request_args=req_args,
                                       state='state',
                                       authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
+        assert set(_info.keys()) == {'kwargs','body', 'uri', 'cis'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
-        assert _info['h_args'] == {
-            'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk',
-                        'Content-Type': 'application/x-www-form-urlencoded'}}
         msg = AccessTokenRequest().from_urlencoded(
             self.req.get_urlinfo(_info['body']))
         assert msg == _info['cis']
@@ -175,15 +167,12 @@ class TestAccessTokenRequest(object):
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          state='state')
         assert set(_info.keys()) == {'body', 'cis', 'uri', 'http_args',
-                                     'h_args'}
+                                     'kwargs'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
             'code': 'access_code', 'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
-        assert _info['h_args'] == {
-            'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk',
-                        'Content-Type': 'application/x-www-form-urlencoded'}}
         msg = AccessTokenRequest().from_urlencoded(
             self.req.get_urlinfo(_info['body']))
         assert msg == _info['cis']

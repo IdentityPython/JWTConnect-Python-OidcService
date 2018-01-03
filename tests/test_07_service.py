@@ -52,11 +52,9 @@ class TestDummyRequest(object):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args'}
-        assert _info['body'] is None
+        assert set(_info.keys()) == {'uri', 'cis'}
         assert _info['cis'].to_dict() == {'foo': 'bar',
                                           'req_str': 'some string'}
-        assert _info['h_args'] == {}
         msg = DummyMessage().from_urlencoded(self.req.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
 
@@ -64,12 +62,9 @@ class TestDummyRequest(object):
         req_args = {'foo': 'bar', 'req_str':'some string'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'h_args',
-                                     'http_args'}
-        assert _info['body'] is None
+        assert set(_info.keys()) == {'uri', 'cis', 'http_args'}
         assert _info['cis'].to_dict() == {'foo': 'bar',
                                           'req_str': 'some string'}
-        assert _info['h_args'] == {}
         assert _info['http_args'] == {}
         msg = DummyMessage().from_urlencoded(self.req.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
