@@ -1,3 +1,5 @@
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptojwt.jwe import split_ctx_and_tag, JWEException
 from future.backports.http.cookies import SimpleCookie
 
 import base64
@@ -15,12 +17,10 @@ from cryptojwt import as_unicode
 from cryptojwt import safe_str_cmp
 
 from oiccli import rndstr
-from oiccli.aes import AEAD
-from oiccli.aes import AESError
 from oiccli.exception import ImproperlyConfigured
 from oicmsg import time_util
 
-__author__ = 'rohe0002'
+__author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
@@ -319,16 +319,15 @@ def make_cookie(name, load, seed, expire=0, domain="", path="", timestamp="",
         # to the top level APIs.
         key = _make_hashed_key((enc_key, seed))
 
-        # Random 128-Bit IV
-        iv = os.urandom(16)
-
-        crypt = AEAD(key, iv)
+        #key = AESGCM.generate_key(bit_length=128)
+        aesgcm = AESGCM(key)
+        iv = os.urandom(12)
 
         # timestamp does not need to be encrypted, just MAC'ed,
         # so we add it to 'Associated Data' only.
-        crypt.add_associated_data(bytes_timestamp)
+        ct = split_ctx_and_tag(aesgcm.encrypt(iv, bytes_load, bytes_timestamp))
 
-        ciphertext, tag = crypt.encrypt_and_tag(bytes_load)
+        ciphertext, tag = ct
         cookie_payload = [bytes_timestamp,
                           base64.b64encode(iv),
                           base64.b64encode(ciphertext),
@@ -389,17 +388,18 @@ def parse_cookie(name, seed, kaka, enc_key=None):
         iv = base64.b64decode(parts[1])
         ciphertext = base64.b64decode(parts[2])
         tag = base64.b64decode(parts[3])
+        ct = ciphertext + tag
 
         # Make sure the key is 32-Bytes long
         key = _make_hashed_key((enc_key, seed))
+        aesgcm = AESGCM(key)
 
-        crypt = AEAD(key, iv)
         # timestamp does not need to be encrypted, just MAC'ed,
         # so we add it to 'Associated Data' only.
-        crypt.add_associated_data(timestamp.encode('utf-8'))
+        aad = timestamp.encode('utf-8')
         try:
-            cleartext = crypt.decrypt_and_verify(ciphertext, tag)
-        except AESError:
+            cleartext = aesgcm.decrypt(iv, ct, aad)
+        except JWEException:
             raise InvalidCookieSign()
         return cleartext.decode('utf-8'), timestamp
     return None

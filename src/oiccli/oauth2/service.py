@@ -202,7 +202,7 @@ class ProviderInfoDiscovery(Service):
 
             try:
                 cli_info.allow['issuer_mismatch']
-            except AttributeError:
+            except KeyError:
                 try:
                     assert _issuer == _pcr_issuer
                 except AssertionError:
