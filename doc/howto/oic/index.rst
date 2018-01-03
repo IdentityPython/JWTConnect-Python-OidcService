@@ -1,7 +1,7 @@
-oiccli OIDC classes and functions documentation!
-================================================
+OIDC services
+=============
 
-Description of oiccli OIDC classes and functions.
+
 
 Contents:
 

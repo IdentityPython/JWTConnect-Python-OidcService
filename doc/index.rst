@@ -24,7 +24,7 @@ provides the API that most service implementers should use.
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
