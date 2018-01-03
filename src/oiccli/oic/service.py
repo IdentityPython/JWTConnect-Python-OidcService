@@ -131,7 +131,7 @@ class Authorization(service.Authorization):
             if not alg:
                 try:
                     alg = cli_info.behaviour["request_object_signing_alg"]
-                except KeyError:
+                except KeyError:  # Use default
                     alg = "RS256"
 
             kwargs["request_object_signing_alg"] = alg

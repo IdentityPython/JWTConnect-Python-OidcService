@@ -1,8 +1,5 @@
-How to use oiccli
-=================
-
-Basic building block
---------------------
+What does oiccli
+================
 
 When an OpenID Connect Relaying party or an OAuth2 client are interacting
 with an OP/AS it is invoking a service. Each such interaction consists of
