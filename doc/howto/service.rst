@@ -129,8 +129,9 @@ wrote above.
 
 This is part of the source code::
 
-    from oiccli.service import Service
     from oicmsg import oauth2
+    from oiccli import OIDCONF_PATTERN
+    from oiccli.service import Service
 
     class ProviderInfoDiscovery(Service):
         msg_type = oauth2.Message
@@ -165,4 +166,23 @@ This is part of the source code::
 
 First regarding the class attributes the values on some atttributes has been
 changed to something more appropriate for this specific service.
-Secondly the
+
+Secondly, I rewrote the *request_info* method because the request has
+no parameters it is just a simple GET.
+
+Thirdly, I added a method that will be excecuted after the response has been
+parsed. This method will store the provider info in the
+:py:class:`oiccli.client_info.ClientInfo` instance the cli_info is pointing to.
+It will also update the service instances such that they will contain the
+endpoint URLs given in the received provider info.
+
+Note that this method is added to the method excution sequence in this line::
+
+    self.post_parse_response.append(self.oauth_post_parse_response)
+
+**post_parse_response** contains a list of methods which is executed in
+sequence by the method *do_post_parse_response* listed in the call sequence
+above.
+
+**do_pre_construct** and **do_post_construct** works the same way.
+
