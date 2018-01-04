@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 """
 
-method call structure for Services:
+method call structure for Services.
+This is for constructing requests:
 
 do_request_init
     - request_info
@@ -32,6 +33,8 @@ do_request_init
         - uri_and_body
             - _endpoint
     - update_http_args
+
+and this for sending a request and parsing the response.
 
 service_request
     - parse_request_response
@@ -97,6 +100,7 @@ class Service(object):
         """
         ar_args = kwargs.copy()
 
+        # Go through the list of claims defined for the message class
         for prop in self.msg_type.c_param.keys():
             if prop in ar_args:
                 continue
