@@ -337,6 +337,13 @@ class Service(object):
         else:
             http_args.update(info['h_args'])
 
+        try:
+            _args = info['kwargs']['headers']
+        except KeyError:
+            pass
+        else:
+            http_args.update(_args)
+
         info['http_args'] = http_args
         return info
 
