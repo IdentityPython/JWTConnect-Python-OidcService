@@ -2,12 +2,12 @@ import hashlib
 import os
 
 from cryptojwt import as_bytes
-from cryptojwt import b64e
-from oiccli import CC_METHOD
+from cryptojwt.jwk import import_private_rsa_key_from_file
+from cryptojwt.jwk import RSAKey
 from oiccli import DEF_SIGN_ALG
-from oiccli import unreserved
-from oiccli.exception import Unsupported
 from oiccli.state import State
+from oicmsg.key_bundle import KeyBundle
+from oicmsg.key_jar import build_keyjar
 from oicmsg.key_jar import KeyJar
 
 ATTRMAP = {
@@ -75,6 +75,14 @@ class ClientInfo(object):
             self.redirect_uris = config['redirect_uris']
         except:
             self.redirect_uris = [None]
+
+        try:
+            self.import_keys(config['keys'])
+        except KeyError:
+            pass
+
+        if 'keydefs' in config:
+            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)[1]
 
     def get_client_secret(self):
         return self._c_secret
@@ -171,34 +179,15 @@ class ClientInfo(object):
         m.update(as_bytes(self.base_url))
         return ['{}{}/{}'.format(self.base_url, request_dir, m.hexdigest())]
 
-
-def add_code_challenge(client_info):
-    """
-    PKCE RFC 7636 support
-
-    :return:
-    """
-    try:
-        cv_len = client_info.config['code_challenge']['length']
-    except KeyError:
-        cv_len = 64  # Use default
-
-    code_verifier = unreserved(cv_len)
-    _cv = code_verifier.encode()
-
-    try:
-        _method = client_info.config['code_challenge']['method']
-    except KeyError:
-        _method = 'S256'
-
-    try:
-        _h = CC_METHOD[_method](_cv).hexdigest()
-        code_challenge = b64e(_h.encode()).decode()
-    except KeyError:
-        raise Unsupported(
-            'PKCE Transformation method:{}'.format(_method))
-
-    # TODO store code_verifier
-
-    return {"code_challenge": code_challenge,
-            "code_challenge_method": _method}, code_verifier
+    def import_keys(self, keyspec):
+        for where, spec in keyspec.items():
+            if where == 'file':
+                for typ, files in spec.items():
+                    if typ == 'rsa':
+                        for fil in files:
+                            _key = RSAKey(
+                                key=import_private_rsa_key_from_file(fil),
+                                use='sig')
+                            _kb = KeyBundle()
+                            _kb.append(_key)
+                            self.keyjar.add_kb('', _kb)
