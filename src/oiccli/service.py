@@ -57,8 +57,7 @@ RESPONSE2ERROR = {
 
 SPECIAL_ARGS = ['authn_endpoint', 'algs']
 
-
-REQUEST_INFO='Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
+REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 
 class Service(object):
@@ -338,11 +337,11 @@ class Service(object):
             http_args.update(info['h_args'])
 
         try:
-            _args = info['kwargs']['headers']
+            _headers = info['kwargs']['headers']
         except KeyError:
             pass
         else:
-            http_args.update(_args)
+            http_args.update({'headers': _headers})
 
         info['http_args'] = http_args
         return info
@@ -517,7 +516,8 @@ class Service(object):
         else:
             return 'urlencoded'
 
-    def parse_request_response(self, reqresp, client_info, response_body_type='',
+    def parse_request_response(self, reqresp, client_info,
+                               response_body_type='',
                                state="", **kwargs):
         """
         Deal with a request response
