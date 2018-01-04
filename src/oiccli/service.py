@@ -256,6 +256,7 @@ class Service(object):
             request_args = {}
 
         if authn_method:
+            logger.debug('Client authn method: {}'.format(authn_method))
             return self.client_authn_method[authn_method]().construct(
                 cis, cli_info, request_args, http_args, **kwargs)
         else:
