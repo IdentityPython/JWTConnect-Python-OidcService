@@ -1,13 +1,16 @@
-from future.backports.http.cookiejar import FileCookieJar
-from future.backports.http.cookiejar import http2time
-from future.backports.http.cookies import SimpleCookie
-from future.backports.urllib.parse import parse_qs
-from future.backports.urllib.parse import urlparse
+import json
 
 import pytest
-from oiccli.exception import WrongContentType
 
+from http.cookiejar import FileCookieJar
+from http.cookiejar import http2time
+from http.cookies import SimpleCookie
+from urllib.parse import parse_qs
+from urllib.parse import urlparse
+
+from oiccli.exception import WrongContentType
 from oiccli import util
+from oiccli.util import JSON_ENCODED
 
 from oicmsg.exception import UnSupported
 from oicmsg.oic import AuthorizationRequest
@@ -38,31 +41,60 @@ def url_compare(url1, url2):
     return True
 
 
-def test_get_or_post():
+def test_get():
     uri = u'https://localhost:8092/authorization'
     method = 'GET'
-    values = {'acr_values': u'PASSWORD',
-              'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
+    values = {'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
               'redirect_uri':
                   'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
-              'response_type': 'code', 'client_id': u'ok8tx7ulVlNV',
+              'response_type': 'code',
+              'client_id': u'ok8tx7ulVlNV',
               'scope': 'openid profile email address phone'}
     request = AuthorizationRequest(**values)
 
     resp = util.get_or_post(uri, method, request)
 
+    assert set(resp.keys()) == {'uri'}
     assert url_compare(resp['uri'],
-                       u"https://localhost:8092/authorization?acr_values"
-                       u"=PASSWORD&state=urn%3A"
+                       u"https://localhost:8092/authorization?state=urn%3A"
                        "uuid%3A92d81fb3-72e8-4e6c-9173-c360b782148a&"
                        "redirect_uri=https%3A%2F%2Flocalhost%3A8666"
                        "%2F919D3F697FDAAF138124B83E09ECB0B7&"
                        "response_type=code&client_id=ok8tx7ulVlNV&scope"
                        "=openid+profile+email+address+phone")
-    assert 'body' not in resp
-    assert 'kwargs' not in resp
 
+
+def test_post():
     method = 'POST'
+    uri = u'https://localhost:8092/token'
+    values = {
+        'redirect_uri':
+            'https://localhost:8666/919D3F697FDAAF138124B83E09ECB0B7',
+        'code': 'Je1iKfPN1vCiN7L43GiXAuAWGAnm0mzA7QIjl',
+        'grant_type': 'authorization_code'}
+    request = AccessTokenRequest(**values)
+    kwargs = {'scope': '',
+              'state': 'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
+              'authn_method': 'client_secret_basic', 'key': [],
+              'headers': {'Authorization': 'Basic aGVqOmhvcHA='}}
+
+    resp = util.get_or_post(uri, method, request, content_type=JSON_ENCODED,
+                            **kwargs)
+    assert set(resp.keys()) == {'uri', 'body', 'kwargs'}
+
+    assert resp['uri'] == u'https://localhost:8092/token'
+    assert json.loads(resp['body']) == request.to_dict()
+
+    assert resp['kwargs'] == {
+        'scope': '',
+        'state':
+            'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
+        'authn_method': 'client_secret_basic', 'key': [],
+        'headers': {'Content-Type':'application/json',
+                    'Authorization': 'Basic aGVqOmhvcHA='}}
+
+
+def test_unsupported():
     uri = u'https://localhost:8092/token'
     values = {
         'redirect_uri':
@@ -80,27 +112,7 @@ def test_get_or_post():
                                    'b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJk'
                                    'YjU4ZjU5YWU3MmFlMGM5NDM4YTY1ZmU0N2IxMDA3OTM1'}
               }
-
-    resp = util.get_or_post(uri, method, request, **kwargs)
-
-    assert resp['uri'] == u'https://localhost:8092/token'
-    assert url_compare("http://test/#{}".format(resp['body']),
-                       'http://test/#code=Je1iKfPN1vCiN7L43GiXAuAWGAnm0mzA7QIjl%2FYLBBZDB9wefNExQlLDUIIDM2rT2t%2BgwuoR'
-                       'oapEXJyY2wrvg9cWTW2vxsZU%2BSuWzZlMDXc%3D&grant_type'
-                       '=authorization_code&redirect_uri=https%3A%2'
-                       'F%2Flocalhost%3A8666%2F919D3F697FDAAF138124B83E09ECB0B7')
-    assert resp['kwargs'] == {'scope': '',
-                              'state':
-                                  'urn:uuid:92d81fb3-72e8-4e6c-9173-c360b782148a',
-                              'authn_method': 'client_secret_basic', 'key': [],
-                              'headers': {
-                                  'Content-Type':
-                                      'application/x-www-form-urlencoded',
-                                  'Authorization': 'Basic '
-                                                   'b2s4dHg3dWxWbE5WOjdlNzUyZDU1MTc0NzA0NzQzYjZiZWJkYjU4ZjU5YWU3MmFl'
-                                                   'MGM5NDM4YTY1ZmU0N2IxMDA3OTM1'}}
-
-    method = 'UNSUPORTED'
+    method = 'UNSUPPORTED'
     with pytest.raises(UnSupported):
         util.get_or_post(uri, method, request, **kwargs)
 

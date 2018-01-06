@@ -15,7 +15,7 @@ from oicmsg.time_util import utc_time_sans_frac
 
 logger = logging.getLogger(__name__)
 
-__author__ = 'rolandh'
+__author__ = 'roland hedberg'
 
 
 class AuthnFailure(Exception):
@@ -52,13 +52,19 @@ class ClientAuthnMethod(object):
 class ClientSecretBasic(ClientAuthnMethod):
     """
     Clients that have received a client_secret value from the Authorization
-    Server, authenticate with the Authorization Server in accordance with
+    Server, may authenticate with the Authorization Server in accordance with
     Section 3.2.1 of OAuth 2.0 [RFC6749] using HTTP Basic authentication scheme.
+
+    The upshot of this is to construct an Authorization header that has the
+    value 'Basic <token>' where <token> is username and password concatenated
+    together with a ':' in between and then base64 encoded.
     """
 
     def construct(self, cis, cli_info=None, request_args=None, http_args=None,
                   **kwargs):
         """
+        Construct a dictionary to be added to the HTTP request headers
+
         :param cis: Request class instance
         :param request_args: Request arguments
         :param http_args: HTTP arguments
@@ -68,6 +74,10 @@ class ClientSecretBasic(ClientAuthnMethod):
         if http_args is None:
             http_args = {}
 
+        if "headers" not in http_args:
+            http_args["headers"] = {}
+
+        # get the username (client_id) and the password (client_secret)
         try:
             passwd = kwargs["password"]
         except KeyError:
@@ -84,32 +94,37 @@ class ClientSecretBasic(ClientAuthnMethod):
         except KeyError:
             user = cli_info.client_id
 
-        if "headers" not in http_args:
-            http_args["headers"] = {}
-
+        # The credential is username and password concatenated with a ':'
+        # in between and then base 64 encoded
         credentials = "{}:{}".format(user, passwd)
         authz = base64.urlsafe_b64encode(credentials.encode("utf-8")).decode(
             "utf-8")
         http_args["headers"]["Authorization"] = "Basic {}".format(authz)
 
+        # If client_secret was part of the request message instance remove it
         try:
             del cis["client_secret"]
         except KeyError:
             pass
 
+        # If we're doing an access token request with an authorization_code
+        # then we should add client_id to the request if it's not already
+        # there
         if isinstance(cis, AccessTokenRequest) and cis[
-            'grant_type'] == 'authorization_code':
+              'grant_type'] == 'authorization_code':
             if 'client_id' not in cis:
                 try:
                     cis['client_id'] = cli_info.client_id
                 except AttributeError:
                     pass
         else:
+            # remove client_id if not required by the request definition
             try:
                 _req = cis.c_param["client_id"][VREQUIRED]
             except KeyError:
                 _req = False
 
+            # if it's not required remove it
             if not _req:
                 try:
                     del cis["client_id"]
@@ -125,11 +140,14 @@ class ClientSecretPost(ClientSecretBasic):
     Server, authenticate with the Authorization Server in accordance with
     Section 3.2.1 of OAuth 2.0 [RFC6749] by including the Client Credentials in
     the request body.
+
+    These means putting both client_secret and client_id in the request body.
     """
 
     def construct(self, cis, cli_info=None, request_args=None, http_args=None,
                   **kwargs):
 
+        # I MUST have a client_secret
         if "client_secret" not in cis:
             try:
                 cis["client_secret"] = http_args["client_secret"]
@@ -149,7 +167,7 @@ class BearerHeader(ClientAuthnMethod):
     def construct(self, cis=None, cli_info=None, request_args=None,
                   http_args=None, **kwargs):
         """
-        More complicated logic then I would have liked it to be
+        Constructing the Authorization header
 
         :param cis: Request class instance
         :param ci: Client information
@@ -159,6 +177,7 @@ class BearerHeader(ClientAuthnMethod):
         :return:
         """
 
+        # try to find the access_token in the request
         if cis is not None:
             if "access_token" in cis:
                 _acc_token = cis["access_token"]

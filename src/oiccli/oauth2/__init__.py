@@ -4,17 +4,10 @@ from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.client_info import ClientInfo
 from oiccli.exception import OicCliError
 from oiccli.http import HTTPLib
-from oiccli.http_util import BadRequest
-from oiccli.http_util import Response
-from oiccli.http_util import R2C
-from oiccli.http_util import SeeOther
 from oiccli.oauth2 import service
-
-from oicmsg.oauth2 import AuthorizationErrorResponse
-from oicmsg.oauth2 import ErrorResponse
-from oicmsg.key_jar import KeyJar
-
 from oiccli.service import Service
+
+from oicmsg.key_jar import KeyJar
 
 __author__ = 'Roland Hedberg'
 
@@ -28,55 +21,6 @@ DEFAULT_SERVICES = ['Authorization', 'AccessToken',
 
 class ExpiredToken(OicCliError):
     pass
-
-
-# =============================================================================
-
-def error_response(error, descr='', status="400 Bad Request"):
-    response = ErrorResponse(error=error, error_description=descr)
-    return Response(response.to_json(), content="application/json",
-                    status=status)
-
-
-def error(error, descr=None, status_code=400):
-    stat_txt = R2C[status_code]._status
-    return error_response(error=error, descr=descr, status=stat_txt)
-
-
-def authz_error(error, descr=None, status_code=400):
-    response = AuthorizationErrorResponse(error=error)
-    if descr:
-        response["error_description"] = descr
-    stat_txt = R2C[status_code]._status
-    return Response(response.to_json(), content="application/json",
-                    status=stat_txt)
-
-
-def redirect_authz_error(error, redirect_uri, descr=None, state="",
-                         return_type=None):
-    err = AuthorizationErrorResponse(error=error)
-    if descr:
-        err["error_description"] = descr
-    if state:
-        err["state"] = state
-    if return_type is None or return_type == ["code"]:
-        location = err.request(redirect_uri)
-    else:
-        location = err.request(redirect_uri, True)
-    return SeeOther(location)
-
-
-def exception_to_error_mesg(excep):
-    if isinstance(excep.args, tuple):
-        _msg = excep.args[0]
-    else:
-        _msg = ', '.join(excep.args)
-
-    err = ErrorResponse(error='service_error',
-                        error_description='{}: {}'.format(
-                            excep.__class__.__name__, _msg))
-    resp = BadRequest(err.to_json(), content='application/json')
-    return resp
 
 
 # =============================================================================

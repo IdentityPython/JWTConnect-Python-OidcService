@@ -1,22 +1,13 @@
-import json
 import os
 import pytest
+import sys
 import time
 
-import sys
-
-from cryptojwt import as_unicode
 from cryptojwt.jwk import rsa_load
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.exception import SubMismatch
-from oiccli.http_util import Response, SeeOther, BadRequest
-from oiccli.oauth2 import authz_error, exception_to_error_mesg
 from oiccli.oauth2 import Client
-from oiccli.oauth2 import error
-from oiccli.oauth2 import error_response
-from oiccli.oauth2 import redirect_authz_error
 from oicmsg.key_bundle import KeyBundle
-from oicmsg.oauth2 import AccessTokenRequest, ErrorResponse
+from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
 from oicmsg.oauth2 import AuthorizationRequest
 from oicmsg.oauth2 import RefreshAccessTokenRequest
@@ -36,65 +27,6 @@ IDTOKEN = IdToken(iss="http://oic.example.org/", sub="sub",
                   aud=CLIENT_ID, exp=utc_time_sans_frac() + 86400,
                   nonce="N0nce",
                   iat=time.time())
-
-
-def test_error_response():
-    resp = error_response('invalid_request')
-    assert isinstance(resp, Response, )
-
-    def start_response(status, headers):
-        assert status == "400 Bad Request"
-        assert headers == [('Content-type', 'application/json')]
-
-    assert resp({}, start_response) == [
-        '{"error": "invalid_request"}'.encode('utf8')]
-
-
-def test_error():
-    resp = error('invalid_grant', 'Grant has expired')
-    assert isinstance(resp, Response, )
-
-    def start_response(status, headers):
-        assert status == "400 Bad Request"
-        assert headers == [('Content-type', 'application/json')]
-
-    _res = json.loads(as_unicode(resp({}, start_response)[0]))
-    assert set(_res.keys()) == {'error', 'error_description'}
-
-
-def test_authz_error():
-    resp = authz_error('unauthorized_client', 'Not in my family')
-    assert isinstance(resp, Response, )
-
-    def start_response(status, headers):
-        assert status == "400 Bad Request"
-        assert headers == [('Content-type', 'application/json')]
-
-    _res = json.loads(as_unicode(resp({}, start_response)[0]))
-    assert set(_res.keys()) == {'error', 'error_description'}
-    assert _res['error'] == 'unauthorized_client'
-
-
-def test_redirect_authz_error():
-    resp = redirect_authz_error('unauthorized_client', 'https://example.com/cb',
-                                state='ABCDEF')
-    assert isinstance(resp, SeeOther)
-    assert resp.status == '303 See Other'
-    assert resp.headers == [('Content-type', 'text/html')]
-    _url, _qp = resp.message.split('?')
-    assert _url == 'https://example.com/cb'
-    _msg = ErrorResponse().from_urlencoded(_qp)
-    assert _msg['state'] == 'ABCDEF'
-    assert _msg['error'] == 'unauthorized_client'
-
-
-def test_exception_to_error_mesg():
-    resp = exception_to_error_mesg(SubMismatch('Not the same'))
-    assert isinstance(resp, BadRequest)
-    _msg = ErrorResponse().from_json(resp.message)
-    assert _msg.to_dict() == {"error_description": "SubMismatch: Not the same",
-                              "error": "service_error"}
-    assert resp.headers == [('Content-type', 'application/json')]
 
 
 class TestClient(object):

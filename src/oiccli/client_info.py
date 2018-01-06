@@ -10,6 +10,8 @@ from oicmsg.key_bundle import KeyBundle
 from oicmsg.key_jar import build_keyjar
 from oicmsg.key_jar import KeyJar
 
+# This is represents a map between the local storage of algorithm choices
+# and how they are represented in a provider info response.
 ATTRMAP = {
     "userinfo": {
         "sign": "userinfo_signed_response_alg",
@@ -27,6 +29,12 @@ ATTRMAP = {
 
 
 class ClientInfo(object):
+    """
+    This class keeps information that a client needs to be able to talk
+    to a server. Some of this information comes from configuration and some
+    from dynamic provider info discovery or client registration.
+    But information is also picked up during the conversation with a server.
+    """
     def __init__(self, keyjar=None, config=None, events=None,
                  db=None, db_name='', strict_on_preferences=False, **kwargs):
         self.keyjar = keyjar or KeyJar()
@@ -37,7 +45,10 @@ class ClientInfo(object):
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
 
-        self.config = config or {}
+        if config is None:
+            config = {}
+        self.config = config
+
         # Below so my IDE won't complain
         self.base_url = ''
         self.requests_dir = ''
@@ -99,6 +110,8 @@ class ClientInfo(object):
                 self.keyjar = KeyJar()
             self.keyjar.add_symmetric("", str(val))
 
+    # since client secret is used as a symmetric key in some instances
+    # some special handling is needed for the client_secret attribute
     client_secret = property(get_client_secret, set_client_secret)
 
     def get_client_id(self):
@@ -108,12 +121,25 @@ class ClientInfo(object):
         self._c_id = client_id
         self.state_db.client_id = client_id
 
+    # I keep the client_id in two places so there is a need to make the
+    # adding client_id to those 2 places to be atomic.
     client_id = property(get_client_id, set_client_id)
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
     def filename_from_webname(self, webname):
+        """
+        A 1<->1 map is maintend between a URL pointing to a file and
+        the name of the file in the file system.
+
+        As an example if the base_url is 'https://example.com' and a jwks_uri
+        is 'https://example.com/jwks_uri.json' then the filename of the
+        corresponding file on the local filesystem would be 'jwks_uri'.
+
+        :param webname: The published URL
+        :return: local filename
+        """
         assert webname.startswith(self.base_url)
         _name = webname[len(self.base_url):]
         if _name.startswith('/'):
@@ -123,9 +149,12 @@ class ClientInfo(object):
 
     def sign_enc_algs(self, typ):
         """
+        Reformat the crypto algorithm information gathered from a
+        client registration response into something more palatable.
 
         :param typ: 'id_token', 'userinfo' or 'request_object'
-        :return:
+        :return: Dictionary with 'sign', 'alg' or 'enc' as keys and the
+            corresponding algorithms as value
         """
         resp = {}
         for key, val in ATTRMAP[typ].items():
@@ -142,15 +171,17 @@ class ClientInfo(object):
     def verify_alg_support(self, alg, usage, typ):
         """
         Verifies that the algorithm to be used are supported by the other side.
+        This will look at provider information either statically configured or
+        obtained through dynamic provider info discovery.
 
         :param alg: The algorithm specification
         :param usage: In which context the 'alg' will be used.
-            The following values are supported:
+            The following contexts are supported:
             - userinfo
             - id_token
             - request_object
             - token_endpoint_auth
-        :param typ:
+        :param typ of algorithm:
             - signing_alg
             - encryption_alg
             - encryption_enc
@@ -165,10 +196,12 @@ class ClientInfo(object):
         else:
             return False
 
-    def generate_request_uris(self, request_dir):
+    def generate_request_uris(self, path):
         """
         Need to generate a path that is unique for the OP/RP combo
+        This is to counter the mix-up attack.
 
+        :param path: Leading path
         :return: A list of one unique URL
         """
         m = hashlib.sha256()
@@ -177,9 +210,15 @@ class ClientInfo(object):
         except KeyError:
             m.update(as_bytes(self.issuer))
         m.update(as_bytes(self.base_url))
-        return ['{}{}/{}'.format(self.base_url, request_dir, m.hexdigest())]
+        return ['{}{}/{}'.format(self.base_url, path, m.hexdigest())]
 
     def import_keys(self, keyspec):
+        """
+        The client needs it's own set of keys. It can either dynamically
+        create them or load them from local storage.
+
+        :param keyspec:
+        """
         for where, spec in keyspec.items():
             if where == 'file':
                 for typ, files in spec.items():

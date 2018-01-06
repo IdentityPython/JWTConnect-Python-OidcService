@@ -46,6 +46,8 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
                 accept=None, **kwargs):
     """
     Create the information pieces necessary for sending a request.
+    Depending on whether the request is done using GET or POST the request
+    is placed in different places and serialized into different formats.
 
     :param uri: The URL pointing to where the request should be sent
     :param method: Which method that should be used to send the request

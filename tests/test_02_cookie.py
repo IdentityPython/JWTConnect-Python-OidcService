@@ -7,61 +7,14 @@ import pytest
 from six import PY2
 
 from oiccli.exception import ImproperlyConfigured
-from oiccli.http_util import CookieDealer, Redirect
-from oiccli.http_util import InvalidCookieSign
-from oiccli.http_util import Response
-from oiccli.http_util import cookie_parts
-from oiccli.http_util import cookie_signature
-from oiccli.http_util import parse_cookie
-from oiccli.http_util import verify_cookie_signature
+from oiccli.cookie import CookieDealer
+from oiccli.cookie import InvalidCookieSign
+from oiccli.cookie import cookie_parts
+from oiccli.cookie import cookie_signature
+from oiccli.cookie import parse_cookie
+from oiccli.cookie import verify_cookie_signature
 
 __author__ = 'roland'
-
-
-class TestResponse(object):
-    def test_response(self):
-        response_header = ("X-Test", "foobar")
-        message = "foo bar"
-
-        def start_response(status, headers):
-            assert status == "200 OK"
-            assert response_header in headers
-
-        resp = Response(message, headers=[response_header])
-        result = resp({}, start_response)
-        assert result == [message.encode('utf8')]
-
-    def test_response_status(self):
-        message = "foo bar"
-
-        def start_response(status, headers):
-            pass
-
-        resp = Response(message, template="== %s ==")
-        result = resp({}, start_response)
-        _txt = "== %s ==" % message
-        assert result == [_txt.encode('utf8')]
-
-    def test_escaped(self):
-        template = '%s'
-        response_header = ("XSS-Test", "script")
-        message = '<script>alert("hi");</script>'
-
-        def start_response(status, headers):
-            assert status == "200 OK"
-            assert response_header in headers
-
-        resp = Response(message=message, headers=[response_header], template=template)
-        assert resp({}, start_response) == ['&lt;script&gt;alert("hi");&lt;/script&gt;'.encode('utf8')]
-
-    def test_redirect(self):
-        resp = Redirect('https://example.com')
-
-        def start_response(status, headers):
-            assert ('location', 'https://example.com') in headers
-
-        result = resp({}, start_response)
-        assert b'Redirecting to https://example.com' in result[0]
 
 
 @pytest.fixture

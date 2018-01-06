@@ -24,7 +24,6 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
 CORS_HEADERS = [
     ("Access-Control-Allow-Origin", "*"),
@@ -33,185 +32,18 @@ CORS_HEADERS = [
 ]
 
 
-class Response(object):
-    _template = None
-    _status = '200 OK'
-    _content_type = 'text/html'
-    _mako_template = None
-    _mako_lookup = None
-
-    def __init__(self, message=None, **kwargs):
-        self.status = kwargs.get("status", self._status)
-        self.response = kwargs.get("response", self._response)
-        self.template = kwargs.get("template", self._template)
-        self.mako_template = kwargs.get("mako_template", self._mako_template)
-        self.mako_lookup = kwargs.get("template_lookup", self._mako_lookup)
-
-        self.message = message
-
-        self.headers = []
-        self.headers.extend(kwargs.get("headers", []))
-        _content_type = kwargs.get("content", self._content_type)
-
-        self.headers.append(("Content-type", _content_type))
-
-    def __call__(self, environ, start_response, **kwargs):
-        start_response(self.status, self.headers)
-        return self.response(self.message, **kwargs)
-
-    def _response(self, message="", **argv):
-        # Have to be more specific, this might be a bit to much.
-        if message:
-            try:
-                if '<script>' in message:
-                    message = message.replace(
-                        '<script>', '&lt;script&gt;').replace(
-                        '</script>', '&lt;/script&gt;')
-            except TypeError:
-                if b'<script>' in message:
-                    message = message.replace(
-                        b'<script>', b'&lt;script&gt;').replace(
-                        b'</script>', b'&lt;/script&gt;')
-
-        if self.template:
-            if ("Content-type", "application/json") in self.headers:
-                return [message.encode("utf-8")]
-            else:
-                return [str(self.template % message).encode("utf-8")]
-        elif self.mako_lookup and self.mako_template:
-            argv["message"] = message
-            mte = self.mako_lookup.get_template(self.mako_template)
-            return [mte.render(**argv)]
-        else:
-            if [x for x in self._c_types() if x.startswith('image/')]:
-                return [message]
-            elif [x for x in self._c_types() if x == 'application/x-gzip']:
-                return [message]
-
-            try:
-                return [message.encode("utf-8")]
-            except AttributeError:
-                return [message]
-
-    def info(self):
-        return {'status': self.status, 'headers': self.headers,
-                'message': self.message}
-
-    def add_header(self, ava):
-        self.headers.append(ava)
-
-    def reply(self, **kwargs):
-        return self.response(self.message, **kwargs)
-
-    def _c_types(self):
-        return [y for x, y in self.headers if x == "Content-type"]
-
-
-class Created(Response):
-    _status = "201 Created"
-
-
-class Accepted(Response):
-    _status = "202 Accepted"
-
-
-class NonAuthoritativeInformation(Response):
-    _status = "203 Non Authoritative Information"
-
-
-class NoContent(Response):
-    _status = "204 No Content"
-
-
-class Redirect(Response):
-    _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
-                '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
-                '</body>\n</html>'
-    _status = '302 Found'
-
-    def __call__(self, environ, start_response, **kwargs):
-        location = self.message
-        self.headers.append(('location', location))
-        start_response(self.status, self.headers)
-        return self.response((location, location, location))
-
-
-class SeeOther(Response):
-    _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
-                '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
-                '</body>\n</html>'
-    _status = '303 See Other'
-
-    def __call__(self, environ, start_response, **kwargs):
-        location = self.message
-        if PY2:
-            try:
-                location = location.encode('utf8')
-            except UnicodeDecodeError:
-                pass
-        self.headers.append(('location', location))
-        start_response(self.status, self.headers)
-        return self.response((location, location, location))
-
-
-class Forbidden(Response):
-    _status = '403 Forbidden'
-    _template = "<html>Not allowed to mess with: '%s'</html>"
-
-
-class BadRequest(Response):
-    _status = "400 Bad Request"
-    _template = "<html>%s</html>"
-
-
-class Unauthorized(Response):
-    _status = "401 Unauthorized"
-    _template = "<html>%s</html>"
-
-
-class NotFound(Response):
-    _status = '404 NOT FOUND'
-
-
-class NotSupported(Response):
-    _status = '405 Not Support'
-
-
-class NotAcceptable(Response):
-    _status = '406 Not Acceptable'
-
-
-class ServiceError(Response):
-    _status = '500 Internal Service Error'
-
-
 class InvalidCookieSign(Exception):
     pass
 
 
-R2C = {
-    200: Response,
-    201: Created,
-    202: Accepted,
-    203: NonAuthoritativeInformation,
-    204: NoContent,
-    302: Redirect,
-    303: SeeOther,
-    400: BadRequest,
-    401: Unauthorized,
-    403: Forbidden,
-    404: NotFound,
-    405: NotSupported,
-    406: NotAcceptable,
-    500: ServiceError,
-}
-
-
-def factory(code, message, **kwargs):
-    return R2C[code](message, **kwargs)
-
-
 def _expiration(timeout, time_format=None):
+    """
+    return an expiration time
+
+    :param timeout: When
+    :param time_format: The format of the returned value
+    :return: A timeout date
+    """
     if timeout == "now":
         return time_util.instant(time_format)
     else:
@@ -406,6 +238,14 @@ def parse_cookie(name, seed, kaka, enc_key=None):
 
 
 def cookie_parts(name, kaka):
+    """
+    Give me the parts of the cookie payload
+
+    :param name: A name of a cookie object
+    :param kaka: The cookie
+    :return: A list of parts or None if there is no cookie object with the
+        given name
+    """
     cookie_obj = SimpleCookie(text_type(kaka))
     morsel = cookie_obj.get(name)
     if morsel:
@@ -415,13 +255,17 @@ def cookie_parts(name, kaka):
 
 
 class CookieDealer(object):
-    def getServer(self):
+    """
+    Functionality that an entity that deals with cookies need to have
+    access to.
+    """
+    def _get_server(self):
         return self._srv
 
-    def setServer(self, server):
+    def _set_server(self, server):
         self._srv = server
 
-    srv = property(getServer, setServer)
+    srv = property(_get_server, _set_server)
 
     def __init__(self, srv, ttl=5):
         self.srv = None
@@ -430,27 +274,51 @@ class CookieDealer(object):
         self.cookie_ttl = ttl  # N minutes
 
     def init_srv(self, srv):
+        """
+        Make sure the server has the necessary attributes
+
+        :param srv: A server instance
+        """
         if not srv:
             return
         self.srv = srv
 
+        # verify that the server instance has a cymkey attribute
         symkey = getattr(self.srv, 'symkey', None)
         if symkey is not None and symkey == "":
-            msg = "CookieDealer.srv.symkey cannot be an empty value"
+            msg = "CookieDealer.srv.symkey can not be an empty value"
             raise ImproperlyConfigured(msg)
 
+        # if there is no 'sed' attribute defined create one
         if not getattr(srv, 'seed', None):
             setattr(srv, 'seed', rndstr().encode("utf-8"))
 
     def delete_cookie(self, cookie_name=None):
+        """
+        Create a cookie that will immediately expire when it hits the other
+        side.
+
+        :param cookie_name: Name of the cookie
+        :return: A tuple to be added to headers
+        """
         return self.create_cookie("", "", cookie_name=cookie_name, ttl=-1,
                                   kill=True)
 
     def create_cookie(self, value, typ, cookie_name=None, ttl=-1, kill=False):
+        """
+
+        :param value: Part of the cookie payload
+        :param typ: Type of cookie
+        :param cookie_name:
+        :param ttl: Number of minutes before this cookie goes stale
+        :param kill: Whether the the cookie should expire on arrival
+        :return: A tuple to be added to headers
+        """
         if kill:
             ttl = -1
         elif ttl < 0:
             ttl = self.cookie_ttl
+
         if cookie_name is None:
             cookie_name = self.srv.cookie_name
 
@@ -466,13 +334,16 @@ class CookieDealer(object):
         except AttributeError:
             cookie_path = ""
 
+        # now
         timestamp = str(int(time.time()))
-        try:
-            _msg = "::".join([value, timestamp, typ])
-        except TypeError:
-            _msg = "::".join([value[0], timestamp, typ])
 
-        cookie = make_cookie(cookie_name, _msg, self.srv.seed,
+        # create cookie payload
+        try:
+            cookie_payload = "::".join([value, timestamp, typ])
+        except TypeError:
+            cookie_payload = "::".join([value[0], timestamp, typ])
+
+        cookie = make_cookie(cookie_name, cookie_payload, self.srv.seed,
                              expire=ttl, domain=cookie_domain, path=cookie_path,
                              timestamp=timestamp,
                              enc_key=self.srv.symkey)
@@ -481,14 +352,11 @@ class CookieDealer(object):
         else:
             return cookie
 
-    def getCookieValue(self, cookie=None, cookie_name=None):
-        return self.get_cookie_value(cookie, cookie_name)
-
     def get_cookie_value(self, cookie=None, cookie_name=None):
         """
-        Return information stored in the Cookie
+        Return information stored in a Cookie
 
-        :param cookie:
+        :param cookie: A cookie instance
         :param cookie_name: The name of the cookie I'm looking for
         :return: tuple (value, timestamp, type)
         """
