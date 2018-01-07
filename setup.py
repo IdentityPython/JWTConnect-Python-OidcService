@@ -56,7 +56,7 @@ setup(
     author_email="roland@catalogix.se",
     license="Apache 2.0",
     url='https://github.com/IdentityPython/oicmsg/',
-    packages=["oiccli", "oiccli/oauth2", "oiccli/oic", 'oiccli/client_authn'],
+    packages=["oiccli", "oiccli/oauth2", "oiccli/oic"],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 4 - Beta",

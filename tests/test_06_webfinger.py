@@ -2,11 +2,11 @@
 
 import json
 
-from oiccli.webfinger import OIC_ISSUER
+from oiccli.webfinger import OIC_ISSUER, LINK, JRD
 from oiccli.webfinger import URINormalizer
 from oiccli.webfinger import WebFinger
 
-__author__ = 'rolandh'
+__author__ = 'Roland Hedberg'
 
 # examples provided by Nat Sakimura
 EXAMPLE = {
@@ -72,6 +72,71 @@ class TestURINormalizer(object):
         for key, val in EXAMPLE.items():
             _val = URINormalizer().normalize(key)
             assert val == _val
+
+
+def test_link1():
+    link = LINK({
+        "rel": "http://webfinger.net/rel/avatar",
+        "type": "image/jpeg",
+        "href": "http://www.example.com/~bob/bob.jpg"
+    })
+
+    assert set(link.keys()) == {'rel', 'type', 'href'}
+    assert link['rel'] == "http://webfinger.net/rel/avatar"
+    assert link['type'] == "image/jpeg"
+    assert link['href'] == "http://www.example.com/~bob/bob.jpg"
+
+
+def test_link2():
+    link = LINK({
+        "rel": "blog",
+        "type": "text/html",
+        "href": "http://blogs.example.com/bob/",
+        "titles": {
+            "en-us": "The Magical World of Bob",
+            "fr": "Le monde magique de Bob"
+        }
+    })
+
+    assert set(link.keys()) == {'rel', 'type', 'href', 'titles'}
+    assert link['rel'] == "blog"
+    assert link['type'] == "text/html"
+    assert link['href'] == "http://blogs.example.com/bob/"
+    assert set(link['titles'].keys()) == {'en-us', 'fr'}
+
+
+def test_link3():
+    link = LINK({"rel": "http://webfinger.net/rel/profile-page",
+                 "href": "http://www.example.com/~bob/"})
+
+    assert set(link.keys()) == {'rel', 'href'}
+    assert link['rel'] == "http://webfinger.net/rel/profile-page"
+    assert link['href'] == "http://www.example.com/~bob/"
+
+
+def test_jrd():
+    jrd = JRD({
+        "expires": "2012-11-16T19:41:35Z",
+        "subject": "acct:bob@example.com",
+        "aliases": [
+            "http://www.example.com/~bob/"
+        ],
+        "properties": {
+            "http://example.com/ns/role/": "employee"
+        },
+        "links": [
+            {
+                "rel": "http://webfinger.net/rel/avatar",
+                "type": "image/jpeg",
+                "href": "http://www.example.com/~bob/bob.jpg"
+            },
+            {
+                "rel": "http://webfinger.net/rel/profile-page",
+                "href": "http://www.example.com/~bob/"
+            }]})
+
+    assert set(jrd.keys()) == {'expires', 'subject', 'aliases', 'properties',
+                               'links'}
 
 
 class TestWebFinger(object):
