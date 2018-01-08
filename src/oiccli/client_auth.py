@@ -57,7 +57,7 @@ class ClientSecretBasic(ClientAuthnMethod):
 
     The upshot of this is to construct an Authorization header that has the
     value 'Basic <token>' where <token> is username and password concatenated
-    together with a ':' in between and then base64 encoded.
+    together with a ':' in between and then URL safe base64 encoded.
     """
 
     def construct(self, cis, cli_info=None, request_args=None, http_args=None,
@@ -107,7 +107,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         except KeyError:
             pass
 
-        # If we're doing an access token request with an authorization_code
+        # If we're doing an access token request with an authorization code
         # then we should add client_id to the request if it's not already
         # there
         if isinstance(cis, AccessTokenRequest) and cis[
@@ -167,13 +167,14 @@ class BearerHeader(ClientAuthnMethod):
     def construct(self, cis=None, cli_info=None, request_args=None,
                   http_args=None, **kwargs):
         """
-        Constructing the Authorization header
+        Constructing the Authorization header. The value of
+        the Authorization header is "Bearer <access_token>".
 
         :param cis: Request class instance
         :param ci: Client information
         :param request_args: request arguments
         :param http_args: HTTP header arguments
-        :param kwargs:
+        :param kwargs: extra keywordd arguments
         :return:
         """
 
@@ -200,9 +201,7 @@ class BearerHeader(ClientAuthnMethod):
             except KeyError:
                 _acc_token = request_args["access_token"]
 
-        # Do I need to base64 encode the access token ? Probably !
-        # _bearer = "Bearer %s" % base64.b64encode(_acc_token)
-        _bearer = "Bearer %s" % _acc_token
+        _bearer = "Bearer {}".format(_acc_token)
         if http_args is None:
             http_args = {"headers": {}}
             http_args["headers"]["Authorization"] = _bearer

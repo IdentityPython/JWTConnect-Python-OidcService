@@ -35,7 +35,7 @@ class TestState(object):
 
         aresp = AuthorizationResponse(code="access grant", state=state)
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         assert self.state_db[state]['code'] == 'access grant'
 
@@ -62,7 +62,7 @@ class TestState(object):
             code="access grant", state=state, access_token='access token',
             token_type='Bearer')
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         assert self.state_db[state]['code'] == 'access grant'
         assert self.state_db[state]['token'] == {'access_token': 'access token',
@@ -78,7 +78,7 @@ class TestState(object):
             code="access grant", state=state, access_token='access token',
             token_type='Bearer', id_token='Dummy.JWT.foo')
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         assert self.state_db[state]['code'] == 'access grant'
         assert self.state_db[state]['token'] == {'access_token': 'access token',
@@ -95,7 +95,7 @@ class TestState(object):
             state=state, access_token='access token',
             token_type='Bearer', id_token='Dummy.JWT.foo')
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         assert self.state_db[state]['token'] == {'access_token': 'access token',
                                                  'token_type': 'Bearer'}
@@ -108,7 +108,7 @@ class TestState(object):
                                            request=request)
         aresp = AuthorizationResponse(state=state, code="access grant")
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         aresp = AccessTokenResponse(access_token='access token',
                                     token_type='Bearer',
@@ -116,7 +116,7 @@ class TestState(object):
                                     expires_in=600)
         _now = utc_time_sans_frac()
 
-        self.state_db.add_message_info(aresp, state=state)
+        self.state_db.add_response(aresp, state=state)
 
         assert set(self.state_db[state]['token'].keys()) == {'access_token',
                                                              'token_type',
@@ -132,13 +132,13 @@ class TestState(object):
                                            request=request)
         aresp = AuthorizationResponse(state=state, code="access grant")
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         aresp = AccessTokenResponse(access_token='access token',
                                     token_type='Bearer',
                                     id_token='Dummy.JWT.foo',
                                     expires_in=600)
-        self.state_db.add_message_info(aresp, state=state)
+        self.state_db.add_response(aresp, state=state)
 
         ti = self.state_db.get_token_info(state)
 
@@ -149,13 +149,13 @@ class TestState(object):
                                            request=request)
         aresp = AuthorizationResponse(state=state, code="access grant")
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         aresp = AccessTokenResponse(access_token='access token',
                                     token_type='Bearer',
                                     id_token='Dummy.JWT.foo',
                                     expires_in=600)
-        self.state_db.add_message_info(aresp, state=state)
+        self.state_db.add_response(aresp, state=state)
 
         _now = utc_time_sans_frac() + 900
 
@@ -169,20 +169,20 @@ class TestState(object):
                                            request=request)
         aresp = AuthorizationResponse(state=state, code="access grant")
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
         aresp1 = AccessTokenResponse(access_token='access token',
                                      token_type='Bearer',
                                      id_token='Dummy.JWT.foo',
                                      expires_in=600)
 
-        self.state_db.add_message_info(aresp1, state=state)
+        self.state_db.add_response(aresp1, state=state)
 
         aresp1 = AccessTokenResponse(access_token='2nd access token',
                                      token_type='Bearer',
                                      expires_in=120)
 
-        self.state_db.add_message_info(aresp1, state=state)
+        self.state_db.add_response(aresp1, state=state)
 
         _tinfo = self.state_db.get_token_info(state)
 
@@ -193,15 +193,15 @@ class TestState(object):
         with pytest.raises(ExpiredToken):
             self.state_db.get_token_info(state, _now)
 
-    def test_get_access_token_request_args(self):
+    def test_get_access_token_response_args(self):
         request = AuthorizationRequest(**REQ_ARGS)
 
         state = self.state_db.create_state(receiver='https://example.org/op',
                                            request=request)
         aresp = AuthorizationResponse(state=state, code="access grant")
 
-        self.state_db.add_message_info(aresp)
+        self.state_db.add_response(aresp)
 
-        req_args = self.state_db.get_request_args(state, AccessTokenRequest)
+        resp_args = self.state_db.get_response_args(state, AccessTokenRequest)
 
-        assert set(req_args.keys()) == {'code', 'client_id', 'redirect_uri'}
+        assert set(resp_args.keys()) == {'code', 'client_id', 'redirect_uri'}

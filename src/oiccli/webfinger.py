@@ -10,6 +10,9 @@ from six.moves.urllib.parse import urlparse
 
 from oicmsg.time_util import in_a_while
 
+"""
+Implements WebFinger RFC 7033
+"""
 __author__ = 'rolandh'
 
 logger = logging.getLogger(__name__)
@@ -22,8 +25,15 @@ class WebFingerError(OicCliError):
     pass
 
 
+class ClaimValueType(object):
+    def __init__(self, typ, required=False, single_value=True):
+        self.type = typ
+        self.required = required
+        self.single_value = single_value
+
+
 class Base(object):
-    c_param = {}
+    claim = {}
 
     def __init__(self, dic=None):
         self._ava = {}
@@ -32,38 +42,37 @@ class Base(object):
 
     def __setitem__(self, item, val):
         try:
-            spec = self.c_param[item]
+            spec = self.claim[item]
         except KeyError:
-            spec = {"type": str, "required": False}  # default
+            spec = ClaimValueType(str)  # default
 
-        try:
-            t1, t2 = spec["type"]
-            if t1 == list:  # Should always be
-                assert not isinstance(val, str)
-                assert isinstance(val, list)
-                res = []
-                if t2 == LINK:
-                    for v in val:
-                        res.append(LINK(v))
-                else:
-                    for v in val:
-                        try:
-                            assert isinstance(v, t2)
-                        except AssertionError:
-                            pass
-                        res.append(v)
-                self._ava[item] = res
-        except TypeError:
-            t2_type = spec["type"]
-            try:
-                assert isinstance(val, t2_type)
+        val_type = spec.type
+        if spec.single_value is False:
+            if isinstance(val, str):
+                raise ValueError('Wrong type of value')
+            if not isinstance(val, list):
+                raise ValueError('Wrong type of value')
+
+            res = []
+            if val_type == LINK:
+                for v in val:
+                    res.append(LINK(v))
+            else:
+                for v in val:
+                    if not isinstance(v, val_type):
+                        raise ValueError('Expected a {}'.format(val_type))
+                    res.append(v)
+            self._ava[item] = res
+        else:
+            val_type = spec.type
+            if isinstance(val, val_type):
                 self._ava[item] = val
-            except AssertionError:
-                pass
+            else:
+                raise ValueError('Expected {} on {}'.format(val_type, item))
 
     def load(self, dictionary):
-        for key, spec in list(self.c_param.items()):
-            if key not in dictionary and spec["required"] is True:
+        for key, spec in list(self.claim.items()):
+            if key not in dictionary and spec.required:
                 raise AttributeError("Required attribute '%s' missing" % key)
 
         for key, val in list(dictionary.items()):
@@ -83,15 +92,17 @@ class Base(object):
         res = {}
         for key, val in self._ava.items():
             try:
-                _type = self.c_param[key]["type"]
+                _cvt = self.claim[key]
             except KeyError:
-                pass
-            else:
-                if _type == (list, LINK):
-                    sres = []
-                    for _val in val:
-                        sres.append(_val.dump())
-                    val = sres
+                _cvt = ClaimValueType(str)
+
+            if not _cvt.single_value:
+                if not isinstance(val, list):
+                    raise ValueError('Expected list of values')
+                sres = []
+                for _val in val:
+                    sres.append(_val.dump())
+                val = sres
             res[key] = val
         return res
 
@@ -121,22 +132,28 @@ class Base(object):
 
 
 class LINK(Base):
-    c_param = {
-        "rel": {"type": str, "required": True},
-        "type": {"type": str, "required": False},
-        "href": {"type": str, "required": False},
-        "titles": {"type": dict, "required": False},
-        "properties": {"type": dict, "required": False},
+    """
+    https://tools.ietf.org/html/rfc5988
+    """
+    claim = {
+        "rel": ClaimValueType(str, required=True),
+        "type": ClaimValueType(str),
+        "href": ClaimValueType(str),
+        "titles": ClaimValueType(dict),
+        "properties": ClaimValueType(dict)
     }
 
 
 class JRD(Base):
-    c_param = {
-        "expires": {"type": str, "required": False},  # Optional
-        "subject": {"type": str, "required": False},  # Should
-        "aliases": {"type": (list, str), "required": False},  # Optional
-        "properties": {"type": dict, "required": False},  # Optional
-        "links": {"type": (list, LINK), "required": False},  # Optional
+    """
+    JSON Resource Descriptor https://tools.ietf.org/html/rfc7033#section-4.4
+    """
+    claim = {
+        "expires": ClaimValueType(str),  # Optional
+        "subject": ClaimValueType(str),  # Should
+        "aliases": ClaimValueType(str, single_value=False),
+        "properties": ClaimValueType(dict),
+        "links": ClaimValueType(LINK, single_value=False)
     }
 
     def __init__(self, dic=None, days=0, seconds=0, minutes=0, hours=0,
@@ -187,7 +204,8 @@ class JRD(Base):
 # identifier like userinfo@host:port, e.g., alice@example.com:8080.
 
 class URINormalizer(object):
-    def has_scheme(self, inp):
+    @staticmethod
+    def has_scheme(inp):
         if "://" in inp:
             return True
         else:
@@ -204,7 +222,8 @@ class URINormalizer(object):
                 return False
         return True
 
-    def acct_scheme_assumed(self, inp):
+    @staticmethod
+    def acct_scheme_assumed(inp):
         if '@' in inp:
             host = inp.split('@')[-1]
             return not (':' in host or '/' in host or '?' in host)

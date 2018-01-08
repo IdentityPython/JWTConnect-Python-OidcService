@@ -76,6 +76,7 @@ class TestClientSecretBasic(object):
         assert http_args["headers"]["Authorization"].endswith("==")
 
     def test_construct_cc(self, client):
+        """CC == Client Credentials, the 4th OAuth2 flow"""
         cis = CCAccessTokenRequest(grant_type="client_credentials")
 
         csb = ClientSecretBasic()
@@ -86,14 +87,14 @@ class TestClientSecretBasic(object):
 
 
 class TestBearerHeader(object):
-    def test_construct(self, client):
+    def test_construct(self):
         request_args = {"access_token": "Sesame"}
         bh = BearerHeader()
         http_args = bh.construct(request_args=request_args)
 
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
-    def test_construct_with_http_args(self, client):
+    def test_construct_with_http_args(self):
         request_args = {"access_token": "Sesame"}
         bh = BearerHeader()
         http_args = bh.construct(request_args=request_args,
@@ -102,7 +103,7 @@ class TestBearerHeader(object):
         assert _eq(http_args.keys(), ["foo", "headers"])
         assert http_args["headers"] == {"Authorization": "Bearer Sesame"}
 
-    def test_construct_with_headers(self, client):
+    def test_construct_with_headers_in_http_args(self):
         request_args = {"access_token": "Sesame"}
 
         bh = BearerHeader()
@@ -123,16 +124,21 @@ class TestBearerHeader(object):
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
     def test_construct_with_token(self, client):
+        # Add a state and bind a code to it
         client.client_info.state_db['AAAA'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
         client.service['authorization'].parse_response(
             resp1.to_urlencoded(), client.client_info, "urlencoded")
+
+        # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="AAAA")
         client.service['accesstoken'].parse_response(
             resp2.to_urlencoded(), client.client_info, "urlencoded")
 
+        # and finally use the access token, bound to a state, to
+        # construct the authorization header
         http_args = BearerHeader().construct(
             ResourceRequest(), cli_info=client.client_info, state="AAAA")
         assert http_args == {"headers": {"Authorization": "Bearer token1"}}

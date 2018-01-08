@@ -1,7 +1,5 @@
 import shelve
 
-from oiccli.exception import ParameterError
-from oicmsg.jwt import JWT
 from oicmsg.message import Message
 from oicmsg.message import SINGLE_OPTIONAL_STRING
 from oicmsg.message import SINGLE_REQUIRED_STRING
@@ -41,8 +39,8 @@ class ExpiredToken(KeyError):
 
 class State(object):
     """
-    Given state I need to be able to find valid access token and id_token
-    and to whom it was sent.
+    Given a state value I need to be able to find valid access token and
+    id_token.
     """
 
     def __init__(self, client_id, db=None, db_name='', lifetime=600):
@@ -57,31 +55,67 @@ class State(object):
         self.lifetime = lifetime
 
     def create_state(self, receiver, request):
+        """
+        Construct a state value. In this class it's just a random string.
+        Also store information about the request using the state value
+        as key.
+
+        :param receiver: Who is the receiver of a request with this
+            state value.
+        :param request: The request
+        :return: a random string
+        """
         _state = rndstr(24)
         _now = utc_time_sans_frac()
-        _info = {'client_id': self.client_id, 'as': receiver, 'iat': _now}
+
+        # gather the information I want to store
+        _state_info = {'client_id': self.client_id, 'as': receiver, 'iat': _now}
+
+        # Add the request to the info
         if isinstance(request, Message):
-            _info.update(request.to_dict())
+            _state_info.update(request.to_dict())
         else:
-            _info.update(request)
-        self._db['state_{}'.format(_state)] = _info
+            _state_info.update(request)
+
+        # store the info
+        self[_state] = _state_info
         return _state
 
-    def _update_token_info(self, info, msg):
+    def _update_token_info(self, state_info, response):
+        """
+        Add information about an access token to the state information
+
+        :param state_info: The state information
+        :param response: A response, typically a access token request response.
+        :return: The updated state information
+        """
+
+        # Fetch the information I have about an access tokens right now.
+        # The response I'm dealing with may be a refresh token response
+        # in which case I already have information base on a previous response.
         try:
-            _tinfo = info['token']
+            _tinfo = state_info['token']
         except KeyError:
             _tinfo = {}
 
+        # If the response doesn't contain an access token then there is
+        # nothing to be done
         try:
-            _token = msg['access_token']
+            _token = response['access_token']
         except KeyError:
             pass
         else:
             _tinfo['access_token'] = _token
+
+            # if there is an access token then look for other claims
+            # that I need to store.
+
+            # calculate when the token will expire based on present time
+            # and how long it's valid.
             try:
-                _exp = int(msg['expires_in'])
+                _exp = int(response['expires_in'])
             except KeyError:
+                # If no new expires_in is given use an old one if available
                 try:
                     _tinfo['exp'] = utc_time_sans_frac() + _tinfo['expires_in']
                 except KeyError:
@@ -90,45 +124,66 @@ class State(object):
                 _tinfo['exp'] = utc_time_sans_frac() + _exp
                 _tinfo['expires_in'] = _exp
 
+            # extra info
             for claim in ['token_type', 'scope']:
                 try:
-                    _tinfo[claim] = msg[claim]
+                    _tinfo[claim] = response[claim]
                 except KeyError:
                     pass
 
-        info['token'] = _tinfo
-        return info
+            state_info['token'] = _tinfo
 
-    def add_message_info(self, msg, state=''):
+        return state_info
+
+    def add_response(self, response, state=''):
+        """
+        Add relevant information from a response to the state information
+
+        :param response: The response
+        :param state: State value
+        :return: state information
+        """
         if not state:
-            state = msg['state']
+            state = response['state']
 
-        _info = self[state]
-        if isinstance(msg, AuthorizationResponse):
+        try:
+            _state_info = self[state]
+        except KeyError:
+            raise UnknownState(state)
+
+        if isinstance(response, AuthorizationResponse):
             try:
-                _info['code'] = msg['code']
+                _state_info['code'] = response['code']
             except KeyError:
                 pass
 
-        self._update_token_info(_info, msg)
+        # If there is information about an access token in the response
+        # add that information too
+        self._update_token_info(_state_info, response)
+
         for claim in ['id_token', 'refresh_token']:
             try:
-                _info[claim] = msg[claim]
+                _state_info[claim] = response[claim]
             except KeyError:
                 pass
 
-        self[state] = _info
-        return _info
+        # Updated the state database
+        self[state] = _state_info
+        return _state_info
 
     def add_info(self, state, **kwargs):
-        try:
-            _info = self[state]
-        except KeyError:
-            _info = self[state] = kwargs
-        else:
-            _info.update(kwargs)
-            self[state] = _info
-        return _info
+        """
+        Add unspecific state information
+
+        :param state: State value
+        :param kwargs: information to be added
+        :return: The present state information
+        """
+        _state_info = self[state]
+        _state_info.update(kwargs)
+
+        self[state] = _state_info
+        return _state_info
 
     def __getitem__(self, state):
         return self._db['state_{}'.format(state)]
@@ -137,12 +192,32 @@ class State(object):
         self._db['state_{}'.format(state)] = value
 
     def bind_nonce_to_state(self, nonce, state):
+        """
+        Bind a nonce value to a state value such that I later given a nonce
+        value I can find the state information
+
+        :param nonce: Nonce value
+        :param state: State value
+        """
         self._db['nonce_{}'.format(nonce)] = state
 
     def nonce_to_state(self, nonce):
+        """
+        Given a nonce value return the state value.
+
+        :param nonce: Nonce value
+        :return: State value
+        """
         return self._db['nonce_{}'.format(nonce)]
 
-    def get_token_info(self, state, now=0, **kwargs):
+    def get_token_info(self, state, now=0):
+        """
+        Get information about a access token bound to a specific state value
+
+        :param state: The state value
+        :param now: A timestamp used to verify if the token is expired or not
+        :return: Token information
+        """
         _tinfo = self[state]['token']
         try:
             _exp = _tinfo['exp']
@@ -155,32 +230,36 @@ class State(object):
                 raise ExpiredToken('Passed best before')
         return _tinfo
 
-    def get_request_args(self, state, request, now=0, **kwargs):
+    def get_response_args(self, state, response_class, now=0, **kwargs):
         """
+        Get the claims returned in a response connected to a specific state
+        value.
 
-        :param state:
-        :param request:
-        :param now:
-        :return:
+        :param state: The state value
+        :param response_class: The type of response that is bound to a state
+        :param now: A time stamp
+        :return: The response arguments
         """
-        _sinfo = self[state]
+        _state_info = self[state]
 
-        req_args = {}
-        for claim in request.c_param:
+        resp_args = {}
+        # only return the claims that are defined in the response class
+        # doesn't matter if they are required or optional.
+        for claim in response_class.c_param:
             if claim == 'access_token':
                 try:
                     tinfo = self.get_token_info(state, now=now)
                 except KeyError:
                     continue
                 else:
-                    req_args[claim] = tinfo['access_token']
+                    resp_args[claim] = tinfo['access_token']
             else:
                 try:
-                    req_args[claim] = _sinfo[claim]
+                    resp_args[claim] = _state_info[claim]
                 except KeyError:
                     pass
 
-        return req_args
+        return resp_args
 
     def get_id_token(self, state):
         return self[state]['id_token']
@@ -195,12 +274,12 @@ class State(object):
 #         self.active = []
 #
 #     def create_state(self, receiver, request):
-#         _req_args = {'as': receiver}
+#         _resp_args = {'as': receiver}
 #         if isinstance(request, Message):
-#             _req_args.update(request.to_dict())
+#             _resp_args.update(request.to_dict())
 #         else:
-#             _req_args.update(request)
-#         return self.jwt.pack(payload=_req_args)
+#             _resp_args.update(request)
+#         return self.jwt.pack(payload=_resp_args)
 #
 #     def __getitem__(self, token):
 #         return self.jwt.unpack(token)
