@@ -117,13 +117,17 @@ class State(object):
             except KeyError:
                 pass
 
-        self._db['state_{}'.format(state)] = _info
+        self[state] = _info
         return _info
 
     def add_info(self, state, **kwargs):
-        _info = self[state]
-        _info.update(kwargs)
-        self._db['state_{}'.format(state)] = _info
+        try:
+            _info = self[state]
+        except KeyError:
+            _info = self[state] = kwargs
+        else:
+            _info.update(kwargs)
+            self[state] = _info
         return _info
 
     def __getitem__(self, state):
