@@ -207,7 +207,7 @@ class Service(object):
                 raise MissingEndpoint("No '{}' endpoint specified".format(
                     self.__name__))
 
-        if not uri:
+        if not uri:  # Only if self.endpoint has no value
             raise MissingEndpoint("No '{}' endpoint specified".format(
                 self.__name__))
 
@@ -223,6 +223,7 @@ class Service(object):
         :param request_args: Message arguments
         :param kwargs: Extra keyword argument
         :return: Dictionary with 'uri' and possibly also 'body' and 'kwargs'
+            as keys
         """
         uri = self._endpoint(**request_args)
 
@@ -242,9 +243,10 @@ class Service(object):
         client authentication method.
 
         :param cis: Message class instance
-        :param cli_info: Client information
+        :param cli_info: Client information, a
+            :py:class:`oiccli.clinet_info.ClientInfo`instance
         :param authn_method: Client authentication method
-        :param request_args: Message argument
+        :param request_args: Request argument
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
         :return: Extended set of HTTP header arguments
@@ -378,6 +380,7 @@ class Service(object):
 
     @staticmethod
     def get_urlinfo(info):
+        # If info is a whole URL pick out the query or fragment part
         if '?' in info or '#' in info:
             parts = urlparse(info)
             scheme, netloc, path, params, query, fragment = parts[:6]
