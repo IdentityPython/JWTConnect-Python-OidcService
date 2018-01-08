@@ -34,8 +34,8 @@ def add_code_challenge(client_info, state):
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
 
-    # TODO store code_verifier
-    client_info.state_db.add_info(state, code_verifier=code_verifier)
+    client_info.state_db.add_info(state, code_verifier=code_verifier,
+                                  code_challenge_method=_method)
 
     return {"code_challenge": code_challenge,
             "code_challenge_method": _method}

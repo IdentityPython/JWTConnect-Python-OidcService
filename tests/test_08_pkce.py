@@ -12,6 +12,8 @@ def test_add_code_challenge_default_values():
     ci = ClientInfo(config=config)
 
     spec = add_code_challenge(ci, 'state')
+
+    # default values are length:64 method:S256
     assert set(spec.keys()) == {'code_challenge', 'code_challenge_method'}
     assert spec['code_challenge_method'] == 'S256'
 
