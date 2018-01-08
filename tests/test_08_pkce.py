@@ -1,8 +1,9 @@
 from oiccli.client_info import ClientInfo
 from oiccli.oic.pkce import add_code_challenge
+from oiccli.oic.pkce import get_code_verifier
 
 
-def test_add_code_challenge_default():
+def test_add_code_challenge_default_values():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
         'client_secret': 'client_secret', 'base_url': 'https://example.com',
@@ -10,6 +11,26 @@ def test_add_code_challenge_default():
     }
     ci = ClientInfo(config=config)
 
-    spec, verifier = add_code_challenge(ci)
+    spec = add_code_challenge(ci, 'state')
     assert set(spec.keys()) == {'code_challenge', 'code_challenge_method'}
     assert spec['code_challenge_method'] == 'S256'
+
+    code_verifier = get_code_verifier(ci, 'state')
+    assert len(code_verifier) == 64
+
+
+def test_add_code_challenge_spec_values():
+    config = {
+        'client_id': 'client_id', 'issuer': 'issuer',
+        'client_secret': 'client_secret', 'base_url': 'https://example.com',
+        'requests_dir': 'requests',
+        'code_challenge': {'length': 128, 'method': 'S384'}
+    }
+    ci = ClientInfo(config=config)
+
+    spec = add_code_challenge(ci, 'state')
+    assert set(spec.keys()) == {'code_challenge', 'code_challenge_method'}
+    assert spec['code_challenge_method'] == 'S384'
+
+    code_verifier = get_code_verifier(ci, 'state')
+    assert len(code_verifier) == 128
