@@ -81,7 +81,7 @@ class State(object):
         self[_state] = _state_info
         return _state
 
-    def _update_token_info(self, state_info, response):
+    def update_token_info(self, state_info, response):
         """
         Add information about an access token to the state information
 
@@ -159,7 +159,7 @@ class State(object):
 
         # If there is information about an access token in the response
         # add that information too
-        self._update_token_info(_state_info, response)
+        self.update_token_info(_state_info, response)
 
         for claim in ['id_token', 'refresh_token']:
             try:

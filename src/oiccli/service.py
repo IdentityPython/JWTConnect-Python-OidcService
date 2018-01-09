@@ -205,11 +205,11 @@ class Service(object):
                 uri = self.endpoint
             except Exception:
                 raise MissingEndpoint("No '{}' endpoint specified".format(
-                    self.__name__))
+                    self.__class__.__name__))
 
         if not uri:  # Only if self.endpoint has no value
             raise MissingEndpoint("No '{}' endpoint specified".format(
-                self.__name__))
+                self.__class__.__name__))
 
         return uri
 

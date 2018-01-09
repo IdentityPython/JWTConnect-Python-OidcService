@@ -55,8 +55,6 @@ class TestCookieDealer(object):
                 self.symkey = ""
         with pytest.raises(ImproperlyConfigured) as err:
             CookieDealer(BadServer())
-        expected_msg = "CookieDealer.srv.symkey cannot be an empty value"
-        assert expected_msg in str(err.value)
 
     def test_cookie_dealer_with_domain(self):
         class DomServer():

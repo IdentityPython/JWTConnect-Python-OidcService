@@ -69,7 +69,7 @@ class TestClient(object):
         # Bind token to state
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.client_info.state_db.add_message_info(resp, "ABCDE")
+        self.client.client_info.state_db.add_response(resp, "ABCDE")
 
         req_args = {}
         msg = self.client.service['refresh_token'].construct(

@@ -158,13 +158,13 @@ class TestBearerBody(object):
         _sdb = client.client_info.state_db
         _sdb['FFFFF'] = {}
         resp = AuthorizationResponse(code="code", state="FFFFF")
-        _sdb.add_message_info(resp)
+        _sdb.add_response(resp)
         atr = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                                   token_type="example",
                                   refresh_token="tGzv3JOkF0XG5Qx2TlKWIA",
                                   example_parameter="example_value",
                                   scope=["inner", "outer"])
-        _sdb.add_message_info(atr, state='FFFFF')
+        _sdb.add_response(atr, state='FFFFF')
 
         cis = ResourceRequest()
         http_args = BearerBody().construct(
