@@ -230,3 +230,7 @@ class ClientInfo(object):
                             _kb = KeyBundle()
                             _kb.append(_key)
                             self.keyjar.add_kb('', _kb)
+            elif where == 'url':
+                for iss, url in spec.items():
+                    kb = KeyBundle(source=url)
+                    self.keyjar.add_kb(iss, kb)
