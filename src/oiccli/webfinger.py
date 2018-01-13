@@ -3,7 +3,6 @@ import json
 import logging
 import re
 
-import requests
 from oiccli.exception import OicCliError
 from oicmsg.exception import MessageException
 from oicmsg.exception import OicMsgError
@@ -19,7 +18,7 @@ from six.moves.urllib.parse import urlparse
 """
 Implements WebFinger RFC 7033
 """
-__author__ = 'rolandh'
+__author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +79,7 @@ def msg_ser(inst, sformat, lev=0):
     return res
 
 
-REQUIRED_LINK = (LINK, True, msg_ser, link_deser, False)
+REQUIRED_LINKS = ([LINK], True, msg_ser, link_deser, False)
 
 
 class JRD(Message):
@@ -91,7 +90,7 @@ class JRD(Message):
         "subject": SINGLE_OPTIONAL_STRING,
         "aliases": OPTIONAL_LIST_OF_STRINGS,
         "properties": SINGLE_OPTIONAL_DICT,
-        "links": REQUIRED_LINK
+        "links": REQUIRED_LINKS
     }
 
 
@@ -196,10 +195,6 @@ class WebFinger(object):
 
         return "%s?%s" % (WF_URL % host, urlencode(info))
 
-    @staticmethod
-    def load(item):
-        return JRD().from_json(item)
-
     def http_args(self, jrd=None):
         if jrd is None:
             if self.jrd:
@@ -212,47 +207,3 @@ class WebFinger(object):
                         "Content-Type": "application/json; charset=UTF-8"},
             "body": jrd.to_json()
         }
-
-    def discovery_query(self, resource):
-        """
-        Given a resource find a OpenID connect OP to use
-
-        :param resource: An identifier of an entity
-        :return: A URL if an OpenID Connect OP could be found
-        """
-
-        logger.debug("Looking for OIDC OP for '%s'" % resource)
-        url = self.query(resource, OIC_ISSUER)
-        try:
-            rsp = self.httpd(url, allow_redirects=True)
-        except requests.ConnectionError:
-            raise
-
-        if rsp.status_code == 200:
-            if self.events:
-                self.events.store('Response', rsp.text)
-
-            self.jrd = self.load(rsp.text)
-            if self.events:
-                self.events.store('JRD Response', self.jrd)
-            for link in self.jrd["links"]:
-                if link["rel"] == OIC_ISSUER:
-                    if not link['href'].startswith('https://'):
-                        raise WebFingerError('Must be a HTTPS href')
-                    return link["href"]
-            return None
-        elif rsp.status_code in [302, 301, 307]:
-            return self.discovery_query(rsp.headers["location"])
-        else:
-            raise WebFingerError(rsp.status_code)
-
-    def response(self, subject, base, **kwargs):
-        self.jrd = JRD()
-        self.jrd["subject"] = subject
-        link = LINK()
-        link["rel"] = OIC_ISSUER
-        link["href"] = base
-        self.jrd["links"] = [link]
-        for k, v in kwargs.items():
-            self.jrd[k] = v
-        return self.jrd.to_json()

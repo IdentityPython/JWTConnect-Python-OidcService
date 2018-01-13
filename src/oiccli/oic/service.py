@@ -11,7 +11,7 @@ except ImportError:  # Only works for >= 3.5
 else:
     _decode_err = JSONDecodeError
 
-from oiccli import rndstr
+from oiccli import rndstr, webfinger
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
 from oiccli.oauth2 import service
@@ -19,6 +19,9 @@ from oiccli.oauth2.service import get_state
 from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
 from oiccli.service import Service
+from oiccli.webfinger import JRD
+from oiccli.webfinger import OIC_ISSUER
+
 from oicmsg import oic
 from oicmsg.exception import MissingParameter
 from oicmsg.exception import MissingRequiredAttribute
@@ -71,7 +74,7 @@ class Authorization(service.Authorization):
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         service.Authorization.__init__(self, httplib, keyjar,
-                                               client_authn_method)
+                                       client_authn_method)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oic_pre_construct]
         self.post_construct = [self.oic_post_construct]
@@ -196,6 +199,50 @@ class RefreshAccessToken(service.RefreshAccessToken):
     error_msg = oic.TokenErrorResponse
 
 
+class WebFinger(Service):
+    """
+    Implements RFC 7033
+    """
+    msg_type = Message
+    response_cls = JRD
+    error_msg = ErrorResponse
+    synchronous = True
+    request = 'webfinger'
+    http_method = 'GET'
+
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+                         client_authn_method=client_authn_method)
+        self.webfinger = webfinger.WebFinger(httpd=self.httplib)
+        self.post_parse_response.append(self.wf_post_parse_response)
+
+    @staticmethod
+    def wf_post_parse_response(resp, client_info, state='', **kwargs):
+        try:
+            links = resp['links']
+        except KeyError:
+            raise MissingRequiredAttribute('links')
+        else:
+            for link in links:
+                if link['rel'] == OIC_ISSUER:
+                    client_info.issuer = link['href']
+                    break
+        return resp
+
+    def request_info(self, cli_info, method="GET", request_args=None,
+                     lax=False, **kwargs):
+
+        try:
+            _resource = kwargs['resource']
+        except KeyError:
+            try:
+                _resource = cli_info.config['resource']
+            except KeyError:
+                raise MissingRequiredAttribute('resource')
+
+        return {'uri': self.webfinger.query(_resource)}
+
+
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oic.Message
     response_cls = oic.ProviderConfigurationResponse
@@ -303,7 +350,7 @@ class Registration(Service):
     endpoint_name = 'registration_endpoint'
     synchronous = True
     request = 'registration'
-    body_type= 'json'
+    body_type = 'json'
     http_method = 'POST'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
@@ -343,7 +390,7 @@ class Registration(Service):
 
         try:
             if cli_info.provider_info[
-                    'require_request_uri_registration'] is True:
+                'require_request_uri_registration'] is True:
                 request_args['request_uris'] = cli_info.generate_request_uris(
                     cli_info.requests_dir)
         except KeyError:

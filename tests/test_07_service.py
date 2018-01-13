@@ -24,78 +24,81 @@ class Response(object):
         self.headers = headers or {"content-type": "text/plain"}
 
 
-class DummyRequest(Service):
+class DummyService(Service):
     msg_type = DummyMessage
 
 
-class TestDummyRequest(object):
+class TestDummyService(object):
     @pytest.fixture(autouse=True)
-    def create_request(self):
-        self.req = DummyRequest()
+    def create_service(self):
+        self.service = DummyService()
         self.cli_info = ClientInfo(client_id='client_id',
                                    issuer='https://www.example.org/as')
         self.cli_info.state_db['state'] = {}
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
-        _req = self.req.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(self.cli_info, request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']
 
     def test_construct_cli_info(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
-        _req = self.req.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(self.cli_info, request_args=req_args)
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
     def test_request_info(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
-        self.req.endpoint = 'https://example.com/authorize'
-        _info = self.req.request_info(self.cli_info, request_args=req_args)
+        self.service.endpoint = 'https://example.com/authorize'
+        _info = self.service.request_info(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'uri', 'cis'}
         assert _info['cis'].to_dict() == {'foo': 'bar',
                                           'req_str': 'some string'}
-        msg = DummyMessage().from_urlencoded(self.req.get_urlinfo(_info['uri']))
+        msg = DummyMessage().from_urlencoded(
+            self.service.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
 
     def test_request_init(self):
-        req_args = {'foo': 'bar', 'req_str':'some string'}
-        self.req.endpoint = 'https://example.com/authorize'
-        _info = self.req.do_request_init(self.cli_info, request_args=req_args)
+        req_args = {'foo': 'bar', 'req_str': 'some string'}
+        self.service.endpoint = 'https://example.com/authorize'
+        _info = self.service.do_request_init(self.cli_info,
+                                             request_args=req_args)
         assert set(_info.keys()) == {'uri', 'cis', 'http_args'}
         assert _info['cis'].to_dict() == {'foo': 'bar',
                                           'req_str': 'some string'}
         assert _info['http_args'] == {}
-        msg = DummyMessage().from_urlencoded(self.req.get_urlinfo(_info['uri']))
+        msg = DummyMessage().from_urlencoded(
+            self.service.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
 
     def test_parse_request_response_urlencoded(self):
         req_resp = Response(200, Message(foo='bar').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               state='state')
+        resp = self.service.parse_request_response(req_resp, self.cli_info,
+                                                   state='state')
         assert isinstance(resp, Message)
         assert set(resp.keys()) == {'foo'}
 
     def test_parse_request_response_200_error(self):
         req_resp = Response(200, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               state='state')
+        resp = self.service.parse_request_response(req_resp, self.cli_info,
+                                                   state='state')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
     def test_parse_request_response_400_error(self):
         req_resp = Response(400, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               state='state')
+        resp = self.service.parse_request_response(req_resp, self.cli_info,
+                                                   state='state')
         assert isinstance(resp, ErrorResponse)
         assert set(resp.keys()) == {'error'}
 
     def test_parse_request_response_json(self):
         req_resp = Response(200, Message(foo='bar').to_json(),
                             headers={'content-type': 'application/json'})
-        resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                               response_body_type='json',
-                                               state='state')
+        resp = self.service.parse_request_response(req_resp, self.cli_info,
+                                                   response_body_type='json',
+                                                   state='state')
         assert isinstance(resp, Message)
         assert set(resp.keys()) == {'foo'}
 
@@ -103,19 +106,20 @@ class TestDummyRequest(object):
         req_resp = Response(200, Message(foo='bar').to_json(),
                             headers={'content-type': "text/plain"})
         with pytest.raises(WrongContentType):
-            resp = self.req.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json',
-                                                   state='state')
+            resp = self.service.parse_request_response(req_resp, self.cli_info,
+                                                       response_body_type='json',
+                                                       state='state')
 
 
 class TestRequest(object):
     @pytest.fixture(autouse=True)
-    def create_request(self):
-        self.req = Service(httplib=None, keyjar=None, client_authn_method=None)
+    def create_service(self):
+        self.service = Service(httplib=None, keyjar=None,
+                               client_authn_method=None)
         self.cli_info = ClientInfo(None)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
-        _req = self.req.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(self.cli_info, request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']

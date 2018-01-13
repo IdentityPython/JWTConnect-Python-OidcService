@@ -1,3 +1,4 @@
+import json
 import os
 
 import pytest
@@ -667,3 +668,40 @@ class TestEndSession(object):
         _req = self.req.construct(self.cli_info, state='abcde')
         assert isinstance(_req, EndSessionRequest)
         assert len(_req) == 1
+
+
+class TestWebFinger(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        self.req = factory('WebFinger',
+                           client_authn_method=CLIENT_AUTHN_METHOD)
+        client_config = {'redirect_uris': ['https://example.com/cli/authz_cb'],
+                         'requests_dir': 'requests',
+                         'base_url': 'https://example.com/cli/',
+                         'resource': 'joe@example.com'}
+        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info.service = build_services(DEFAULT_SERVICES,
+                                               factory, None, None,
+                                               CLIENT_AUTHN_METHOD)
+
+    def test_request_info(self):
+        _req = self.req.request_info(self.cli_info)
+        assert set(_req.keys()) == {'uri'}
+        assert _req['uri'] == \
+               'https://example.com/.well-known/webfinger?resource=acct%3Ajoe' \
+               '%40example.com'
+
+    def test_parse_response(self):
+        _info = {
+            "subject": "acct:joe@example.com",
+            "links":
+                [
+                    {
+                        "rel": "http://openid.net/specs/connect/1.0/issuer",
+                        "href": "https://server.example.com"
+                    }
+                ]
+        }
+        resp = self.req.parse_response(json.dumps(_info), self.cli_info)
+        assert resp.to_dict() == _info
+        assert self.cli_info.issuer == _info['links'][0]['href']

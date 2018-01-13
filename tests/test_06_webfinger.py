@@ -132,6 +132,70 @@ def test_jrd():
     assert set(jrd.keys()) == {'subject', 'aliases', 'properties', 'links'}
 
 
+def test_jrd2():
+    ex0 = {
+        "subject": "acct:bob@example.com",
+        "aliases": [
+            "http://www.example.com/~bob/"
+        ],
+        "properties": {
+            "http://example.com/ns/role/": "employee"
+        },
+        "links": [
+            {
+                "rel": "http://webfinger.net/rel/avatar",
+                "type": "image/jpeg",
+                "href": "http://www.example.com/~bob/bob.jpg"
+            },
+            {
+                "rel": "http://webfinger.net/rel/profile-page",
+                "href": "http://www.example.com/~bob/"
+            },
+            {
+                "rel": "blog",
+                "type": "text/html",
+                "href": "http://blogs.example.com/bob/",
+                "titles": {
+                    "en-us": "The Magical World of Bob",
+                    "fr": "Le monde magique de Bob"
+                }
+            },
+            {
+                "rel": "vcard",
+                "href": "https://www.example.com/~bob/bob.vcf"
+            }
+        ]
+    }
+
+    jrd0 = JRD().from_json(json.dumps(ex0))
+
+    for link in jrd0["links"]:
+        if link["rel"] == "blog":
+            assert link["href"] == "http://blogs.example.com/bob/"
+            break
+
+
+def test_extra_member_response():
+    ex = {
+        "subject": "acct:bob@example.com",
+        "aliases": [
+            "http://www.example.com/~bob/"
+        ],
+        "properties": {
+            "http://example.com/ns/role/": "employee"
+        },
+        'dummy':'foo',
+        "links": [
+            {
+                "rel": "http://webfinger.net/rel/avatar",
+                "type": "image/jpeg",
+                "href": "http://www.example.com/~bob/bob.jpg"
+            }]}
+
+    _resp = JRD().from_json(json.dumps(ex))
+    assert _resp['dummy'] == 'foo'
+
+
 class TestWebFinger(object):
     def test_query_device(self):
         wf = WebFinger()
@@ -155,55 +219,4 @@ class TestWebFinger(object):
                         "=acct%3Acarol%40example.com&rel=http%3A%2F%2Fopenid" \
                         ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer"
 
-    def test_wf4(self):
-        ex0 = {
-            "subject": "acct:bob@example.com",
-            "aliases": [
-                "http://www.example.com/~bob/"
-            ],
-            "properties": {
-                "http://example.com/ns/role/": "employee"
-            },
-            "links": [
-                {
-                    "rel": "http://webfinger.net/rel/avatar",
-                    "type": "image/jpeg",
-                    "href": "http://www.example.com/~bob/bob.jpg"
-                },
-                {
-                    "rel": "http://webfinger.net/rel/profile-page",
-                    "href": "http://www.example.com/~bob/"
-                },
-                {
-                    "rel": "blog",
-                    "type": "text/html",
-                    "href": "http://blogs.example.com/bob/",
-                    "titles": {
-                        "en-us": "The Magical World of Bob",
-                        "fr": "Le monde magique de Bob"
-                    }
-                },
-                {
-                    "rel": "vcard",
-                    "href": "https://www.example.com/~bob/bob.vcf"
-                }
-            ]
-        }
 
-        wf = WebFinger()
-        jrd0 = wf.load(json.dumps(ex0))
-
-        for link in jrd0["links"]:
-            if link["rel"] == "blog":
-                assert link["href"] == "http://blogs.example.com/bob/"
-                break
-
-    def test_extra_member_response(self):
-        wf = WebFinger()
-        resp = wf.response('acct:local@domain', 'https://example.com',
-                           dummy='foo')
-
-        # resp should be a JSON document
-
-        _resp = json.loads(resp)
-        assert _resp['dummy'] == 'foo'
