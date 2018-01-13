@@ -68,7 +68,7 @@ class TestClient(object):
         # Bind token to state
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.client_info.state_db.add_message_info(resp, "ABCDE")
+        self.client.client_info.state_db.add_response(resp, "ABCDE")
 
         req_args = {}
         msg = self.client.service['refresh_token'].construct(
@@ -82,7 +82,7 @@ class TestClient(object):
     def test_do_userinfo_request_init(self):
         resp = AccessTokenResponse(refresh_token="refresh_with_me",
                                    access_token="access")
-        self.client.client_info.state_db.add_message_info(resp, "ABCDE")
+        self.client.client_info.state_db.add_response(resp, "ABCDE")
 
         _srv = self.client.service['userinfo']
         _srv.endpoint = "https://example.com/userinfo"

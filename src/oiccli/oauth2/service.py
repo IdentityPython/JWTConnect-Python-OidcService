@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _post_x_parse_response(resp, cli_info, state=''):
     if isinstance(resp, (AuthorizationResponse, AccessTokenResponse)):
-        cli_info.state_db.add_message_info(resp, state)
+        cli_info.state_db.add_response(resp, state)
 
 
 def get_state(request_args, kwargs):
@@ -114,7 +114,7 @@ class AccessToken(Service):
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
+        req_args = cli_info.state_db.get_response_args(_state, self.msg_type)
 
         if request_args is None:
             request_args = req_args
@@ -144,7 +144,7 @@ class RefreshAccessToken(Service):
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = cli_info.state_db.get_request_args(_state, self.msg_type)
+        req_args = cli_info.state_db.get_response_args(_state, self.msg_type)
 
         if request_args is None:
             request_args = req_args

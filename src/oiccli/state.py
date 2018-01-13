@@ -81,7 +81,7 @@ class State(object):
         self[_state] = _state_info
         return _state
 
-    def _update_token_info(self, state_info, response):
+    def update_token_info(self, state_info, response):
         """
         Add information about an access token to the state information
 
@@ -89,9 +89,9 @@ class State(object):
         :param response: A response, typically a access token request response.
         :return: The updated state information
         """
-        
+
         # Fetch the information I have about an access tokens right now.
-        # The response I'm dealing with may be a refresh token response 
+        # The response I'm dealing with may be a refresh token response
         # in which case I already have information base on a previous response.
         try:
             _tinfo = state_info['token']
@@ -159,7 +159,7 @@ class State(object):
 
         # If there is information about an access token in the response
         # add that information too
-        self._update_token_info(_state_info, response)
+        self.update_token_info(_state_info, response)
 
         for claim in ['id_token', 'refresh_token']:
             try:
@@ -195,8 +195,8 @@ class State(object):
         """
         Bind a nonce value to a state value such that I later given a nonce
         value I can find the state information
-        
-        :param nonce: Nonce value  
+
+        :param nonce: Nonce value
         :param state: State value
         """
         self._db['nonce_{}'.format(nonce)] = state
@@ -204,8 +204,8 @@ class State(object):
     def nonce_to_state(self, nonce):
         """
         Given a nonce value return the state value.
-        
-        :param nonce: Nonce value 
+
+        :param nonce: Nonce value
         :return: State value
         """
         return self._db['nonce_{}'.format(nonce)]
@@ -213,7 +213,7 @@ class State(object):
     def get_token_info(self, state, now=0):
         """
         Get information about a access token bound to a specific state value
-        
+
         :param state: The state value
         :param now: A timestamp used to verify if the token is expired or not
         :return: Token information
@@ -232,9 +232,9 @@ class State(object):
 
     def get_response_args(self, state, response_class, now=0, **kwargs):
         """
-        Get the claims returned in a response connected to a specific state 
+        Get the claims returned in a response connected to a specific state
         value.
-        
+
         :param state: The state value
         :param response_class: The type of response that is bound to a state
         :param now: A time stamp
