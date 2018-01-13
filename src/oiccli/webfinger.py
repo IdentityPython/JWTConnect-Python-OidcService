@@ -5,10 +5,16 @@ import re
 
 import requests
 from oiccli.exception import OicCliError
+from oicmsg.exception import MessageException
+from oicmsg.exception import OicMsgError
+from oicmsg.message import Message
+from oicmsg.message import OPTIONAL_LIST_OF_STRINGS
+from oicmsg.message import SINGLE_OPTIONAL_STRING
+from oicmsg.message import SINGLE_REQUIRED_STRING
+from oicmsg.oic import SINGLE_OPTIONAL_DICT
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.parse import urlparse
 
-from oicmsg.time_util import in_a_while
 
 """
 Implements WebFinger RFC 7033
@@ -25,155 +31,68 @@ class WebFingerError(OicCliError):
     pass
 
 
-class ClaimValueType(object):
-    def __init__(self, typ, required=False, single_value=True):
-        self.type = typ
-        self.required = required
-        self.single_value = single_value
-
-
-class Base(object):
-    claim = {}
-
-    def __init__(self, dic=None):
-        self._ava = {}
-        if dic is not None:
-            self.load(dic)
-
-    def __setitem__(self, item, val):
-        try:
-            spec = self.claim[item]
-        except KeyError:
-            spec = ClaimValueType(str)  # default
-
-        val_type = spec.type
-        if spec.single_value is False:
-            if isinstance(val, str):
-                raise ValueError('Wrong type of value')
-            if not isinstance(val, list):
-                raise ValueError('Wrong type of value')
-
-            res = []
-            if val_type == LINK:
-                for v in val:
-                    res.append(LINK(v))
-            else:
-                for v in val:
-                    if not isinstance(v, val_type):
-                        raise ValueError('Expected a {}'.format(val_type))
-                    res.append(v)
-            self._ava[item] = res
-        else:
-            val_type = spec.type
-            if isinstance(val, val_type):
-                self._ava[item] = val
-            else:
-                raise ValueError('Expected {} on {}'.format(val_type, item))
-
-    def load(self, dictionary):
-        for key, spec in list(self.claim.items()):
-            if key not in dictionary and spec.required:
-                raise AttributeError("Required attribute '%s' missing" % key)
-
-        for key, val in list(dictionary.items()):
-            if val == "" or val == [""]:
-                continue
-
-            skey = str(key)
-            try:
-                self[skey] = val
-            except KeyError:
-                # ignore what I don't know
-                pass
-
-        return self
-
-    def dump(self):
-        res = {}
-        for key, val in self._ava.items():
-            try:
-                _cvt = self.claim[key]
-            except KeyError:
-                _cvt = ClaimValueType(str)
-
-            if not _cvt.single_value:
-                if not isinstance(val, list):
-                    raise ValueError('Expected list of values')
-                sres = []
-                for _val in val:
-                    sres.append(_val.dump())
-                val = sres
-            res[key] = val
-        return res
-
-    def __repr__(self):
-        return "%s" % self.dump()
-
-    def verify(self):
-        pass
-
-    def __getitem__(self, item):
-        return self._ava[item]
-
-    def items(self):
-        return list(self._ava.items())
-
-    def keys(self):
-        return list(self._ava.keys())
-
-    def values(self):
-        return list(self._ava.values())
-
-    def __len__(self):
-        return self._ava.__len__()
-
-    def __contains__(self, item):
-        return item in self._ava
-
-
-class LINK(Base):
+class LINK(Message):
     """
     https://tools.ietf.org/html/rfc5988
     """
-    claim = {
-        "rel": ClaimValueType(str, required=True),
-        "type": ClaimValueType(str),
-        "href": ClaimValueType(str),
-        "titles": ClaimValueType(dict),
-        "properties": ClaimValueType(dict)
+    c_param = {
+        "rel": SINGLE_REQUIRED_STRING,
+        "type": SINGLE_OPTIONAL_STRING,
+        "href": SINGLE_OPTIONAL_STRING,
+        "titles": SINGLE_OPTIONAL_DICT,
+        "properties": SINGLE_OPTIONAL_DICT
     }
 
 
-class JRD(Base):
+def link_deser(val, sformat="urlencoded"):
+    if isinstance(val, LINK):
+        return val
+    elif sformat in ["dict", "json"]:
+        if not isinstance(val, str):
+            val = json.dumps(val)
+            sformat = "json"
+    return LINK().deserialize(val, sformat)
+
+
+def msg_ser(inst, sformat, lev=0):
+    if sformat in ["urlencoded", "json"]:
+        if isinstance(inst, dict):
+            if sformat == 'json':
+                res = json.dumps(inst)
+            else:
+                res = urlencode([(k, v) for k, v in inst.items()])
+        elif isinstance(inst, LINK):
+            res = inst.serialize(sformat, lev)
+        else:
+            res = inst
+    elif sformat == "dict":
+        if isinstance(inst, LINK):
+            res = inst.serialize(sformat, lev)
+        elif isinstance(inst, dict):
+            res = inst
+        elif isinstance(inst, str):  # Iff ID Token
+            res = inst
+        else:
+            raise MessageException("Wrong type: %s" % type(inst))
+    else:
+        raise OicMsgError("Unknown sformat", inst)
+
+    return res
+
+
+REQUIRED_LINK = (LINK, True, msg_ser, link_deser, False)
+
+
+class JRD(Message):
     """
     JSON Resource Descriptor https://tools.ietf.org/html/rfc7033#section-4.4
     """
     claim = {
-        "expires": ClaimValueType(str),  # Optional
-        "subject": ClaimValueType(str),  # Should
-        "aliases": ClaimValueType(str, single_value=False),
-        "properties": ClaimValueType(dict),
-        "links": ClaimValueType(LINK, single_value=False)
+        "subject": SINGLE_OPTIONAL_STRING,
+        "aliases": OPTIONAL_LIST_OF_STRINGS,
+        "properties": SINGLE_OPTIONAL_DICT,
+        "links": REQUIRED_LINK
     }
-
-    def __init__(self, dic=None, days=0, seconds=0, minutes=0, hours=0,
-                 weeks=0):
-        Base.__init__(self, dic)
-        self.expires_in(days, seconds, minutes, hours, weeks)
-
-    def expires_in(self, days=0, seconds=0, minutes=0, hours=0, weeks=0):
-        self._exp_days = days
-        self._exp_secs = seconds
-        self._exp_min = minutes
-        self._exp_hour = hours
-        self._exp_week = weeks
-
-    def export(self):
-        res = self.dump()
-        res["expires"] = in_a_while(days=self._exp_days, seconds=self._exp_secs,
-                                    minutes=self._exp_min, hours=self._exp_hour,
-                                    weeks=self._exp_week)
-        return res
 
 
 # -- Normalization --
@@ -202,6 +121,7 @@ class JRD(Base):
 # Note: Since the definition of authority in RFC 3986 [RFC3986] is
 # [ userinfo "@" ] host [ ":" port ], it is legal to have a user input
 # identifier like userinfo@host:port, e.g., alice@example.com:8080.
+
 
 class URINormalizer(object):
     @staticmethod
@@ -278,7 +198,7 @@ class WebFinger(object):
 
     @staticmethod
     def load(item):
-        return JRD(json.loads(item))
+        return JRD().from_json(item)
 
     def http_args(self, jrd=None):
         if jrd is None:
@@ -290,7 +210,7 @@ class WebFinger(object):
         return {
             "headers": {"Access-Control-Allow-Origin": "*",
                         "Content-Type": "application/json; charset=UTF-8"},
-            "body": json.dumps(jrd.export())
+            "body": jrd.to_json()
         }
 
     def discovery_query(self, resource):
@@ -335,4 +255,4 @@ class WebFinger(object):
         self.jrd["links"] = [link]
         for k, v in kwargs.items():
             self.jrd[k] = v
-        return json.dumps(self.jrd.export())
+        return self.jrd.to_json()
