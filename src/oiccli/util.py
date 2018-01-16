@@ -47,7 +47,7 @@ ATTRS = {"version": None,
 
 
 def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
-                accept=None, **kwargs):
+        accept=None, **kwargs):
     """
     Create the information pieces necessary for sending a request.
     Depending on whether the request is done using GET or POST the request
@@ -71,7 +71,7 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
 
             _query = str(_req.to_urlencoded())
             resp['uri'] = urlunsplit((comp.scheme, comp.netloc, comp.path,
-                               _query, comp.fragment))
+                                      _query, comp.fragment))
         else:
             resp['uri'] = uri
     elif method in ["POST", "PUT"]:
@@ -201,7 +201,8 @@ def verify_header(reqresp, body_type):
     logger.debug('Expected body type: "{}"'.format(body_type))
 
     if body_type == "":
-        if match_to_("application/json", _ctype):
+        if match_to_("application/json", _ctype) or match_to_(
+                'application/jrd+json', _ctype):
             body_type = 'json'
         elif match_to_("application/jwt", _ctype):
             body_type = "jwt"
@@ -210,10 +211,11 @@ def verify_header(reqresp, body_type):
         else:
             body_type = 'txt'  # reasonable default ??
     elif body_type == "json":
-        if match_to_("application/json", _ctype):
+        if match_to_("application/json", _ctype) or match_to_(
+                'application/jrd+json', _ctype):
             pass
         elif match_to_("application/jwt", _ctype):
-                body_type = "jwt"
+            body_type = "jwt"
         else:
             raise WrongContentType(_ctype)
     elif body_type == "jwt":
@@ -224,6 +226,13 @@ def verify_header(reqresp, body_type):
             # I can live with text/plain
             if not match_to_("text/plain", _ctype):
                 raise WrongContentType(_ctype)
+    elif body_type == 'txt':
+        if match_to_("text/plain", _ctype):
+            pass
+        elif match_to_("text/html", _ctype):
+            pass
+        else:
+            raise WrongContentType(_ctype)
     else:
         raise ValueError("Unknown return format: %s" % body_type)
 
