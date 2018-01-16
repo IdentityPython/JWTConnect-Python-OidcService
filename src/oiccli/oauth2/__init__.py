@@ -104,8 +104,13 @@ class Client(object):
 
         logger.debug('do_request info: {}'.format(_info))
 
+        try:
+            _body = _info['body']
+        except KeyError:
+            _body = None
+
         return _srv.service_request(
-            _info['uri'], method, _info['body'], response_body_type,
+            _info['uri'], method, _body, response_body_type,
             http_args=_info['http_args'], client_info=self.client_info,
             **kwargs)
 
