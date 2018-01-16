@@ -209,11 +209,13 @@ class WebFinger(Service):
     synchronous = True
     request = 'webfinger'
     http_method = 'GET'
+    response_body_type = 'json'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
                          client_authn_method=client_authn_method)
-        self.webfinger = webfinger.WebFinger(httpd=self.httplib)
+        self.webfinger = webfinger.WebFinger(httpd=self.httplib,
+                                             default_rel=OIC_ISSUER)
         self.post_parse_response.append(self.wf_post_parse_response)
 
     @staticmethod

@@ -74,5 +74,5 @@ class Client(oauth2.Client):
                                httplib=httplib, services=_srvs,
                                service_factory=service_factory)
 
-        self.wf = WebFinger(OIC_ISSUER)
-        self.wf.httpd = self.http
+        # self.wf = WebFinger(OIC_ISSUER)
+        # self.wf.httpd = self.http
