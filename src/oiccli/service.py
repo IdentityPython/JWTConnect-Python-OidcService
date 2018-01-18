@@ -406,6 +406,8 @@ class Service(object):
 
         logger.debug('response format: {}'.format(sformat))
 
+        # If format is urlencoded 'info' may be a URL
+        # in which case I have to get at the query/fragment part
         if sformat == "urlencoded":
             info = self.get_urlinfo(info)
 
@@ -424,8 +426,12 @@ class Service(object):
         if self.events:
             self.events.store('Protocol Response', resp)
 
+        # if it's an error message and I didn't expect it recast the
+        # response as an ErrorResponse
         if "error" in resp and not isinstance(resp, ErrorResponse):
             resp = None
+            # Gather error message classes that are expected if an
+            # error was returned.
             try:
                 errmsgs = [self.error_msg]
                 if ErrorResponse not in errmsgs:
@@ -434,6 +440,8 @@ class Service(object):
             except KeyError:
                 errmsgs = [ErrorResponse]
 
+            # loop through the error message classes and pick the one
+            # that verifies OK.
             try:
                 for errmsg in errmsgs:
                     try:
@@ -447,9 +455,12 @@ class Service(object):
 
             logger.debug('Error response: {}'.format(resp))
         else:
+            # Need to add some information before running verify()
             kwargs["client_id"] = client_info.client_id
             kwargs['iss'] = client_info.issuer
 
+            # If no keys where provided in the method call use the instance
+            # keyjar as default
             if "key" not in kwargs and "keyjar" not in kwargs:
                 kwargs["keyjar"] = self.keyjar
 
@@ -464,6 +475,9 @@ class Service(object):
             if not verf:
                 logger.error('Verification of the response failed')
                 raise OicCliError("Verification of the response failed")
+
+            # if it's an Authorization response and the scope claim was not
+            # present in the response use the one I expected to be there.
             if resp.type() == "AuthorizationResponse" and "scope" not in resp:
                 try:
                     resp["scope"] = kwargs["scope"]
@@ -507,11 +521,11 @@ class Service(object):
     @staticmethod
     def get_value_type(reqresp, body_type):
         """
-        Get the encoding of the response.
+        Get the HTML encoding of the response.
 
         :param reqresp: The response
         :param body_type: Assumed body type
-        :return: The calculated body type
+        :return: The found body type
         """
         if body_type:
             return verify_header(reqresp, body_type)
