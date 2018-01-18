@@ -689,7 +689,9 @@ class TestWebFinger(object):
         assert set(_req.keys()) == {'uri'}
         assert _req['uri'] == \
                'https://example.com/.well-known/webfinger?resource=acct%3Ajoe' \
-               '%40example.com'
+               '%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect' \
+               '%2F1.0%2Fissuer'
+
 
     def test_parse_response(self):
         _info = {

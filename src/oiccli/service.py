@@ -236,13 +236,13 @@ class Service(object):
 
         return resp
 
-    def init_authentication_method(self, cis, cli_info, authn_method,
+    def init_authentication_method(self, request, cli_info, authn_method,
                                    request_args=None, http_args=None, **kwargs):
         """
         Place the necessary information in the necessary places depending on
         client authentication method.
 
-        :param cis: Message class instance
+        :param request: The request, a Message class instance
         :param cli_info: Client information, a
             :py:class:`oiccli.clinet_info.ClientInfo`instance
         :param authn_method: Client authentication method
@@ -259,7 +259,8 @@ class Service(object):
         if authn_method:
             logger.debug('Client authn method: {}'.format(authn_method))
             return self.client_authn_method[authn_method]().construct(
-                cis, cli_info, request_args, http_args, **kwargs)
+                request, cli_info, request_args=request_args,
+                http_args=http_args, **kwargs)
         else:
             return http_args
 
