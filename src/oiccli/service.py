@@ -27,7 +27,7 @@ do_request_init
     - request_info
         - construct 
             - pre_construct (*)
-            - parse_args
+            - gather_request_args
             - post_construct (*)
         - init_authentication_method
         - uri_and_body
@@ -116,7 +116,7 @@ class Service(object):
         self.post_construct = []
         self.post_parse_response = []
 
-    def parse_args(self, cli_info, **kwargs):
+    def gather_request_args(self, cli_info, **kwargs):
         """
         Go through the attributes that the message class can contain and
         add values if they are missing and exists in the client info or
@@ -211,7 +211,7 @@ class Service(object):
                 pass
 
         # logger.debug("request_args: %s" % sanitize(request_args))
-        _args = self.parse_args(cli_info, **request_args)
+        _args = self.gather_request_args(cli_info, **request_args)
 
         # logger.debug("kwargs: %s" % sanitize(kwargs))
         request = self.msg_type(**_args)

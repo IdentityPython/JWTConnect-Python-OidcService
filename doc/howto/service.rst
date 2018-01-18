@@ -100,7 +100,7 @@ The call sequence for the Service methods is this for constructing a request:
         + request_info
             * construct
                 - do_pre_construct (#)
-                - parse_args
+                - gather_request_args
                 - do_post_construct (#)
             * init_authentication_method
             * uri_and_body

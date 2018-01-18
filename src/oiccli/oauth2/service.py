@@ -48,8 +48,8 @@ class Authorization(Service):
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
-    def parse_args(self, cli_info, **kwargs):
-        ar_args = Service.parse_args(self, cli_info, **kwargs)
+    def gather_request_args(self, cli_info, **kwargs):
+        ar_args = Service.gather_request_args(self, cli_info, **kwargs)
 
         if 'redirect_uri' not in ar_args:
             try:
