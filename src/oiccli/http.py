@@ -1,10 +1,10 @@
 import copy
 import logging
-import requests
+from http.cookiejar import FileCookieJar
+from http.cookies import CookieError
+from http.cookies import SimpleCookie
 
-from future.backports.http.cookiejar import FileCookieJar
-from future.backports.http.cookies import CookieError
-from future.backports.http.cookies import SimpleCookie
+import requests
 
 from oiccli import sanitize
 from oiccli.exception import NonFatalException
@@ -35,7 +35,7 @@ class HTTPLib(object):
         self.keyjar = keyjar or KeyJar(verify_ssl=verify_ssl)
 
         self.request_args = {"allow_redirects": False}
-        # self.cookies = {}
+
         self.cookiejar = FileCookieJar()
         self.ca_certs = ca_certs
 
@@ -56,7 +56,7 @@ class HTTPLib(object):
             self.request_args["verify"] = True
 
         else:
-            # Instruct requests to n ot perform server cert verification.
+            # Instruct requests to not perform server cert verification.
             self.request_args["verify"] = False
 
         self.events = None
@@ -65,29 +65,47 @@ class HTTPLib(object):
             self.request_args['cert'] = client_cert
 
     def _cookies(self):
+        """
+        Return a dictionary of all the cookies I have keyed on cookie name
+
+        :return: Dictionary
+        """
         cookie_dict = {}
 
         for _, a in list(self.cookiejar._cookies.items()):
             for _, b in list(a.items()):
                 for cookie in list(b.values()):
-                    # print cookie
                     cookie_dict[cookie.name] = cookie.value
 
         return cookie_dict
 
     def __call__(self, url, method="GET", **kwargs):
+        """
+        Send a HTTP request to a URL using a specified method
+
+        :param url: The URL to access
+        :param method: The method to use (GET, POST, ..)
+        :param kwargs: extra HTTP request parameters
+        :return: A Response
+        """
+
+        # copy the default set before starting to modify it.
         _kwargs = copy.copy(self.request_args)
         if kwargs:
             _kwargs.update(kwargs)
 
+        # If I have cookies add them all to the request
         if self.cookiejar:
             _kwargs["cookies"] = self._cookies()
             logger.debug("SENT {} COOKIES".format(len(_kwargs["cookies"])))
 
+        # If I want to modify the request arguments based on URL, method
+        # and current arguments I can use this call back function.
         if self.req_callback is not None:
             _kwargs = self.req_callback(method, url, **_kwargs)
 
         try:
+            # Do the request
             r = requests.request(method, url, **_kwargs)
         except Exception as err:
             logger.error(
@@ -100,11 +118,9 @@ class HTTPLib(object):
 
         try:
             _cookie = r.headers["set-cookie"]
-            # Telekom fix
-            # set_cookie = set_cookie.replace(
-            # "=;Path=/;Expires=Thu, 01-Jan-1970 00:00:01 GMT;HttpOnly,", "")
             logger.debug("RECEIVED COOKIE")
             try:
+                # add received cookies to the cookie jar
                 set_cookie(self.cookiejar, SimpleCookie(_cookie))
             except CookieError as err:
                 logger.error(err)
@@ -112,9 +128,18 @@ class HTTPLib(object):
         except (AttributeError, KeyError) as err:
             pass
 
+        # return the response
         return r
 
     def send(self, url, method="GET", **kwargs):
+        """
+        Another name for the send method
+
+        :param url: URL
+        :param method: HTTP method
+        :param kwargs: HTTP request argument
+        :return: Request response
+        """
         return self(url, method, **kwargs)
 
     def load_cookies_from_file(self, filename, ignore_discard=False,
@@ -123,5 +148,4 @@ class HTTPLib(object):
 
     def save_cookies_to_file(self, filename, ignore_discard=False,
                              ignore_expires=False):
-
         self.cookiejar.save(filename, ignore_discard, ignore_expires)

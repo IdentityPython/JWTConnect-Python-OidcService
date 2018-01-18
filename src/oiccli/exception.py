@@ -2,6 +2,7 @@
 __author__ = 'roland'
 
 
+# The base exception class for oiccli specific exceptions
 class OicCliError(Exception):
     def __init__(self, errmsg, content_type="", *args):
         Exception.__init__(self, errmsg, *args)

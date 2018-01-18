@@ -1,7 +1,3 @@
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptojwt.jwe import split_ctx_and_tag, JWEException
-from future.backports.http.cookies import SimpleCookie
-
 import base64
 import hashlib
 import hmac
@@ -9,12 +5,14 @@ import logging
 import os
 import time
 
-from six import PY2
-from six import binary_type
-from six import text_type
+from http.cookies import SimpleCookie
 
-from cryptojwt import as_unicode
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from cryptojwt import as_unicode, as_bytes
 from cryptojwt import safe_str_cmp
+from cryptojwt.jwe import JWEException
+from cryptojwt.jwe import split_ctx_and_tag
 
 from oiccli import rndstr
 from oiccli.exception import ImproperlyConfigured
@@ -38,7 +36,7 @@ class InvalidCookieSign(Exception):
 
 def _expiration(timeout, time_format=None):
     """
-    return an expiration time
+    Return an expiration time
 
     :param timeout: When
     :param time_format: The format of the returned value
@@ -60,30 +58,26 @@ def cookie_signature(key, *parts):
        :type parts: list of bytes or strings
        :returns: hexdigest of the HMAC
     """
-    assert isinstance(key, binary_type)
-    sha1 = hmac.new(key, digestmod=hashlib.sha1)
+
+    sha1 = hmac.new(as_bytes(key), digestmod=hashlib.sha1)
     for part in parts:
         if part:
-            if isinstance(part, text_type):
-                sha1.update(part.encode('utf-8'))
-            else:
-                sha1.update(part)
-    return text_type(sha1.hexdigest())
+            sha1.update(as_bytes(part))
+    return str(sha1.hexdigest())
 
 
 def verify_cookie_signature(sig, key, *parts):
     """Constant time verifier for signatures
 
        :param sig: The signature hexdigest to check
-       :type sig: text_type
+       :type sig: str
        :param key: The HMAC key to use.
        :type key: bytes
        :param parts: List of parts to include in the MAC
        :type parts: list of bytes or strings
        :raises: `InvalidCookieSign` when the signature is wrong
     """
-    assert isinstance(sig, text_type)
-    return safe_str_cmp(sig, cookie_signature(key, *parts))
+    return safe_str_cmp(as_unicode(sig), cookie_signature(key, *parts))
 
 
 def _make_hashed_key(parts, hashfunc='sha256'):
@@ -97,10 +91,8 @@ def _make_hashed_key(parts, hashfunc='sha256'):
     """
     h = hashlib.new(hashfunc)
     for part in parts:
-        if isinstance(part, text_type):
-            part = part.encode('utf-8')
         if part:
-            h.update(part)
+            h.update(as_bytes(part))
     return h.digest()
 
 
@@ -202,8 +194,7 @@ def parse_cookie(name, seed, kaka, enc_key=None):
     if not kaka:
         return None
 
-    if isinstance(seed, text_type):
-        seed = as_unicode(seed)
+    seed = as_unicode(seed)
 
     parts = cookie_parts(name, kaka)
     if parts is None:
@@ -246,7 +237,7 @@ def cookie_parts(name, kaka):
     :return: A list of parts or None if there is no cookie object with the
         given name
     """
-    cookie_obj = SimpleCookie(text_type(kaka))
+    cookie_obj = SimpleCookie(as_unicode(kaka))
     morsel = cookie_obj.get(name)
     if morsel:
         return morsel.value.split("|")
@@ -347,10 +338,7 @@ class CookieDealer(object):
                              expire=ttl, domain=cookie_domain, path=cookie_path,
                              timestamp=timestamp,
                              enc_key=self.srv.symkey)
-        if PY2:
-            return str(cookie[0]), str(cookie[1])
-        else:
-            return cookie
+        return cookie
 
     def get_cookie_value(self, cookie=None, cookie_name=None):
         """
