@@ -10,8 +10,10 @@ from oicmsg.key_bundle import KeyBundle
 from oicmsg.key_jar import build_keyjar
 from oicmsg.key_jar import KeyJar
 
-# This is represents a map between the local storage of algorithm choices
+
+# This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
+
 ATTRMAP = {
     "userinfo": {
         "sign": "userinfo_signed_response_alg",
@@ -68,9 +70,9 @@ class ClientInfo(object):
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, '')
-            else:
-                if attr == 'client_id':
-                    self.state_db.client_id = config[attr]
+            # else:
+            #     if attr == 'client_id':
+            #         self.state_db.client_id = config[attr]
 
         for attr in ['allow', 'client_prefs', 'behaviour', 'provider_info']:
             try:
@@ -79,6 +81,7 @@ class ClientInfo(object):
                 setattr(self, attr, {})
 
         if self.requests_dir:
+            # make sure the path exists. If not, then make it.
             if not os.path.isdir(self.requests_dir):
                 os.makedirs(self.requests_dir)
 
@@ -122,7 +125,7 @@ class ClientInfo(object):
         self.state_db.client_id = client_id
 
     # I keep the client_id in two places so there is a need to make the
-    # adding client_id to those 2 places to be atomic.
+    # adding of client_id to those 2 places to be atomic.
     client_id = property(get_client_id, set_client_id)
 
     def __setitem__(self, key, value):
@@ -130,12 +133,13 @@ class ClientInfo(object):
 
     def filename_from_webname(self, webname):
         """
-        A 1<->1 map is maintend between a URL pointing to a file and
+        A 1<->1 map is maintained between a URL pointing to a file and
         the name of the file in the file system.
 
         As an example if the base_url is 'https://example.com' and a jwks_uri
         is 'https://example.com/jwks_uri.json' then the filename of the
         corresponding file on the local filesystem would be 'jwks_uri'.
+        Relative to the directory from which the RP instance is run.
 
         :param webname: The published URL
         :return: local filename
@@ -181,7 +185,7 @@ class ClientInfo(object):
             - id_token
             - request_object
             - token_endpoint_auth
-        :param typ of algorithm:
+        :param typ: Type of algorithm
             - signing_alg
             - encryption_alg
             - encryption_enc
@@ -198,7 +202,7 @@ class ClientInfo(object):
 
     def generate_request_uris(self, path):
         """
-        Need to generate a path that is unique for the OP/RP combo
+        Need to generate a redirect_uri path that is unique for a OP/RP combo
         This is to counter the mix-up attack.
 
         :param path: Leading path
@@ -216,6 +220,8 @@ class ClientInfo(object):
         """
         The client needs it's own set of keys. It can either dynamically
         create them or load them from local storage.
+        This method can also fetch other entities keys provided the
+        URL points to a JWKS.
 
         :param keyspec:
         """
