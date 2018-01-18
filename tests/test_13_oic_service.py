@@ -692,7 +692,6 @@ class TestWebFinger(object):
                '%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect' \
                '%2F1.0%2Fissuer'
 
-
     def test_parse_response(self):
         _info = {
             "subject": "acct:joe@example.com",
