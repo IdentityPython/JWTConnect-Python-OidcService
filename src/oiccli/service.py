@@ -145,7 +145,7 @@ class Service(object):
 
     def do_pre_construct(self, cli_info, request_args, **kwargs):
         """
-        Will run the pre_construct methods one at the time in order.
+        Will run the pre_construct methods one by one in the order given.
 
         :param cli_info: Client Information as a :py:class:`oiccli.Client`
             instance.
@@ -168,8 +168,8 @@ class Service(object):
         :param cli_info: Client Information as a :py:class:`oiccli.Client`
             instance.
         :param request_args: Request arguments
-        :param kwargs: Extra key word arguments
-        :return: request_args.
+        :param post_args: Arguments used by the post_construct method
+        :return: Possible modified set of request arguments.
         """
         for meth in self.post_construct:
             request_args = meth(cli_info, request_args, **post_args)
@@ -349,6 +349,7 @@ class Service(object):
         :param cli_info: Client information
         :param body_type: Which serialization to use for the HTTP body
         :param method: HTTP method used.
+        :param authn_method: Client authentication method
         :param request_args: Message arguments
         :param http_args: Initial HTTP header arguments
         :param kwargs: extra keyword arguments
@@ -386,7 +387,13 @@ class Service(object):
     def parse_response(self, info, client_info, sformat="json", state="",
                        **kwargs):
         """
-        Parse a response
+        Deserializes a response into it's response message class.
+        Or :py:class:`oicmsg.oauth2.ErrorResponse` if it's an error message
+
+        It then verifies the correctness of the response by running the
+        verify method belonging to the message class used.
+
+        And finally it runs the do_post_parse_response method.
 
         :param info: The response, can be either in a JSON or an urlencoded
             format
@@ -450,6 +457,8 @@ class Service(object):
             try:
                 verf = resp.verify(**kwargs)
             except Exception as err:
+                logger.error(
+                    'Got exception while verifying response: {}'.format(err))
                 raise
 
             if not verf:
@@ -495,7 +504,8 @@ class Service(object):
         else:
             return err
 
-    def get_value_type(self, reqresp, body_type):
+    @staticmethod
+    def get_value_type(reqresp, body_type):
         """
         Get the encoding of the response.
 
@@ -565,12 +575,12 @@ class Service(object):
         This assumes a synchronous request-response exchange.
 
         :param url: The URL to which the request should be sent
-        :param response: Response type
         :param method: Which HTTP method to use
         :param body: A message body if any
         :param response_body_type: The expected format of the body of the
             return message
         :param http_args: Arguments for the HTTP client
+        :param client_info: A py:class:`oiccli.client_info.ClientInfo` instance
         :return: A cls or ErrorResponse instance or the HTTP response
             instance if no response body was expected.
         """
