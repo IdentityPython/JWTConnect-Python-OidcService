@@ -10,7 +10,7 @@ def test_add_code_challenge_default_values():
         'requests_dir': 'requests',
     }
     ci = ClientInfo(config=config)
-
+    ci.state_db['state'] = {}
     spec = add_code_challenge(ci, 'state')
 
     # default values are length:64 method:S256
@@ -29,6 +29,7 @@ def test_add_code_challenge_spec_values():
         'code_challenge': {'length': 128, 'method': 'S384'}
     }
     ci = ClientInfo(config=config)
+    ci.state_db['state'] = {}
 
     spec = add_code_challenge(ci, 'state')
     assert set(spec.keys()) == {'code_challenge', 'code_challenge_method'}

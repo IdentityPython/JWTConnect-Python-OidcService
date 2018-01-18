@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit
 
+import os
 import pytest
 from oiccli.client_info import ClientInfo
 
@@ -195,7 +196,10 @@ class TestClientInfo(object):
         # for signing and encryption
         assert len(self.ci.keyjar.get_issuer_keys('')) == 2
 
-        keyspec = {'file': {'rsa': ['salesforce.key']}}
+        file_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), 'salesforce.key'))
+
+        keyspec = {'file': {'rsa': [file_path]}}
         self.ci.import_keys(keyspec)
 
         # Now there should be 3, the third a RSA key for signing

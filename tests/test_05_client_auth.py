@@ -168,8 +168,7 @@ class TestBearerBody(object):
 
         cis = ResourceRequest()
         http_args = BearerBody().construct(
-            cis, cli_info=client.client_info, request_args={}, state="FFFFF",
-            scope="inner")
+            cis, cli_info=client.client_info, request_args={}, state="FFFFF")
         assert cis["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
