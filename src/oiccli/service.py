@@ -60,6 +60,36 @@ SPECIAL_ARGS = ['authn_endpoint', 'algs']
 REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 
+def update_http_args(http_args, info):
+    """
+    Extending the header with information gathered during the request
+    setup.
+
+    :param http_args: Original HTTP header arguments
+    :param info: Request info
+    :return: Updated request info
+    """
+    try:
+        h_args = info['h_args']
+    except KeyError:
+        h_args = {}
+
+    if http_args is None:
+        http_args = h_args
+    else:
+        http_args.update(info['h_args'])
+
+    try:
+        _headers = info['kwargs']['headers']
+    except KeyError:
+        pass
+    else:
+        http_args.update({'headers': _headers})
+
+    info['http_args'] = http_args
+    return info
+
+
 class Service(object):
     msg_type = Message
     response_cls = Message
@@ -85,7 +115,6 @@ class Service(object):
         self.pre_construct = []
         self.post_construct = []
         self.post_parse_response = []
-        self.setup()
 
     def parse_args(self, cli_info, **kwargs):
         """
@@ -160,9 +189,6 @@ class Service(object):
         for meth in self.post_parse_response:
             meth(resp, cli_info, state=state, **kwargs)
 
-    def setup(self):
-        pass
-
     def construct(self, cli_info, request_args=None, **kwargs):
         """
         Instantiate the request as a message class instance
@@ -213,31 +239,32 @@ class Service(object):
 
         return uri
 
-    def uri_and_body(self, cis, method="POST", request_args=None, **kwargs):
+    def uri_and_body(self, request, method="POST", **kwargs):
         """
         Based on the HTTP method place the protocol message in the right
         place.
 
-        :param cis: Message class instance
+        :param request: The request as a Message class instance
         :param method: HTTP method
-        :param request_args: Message arguments
         :param kwargs: Extra keyword argument
         :return: Dictionary with 'uri' and possibly also 'body' and 'kwargs'
             as keys
         """
-        uri = self._endpoint(**request_args)
+        # Find out where to send this request
+        uri = self._endpoint(**kwargs)
 
-        resp = get_or_post(uri, method, cis, **kwargs)
-        resp['cis'] = cis
+        # This is where the message gets assigned to its proper place
+        info = get_or_post(uri, method, request, **kwargs)
+        info['cis'] = request
         try:
-            resp['h_args'] = {"headers": resp["headers"]}
+            info['h_args'] = {"headers": info["headers"]}
         except KeyError:
             pass
 
-        return resp
+        return info
 
     def init_authentication_method(self, request, cli_info, authn_method,
-                                   request_args=None, http_args=None, **kwargs):
+                                   http_args=None, **kwargs):
         """
         Place the necessary information in the necessary places depending on
         client authentication method.
@@ -246,21 +273,17 @@ class Service(object):
         :param cli_info: Client information, a
             :py:class:`oiccli.clinet_info.ClientInfo`instance
         :param authn_method: Client authentication method
-        :param request_args: Request argument
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
         :return: Extended set of HTTP header arguments
         """
         if http_args is None:
             http_args = {}
-        if request_args is None:
-            request_args = {}
 
         if authn_method:
             logger.debug('Client authn method: {}'.format(authn_method))
             return self.client_authn_method[authn_method]().construct(
-                request, cli_info, request_args=request_args,
-                http_args=http_args, **kwargs)
+                request, cli_info, http_args=http_args, **kwargs)
         else:
             return http_args
 
@@ -293,21 +316,18 @@ class Service(object):
         _args = dict(
             [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
 
-        cis = self.construct(cli_info, request_args, **_args)
+        request = self.construct(cli_info, request_args, **_args)
 
         if self.events:
-            self.events.store('Protocol request', cis)
+            self.events.store('Protocol request', request)
 
-        # if 'nonce' in cis and 'state' in cis:
-        #     self.state2nonce[cis['state']] = cis['nonce']
-
-        cis.lax = lax
+        # If I'm to be lenient when verifying the message
+        request.lax = lax
         h_arg = None
 
         if authn_method:
             h_arg = self.init_authentication_method(
-                cis, cli_info, authn_method, request_args=request_args,
-                **kwargs)
+                request, cli_info, authn_method, **kwargs)
 
         if h_arg:
             if "headers" in kwargs.keys():
@@ -318,36 +338,7 @@ class Service(object):
         if body_type == 'json':
             kwargs['content_type'] = JSON_ENCODED
 
-        return self.uri_and_body(cis, method, request_args, **kwargs)
-
-    def update_http_args(self, http_args, info):
-        """
-        Extending the header with information gathered during the request
-        setup.
-
-        :param http_args: Original HTTP header arguments
-        :param info: Request info
-        :return: Updated request info
-        """
-        try:
-            h_args = info['h_args']
-        except KeyError:
-            h_args = {}
-
-        if http_args is None:
-            http_args = h_args
-        else:
-            http_args.update(info['h_args'])
-
-        try:
-            _headers = info['kwargs']['headers']
-        except KeyError:
-            pass
-        else:
-            http_args.update({'headers': _headers})
-
-        info['http_args'] = http_args
-        return info
+        return self.uri_and_body(request, method, **kwargs)
 
     def do_request_init(self, cli_info, body_type="", method="",
                         authn_method='', request_args=None, http_args=None,
@@ -375,7 +366,7 @@ class Service(object):
                                   request_args=request_args,
                                   authn_method=authn_method, **kwargs)
 
-        return self.update_http_args(http_args, _info)
+        return update_http_args(http_args, _info)
 
     # ------------------ response handling -----------------------
 
@@ -391,9 +382,6 @@ class Service(object):
             else:
                 info = fragment
         return info
-
-    def _post_parse_response(self, resp, client_info, state='', **kwargs):
-        pass
 
     def parse_response(self, info, client_info, sformat="json", state="",
                        **kwargs):

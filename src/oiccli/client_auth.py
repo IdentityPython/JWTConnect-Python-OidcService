@@ -2,6 +2,7 @@ import base64
 import logging
 
 from cryptojwt.jws import alg2keytype
+from oiccli.exception import MissingRequiredAttribute
 
 from oiccli import rndstr
 from oiccli import sanitize
@@ -181,17 +182,15 @@ class ClientSecretPost(ClientSecretBasic):
 
 
 class BearerHeader(ClientAuthnMethod):
-    def construct(self, request=None, cli_info=None, request_args=None,
-                  http_args=None, **kwargs):
+    def construct(self, request=None, cli_info=None, http_args=None, **kwargs):
         """
         Constructing the Authorization header. The value of
         the Authorization header is "Bearer <access_token>".
 
         :param request: Request class instance
         :param ci: Client information
-        :param request_args: request arguments
         :param http_args: HTTP header arguments
-        :param kwargs: extra keywordd arguments
+        :param kwargs: extra keyword arguments
         :return:
         """
 
@@ -204,19 +203,15 @@ class BearerHeader(ClientAuthnMethod):
                 request.c_param["access_token"] = SINGLE_OPTIONAL_STRING
             else:
                 try:
-                    _acc_token = request_args["access_token"]
-                    del request_args["access_token"]
-                except (KeyError, TypeError):
-                    try:
-                        _acc_token = kwargs["access_token"]
-                    except KeyError:
-                        _acc_token = cli_info.state_db.get_token_info(
-                            **kwargs)['access_token']
+                    _acc_token = kwargs["access_token"]
+                except KeyError:
+                    _acc_token = cli_info.state_db.get_token_info(
+                        **kwargs)['access_token']
         else:
             try:
                 _acc_token = kwargs["access_token"]
             except KeyError:
-                _acc_token = request_args["access_token"]
+                raise MissingRequiredAttribute('access_token')
 
         # The authorization value starts with 'Bearer' when bearer tokens
         # are used
@@ -236,26 +231,22 @@ class BearerHeader(ClientAuthnMethod):
 
 
 class BearerBody(ClientAuthnMethod):
-    def construct(self, request, cli_info=None, request_args=None,
-                  http_args=None, **kwargs):
+    def construct(self, request, cli_info=None, http_args=None, **kwargs):
         """
         Will add access_token to the request if not present
 
         :param request: The request
         :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
-        :param request_args: Extra request arguments
         :param http_args: HTTP arguments
         :param kwargs: extra keyword arguments
         :return: A possibly modified dictionary with HTTP arguments.
         """
-        if request_args is None:
-            request_args = {}
 
         if "access_token" in request:
             pass
         else:
             try:
-                request["access_token"] = request_args["access_token"]
+                request["access_token"] = kwargs["access_token"]
             except KeyError:
                 try:
                     kwargs["state"]
