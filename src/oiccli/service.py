@@ -34,7 +34,7 @@ do_request_init
             - _endpoint
     - update_http_args
 
-and this for sending a request and parsing the response.
+and this for parsing the response.
 
 service_request
     - parse_request_response

@@ -392,7 +392,7 @@ class Registration(Service):
 
         try:
             if cli_info.provider_info[
-                'require_request_uri_registration'] is True:
+                    'require_request_uri_registration'] is True:
                 request_args['request_uris'] = cli_info.generate_request_uris(
                     cli_info.requests_dir)
         except KeyError:
