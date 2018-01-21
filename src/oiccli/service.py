@@ -257,7 +257,7 @@ class Service(object):
         info = get_or_post(uri, method, request, **kwargs)
         info['cis'] = request
         try:
-            info['h_args'] = {"headers": info["headers"]}
+            info['h_args'] = {"headers": kwargs["headers"]}
         except KeyError:
             pass
 
