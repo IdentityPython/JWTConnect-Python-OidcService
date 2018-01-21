@@ -80,13 +80,18 @@ class Authorization(service.Authorization):
         self.post_construct = [self.oic_post_construct]
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
-        if request_args is not None:
+        if request_args is None:
+            request_args = {}
+
+        try:
             _rt = request_args["response_type"]
-            if "token" in _rt or "id_token" in _rt:
-                if "nonce" not in request_args:
-                    request_args["nonce"] = rndstr(32)
-        else:  # Never wrong to specify a nonce
-            request_args = {"nonce": rndstr(32)}
+        except KeyError:
+            _rt = cli_info.behaviour['response_types'][0]
+            request_args["response_type"] = _rt
+
+        if "token" in _rt or "id_token" in _rt:
+            if "nonce" not in request_args:
+                request_args["nonce"] = rndstr(32)
 
         post_args = {}
         for attr in ["request_object_signing_alg", "algorithm", 'sig_kid']:
@@ -111,6 +116,10 @@ class Authorization(service.Authorization):
         else:
             if response_mod == 'form_post':
                 request_args['response_mode'] = response_mod
+
+        if 'state' not in request_args:
+            request_args['state'] = cli_info.state_db.create_state(
+                cli_info.issuer, request_args)
 
         return request_args, post_args
 
@@ -232,7 +241,7 @@ class WebFinger(Service):
         return resp
 
     def request_info(self, cli_info, method="GET", request_args=None,
-                     lax=False, **kwargs):
+            lax=False, **kwargs):
 
         try:
             _resource = kwargs['resource']
@@ -392,7 +401,7 @@ class Registration(Service):
 
         try:
             if cli_info.provider_info[
-                    'require_request_uri_registration'] is True:
+                'require_request_uri_registration'] is True:
                 request_args['request_uris'] = cli_info.generate_request_uris(
                     cli_info.requests_dir)
         except KeyError:
@@ -430,7 +439,7 @@ class UserInfo(Service):
     synchronous = True
     request = 'userinfo'
     default_authn_method = 'bearer_header'
-    http_method = 'POST'
+    http_method = 'GET'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
