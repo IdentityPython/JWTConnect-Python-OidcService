@@ -190,6 +190,7 @@ class AccessToken(service.AccessToken):
         self.post_parse_response = [self.oic_post_parse_response]
 
     def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
+        cli_info.state_db.add_response(resp, state)
         try:
             _idt = resp['verified_id_token']
         except KeyError:
