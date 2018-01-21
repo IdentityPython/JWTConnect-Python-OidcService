@@ -18,6 +18,7 @@ CC_METHOD = {
     'S512': hashlib.sha512,
 }
 
+# Map the signing context to a signing algorithm
 DEF_SIGN_ALG = {"id_token": "RS256",
                 "userinfo": "RS256",
                 "request_object": "RS256",

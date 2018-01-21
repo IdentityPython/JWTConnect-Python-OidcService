@@ -32,6 +32,16 @@ class UnknownAuthnMethod(Exception):
 
 # ========================================================================
 def assertion_jwt(client_id, keys, audience, algorithm, lifetime=600):
+    """
+    Create a signed Json Web Token containing some information.
+
+    :param client_id: The Client ID
+    :param keys: Signing keys
+    :param audience: Who is the receivers for this assertion
+    :param algorithm: Signing algorithm
+    :param lifetime: The lifetime of the signed Json Web Token
+    :return: A Signed Json Web Token
+    """
     _now = utc_time_sans_frac()
 
     at = AuthnToken(iss=client_id, sub=client_id,
@@ -42,6 +52,11 @@ def assertion_jwt(client_id, keys, audience, algorithm, lifetime=600):
 
 
 class ClientAuthnMethod(object):
+    """
+    Basic Client Authentication Method class.
+    Only has one method: 'construct'
+    """
+
     def construct(self, **kwargs):
         """ Add authentication information to a request
         :return:
@@ -60,13 +75,12 @@ class ClientSecretBasic(ClientAuthnMethod):
     together with a ':' in between and then URL safe base64 encoded.
     """
 
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
-                  **kwargs):
+    def construct(self, request, cli_info=None, http_args=None, **kwargs):
         """
         Construct a dictionary to be added to the HTTP request headers
 
-        :param cis: Request class instance
-        :param request_args: Request arguments
+        :param request: The request
+        :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
         :param http_args: HTTP arguments
         :return: dictionary of HTTP arguments
         """
@@ -85,7 +99,7 @@ class ClientSecretBasic(ClientAuthnMethod):
                 passwd = http_args["password"]
             except KeyError:
                 try:
-                    passwd = cis["client_secret"]
+                    passwd = request["client_secret"]
                 except KeyError:
                     passwd = cli_info.client_secret
 
@@ -95,7 +109,8 @@ class ClientSecretBasic(ClientAuthnMethod):
             user = cli_info.client_id
 
         # The credential is username and password concatenated with a ':'
-        # in between and then base 64 encoded
+        # in between and then base 64 encoded becomes the authentication
+        # token.
         credentials = "{}:{}".format(user, passwd)
         authz = base64.urlsafe_b64encode(credentials.encode("utf-8")).decode(
             "utf-8")
@@ -103,31 +118,31 @@ class ClientSecretBasic(ClientAuthnMethod):
 
         # If client_secret was part of the request message instance remove it
         try:
-            del cis["client_secret"]
+            del request["client_secret"]
         except KeyError:
             pass
 
         # If we're doing an access token request with an authorization code
         # then we should add client_id to the request if it's not already
         # there
-        if isinstance(cis, AccessTokenRequest) and cis[
-              'grant_type'] == 'authorization_code':
-            if 'client_id' not in cis:
+        if isinstance(request, AccessTokenRequest) and request[
+            'grant_type'] == 'authorization_code':
+            if 'client_id' not in request:
                 try:
-                    cis['client_id'] = cli_info.client_id
+                    request['client_id'] = cli_info.client_id
                 except AttributeError:
                     pass
         else:
             # remove client_id if not required by the request definition
             try:
-                _req = cis.c_param["client_id"][VREQUIRED]
+                _req = request.c_param["client_id"][VREQUIRED]
             except KeyError:
                 _req = False
 
             # if it's not required remove it
             if not _req:
                 try:
-                    del cis["client_id"]
+                    del request["client_id"]
                 except KeyError:
                     pass
 
@@ -144,33 +159,35 @@ class ClientSecretPost(ClientSecretBasic):
     These means putting both client_secret and client_id in the request body.
     """
 
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
-                  **kwargs):
-
-        # I MUST have a client_secret
-        if "client_secret" not in cis:
+    def construct(self, request, cli_info=None, http_args=None, **kwargs):
+        # I MUST have a client_secret, there are 3 possible places
+        # where I can find it. In the request, as an argument in http_args
+        # or among the client information.
+        if "client_secret" not in request:
             try:
-                cis["client_secret"] = http_args["client_secret"]
+                request["client_secret"] = http_args["client_secret"]
                 del http_args["client_secret"]
             except (KeyError, TypeError):
                 if cli_info.client_secret:
-                    cis["client_secret"] = cli_info.client_secret
+                    request["client_secret"] = cli_info.client_secret
                 else:
                     raise AuthnFailure("Missing client secret")
 
-        cis["client_id"] = cli_info.client_id
+        # Add the client_id to the request
+        request["client_id"] = cli_info.client_id
 
+        # return a possbly modified http_args dictionary
         return http_args
 
 
 class BearerHeader(ClientAuthnMethod):
-    def construct(self, cis=None, cli_info=None, request_args=None,
+    def construct(self, request=None, cli_info=None, request_args=None,
                   http_args=None, **kwargs):
         """
         Constructing the Authorization header. The value of
         the Authorization header is "Bearer <access_token>".
 
-        :param cis: Request class instance
+        :param request: Request class instance
         :param ci: Client information
         :param request_args: request arguments
         :param http_args: HTTP header arguments
@@ -179,12 +196,12 @@ class BearerHeader(ClientAuthnMethod):
         """
 
         # try to find the access_token in the request
-        if cis is not None:
-            if "access_token" in cis:
-                _acc_token = cis["access_token"]
-                del cis["access_token"]
+        if request is not None:
+            if "access_token" in request:
+                _acc_token = request["access_token"]
+                del request["access_token"]
                 # Required under certain circumstances :-) not under other
-                cis.c_param["access_token"] = SINGLE_OPTIONAL_STRING
+                request.c_param["access_token"] = SINGLE_OPTIONAL_STRING
             else:
                 try:
                     _acc_token = request_args["access_token"]
@@ -201,7 +218,11 @@ class BearerHeader(ClientAuthnMethod):
             except KeyError:
                 _acc_token = request_args["access_token"]
 
+        # The authorization value starts with 'Bearer' when bearer tokens
+        # are used
         _bearer = "Bearer {}".format(_acc_token)
+
+        # Add 'Authorization' to the headers
         if http_args is None:
             http_args = {"headers": {}}
             http_args["headers"]["Authorization"] = _bearer
@@ -215,16 +236,26 @@ class BearerHeader(ClientAuthnMethod):
 
 
 class BearerBody(ClientAuthnMethod):
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
-                  **kwargs):
+    def construct(self, request, cli_info=None, request_args=None,
+                  http_args=None, **kwargs):
+        """
+        Will add access_token to the request if not present
+
+        :param request: The request
+        :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
+        :param request_args: Extra request arguments
+        :param http_args: HTTP arguments
+        :param kwargs: extra keyword arguments
+        :return: A possibly modified dictionary with HTTP arguments.
+        """
         if request_args is None:
             request_args = {}
 
-        if "access_token" in cis:
+        if "access_token" in request:
             pass
         else:
             try:
-                cis["access_token"] = request_args["access_token"]
+                request["access_token"] = request_args["access_token"]
             except KeyError:
                 try:
                     kwargs["state"]
@@ -233,44 +264,72 @@ class BearerBody(ClientAuthnMethod):
                         raise AuthnFailure("Missing state specification")
                     kwargs["state"] = cli_info.state
 
-                cis["access_token"] = cli_info.state_db.get_token_info(
+                request["access_token"] = cli_info.state_db.get_token_info(
                     **kwargs)['access_token']
 
         return http_args
 
 
-def bearer_auth(req, authn):
+def bearer_auth(request, authn):
     """
     Pick out the access token, either in HTTP_Authorization header or
     in request body.
 
-    :param req:
-    :param authn:
-    :return:
+    :param request: The request
+    :param authn: The value of the Authorization header
+    :return: An access token
     """
 
     try:
-        return req["access_token"]
+        return request["access_token"]
     except KeyError:
         assert authn.startswith("Bearer ")
         return authn[7:]
 
 
 class JWSAuthnMethod(ClientAuthnMethod):
-    def choose_algorithm(self, entity, **kwargs):
+    """
+    Base class for client authentication methods that uses signed Json
+    Web Tokens.
+    """
+
+    def choose_algorithm(self, context, **kwargs):
+        """
+        Pick signing algorithm
+
+        :param context: Signing context
+        :param kwargs: extra keyword arguments
+        :return: Name of a signing algorithm
+        """
         try:
             algorithm = kwargs["algorithm"]
         except KeyError:
-            algorithm = DEF_SIGN_ALG[entity]
+            # different contexts uses different signing algorithms
+            algorithm = DEF_SIGN_ALG[context]
         if not algorithm:
             raise AuthnFailure("Missing algorithm specification")
         return algorithm
 
     def get_signing_key(self, algorithm, cli_info):
+        """
+        Pick signing key based on signing algorithm to be used
+
+        :param algorithm: Signing algorithm
+        :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
+        :return: A key
+        """
         return cli_info.keyjar.get_signing_key(
             alg2keytype(algorithm), alg=algorithm)
 
     def get_key_by_kid(self, kid, algorithm, cli_info):
+        """
+        Pick a key that matches a given key ID and signing algorithm.
+
+        :param kid: Key ID
+        :param algorithm: Signing algorithm
+        :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
+        :return: A matching key
+        """
         _key = cli_info.keyjar.get_key_by_kid(kid)
         if _key:
             ktype = alg2keytype(algorithm)
@@ -283,34 +342,32 @@ class JWSAuthnMethod(ClientAuthnMethod):
         else:
             raise NoMatchingKey("No key with kid:%s" % kid)
 
-    def construct(self, cis, cli_info=None, request_args=None, http_args=None,
-                  **kwargs):
+    def construct(self, request, cli_info=None, http_args=None, **kwargs):
         """
         Constructs a client assertion and signs it with a key.
         The request is modified as a side effect.
 
-        :param cis: The request
-        :param request_args: request arguments
+        :param request: The request
+        :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
         :param http_args: HTTP arguments
         :param kwargs: Extra arguments
         :return: Constructed HTTP arguments, in this case none
         """
 
-        # audience is the OP endpoint
-        # audience = self.cli._endpoint(REQUEST2ENDPOINT[cis.type()])
-        # OR OP identifier
-
         if 'client_assertion' in kwargs:
-            cis["client_assertion"] = kwargs['client_assertion']
+            request["client_assertion"] = kwargs['client_assertion']
             if 'client_assertion_type' in kwargs:
-                cis['client_assertion_type'] = kwargs['client_assertion_type']
+                request[
+                    'client_assertion_type'] = kwargs['client_assertion_type']
             else:
-                cis["client_assertion_type"] = JWT_BEARER
-        elif 'client_assertion' in cis:
-            if 'client_assertion_type' not in cis:
-                cis["client_assertion_type"] = JWT_BEARER
+                request["client_assertion_type"] = JWT_BEARER
+        elif 'client_assertion' in request:
+            if 'client_assertion_type' not in request:
+                request["client_assertion_type"] = JWT_BEARER
         else:
             algorithm = None
+            # audience for the signed JWT depends on which endpoint
+            # we're talking to.
             if kwargs['authn_endpoint'] in ['token', 'refresh']:
                 try:
                     algorithm = cli_info.registration_info[
@@ -346,20 +403,23 @@ class JWSAuthnMethod(ClientAuthnMethod):
             except KeyError:
                 _args = {}
 
-            cis["client_assertion"] = assertion_jwt(
+            # construct the signed JWT with the assertions and add
+            # it as value to the 'client_assertion' claim of the request
+            request["client_assertion"] = assertion_jwt(
                 cli_info.client_id, signing_key, audience,
                 algorithm, **_args)
 
-            cis["client_assertion_type"] = JWT_BEARER
+            request["client_assertion_type"] = JWT_BEARER
 
         try:
-            del cis["client_secret"]
+            del request["client_secret"]
         except KeyError:
             pass
 
-        if not cis.c_param["client_id"][VREQUIRED]:
+        # If client_id is not required to be present, remove it.
+        if not request.c_param["client_id"][VREQUIRED]:
             try:
-                del cis["client_id"]
+                del request["client_id"]
             except KeyError:
                 pass
 
@@ -369,13 +429,14 @@ class JWSAuthnMethod(ClientAuthnMethod):
 class ClientSecretJWT(JWSAuthnMethod):
     """
     Clients that have received a client_secret value from the Authorization
-    Server create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256.
+    Server can create a signed JWT using an HMAC SHA algorithm, such as
+    HMAC SHA-256.
     The HMAC (Hash-based Message Authentication Code) is calculated using the
     bytes of the UTF-8 representation of the client_secret as the shared key.
     """
 
-    def choose_algorithm(self, entity="client_secret_jwt", **kwargs):
-        return JWSAuthnMethod.choose_algorithm(self, entity, **kwargs)
+    def choose_algorithm(self, context="client_secret_jwt", **kwargs):
+        return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
 
     def get_signing_key(self, algorithm, cli_info):
         return cli_info.keyjar.get_signing_key(
@@ -384,17 +445,18 @@ class ClientSecretJWT(JWSAuthnMethod):
 
 class PrivateKeyJWT(JWSAuthnMethod):
     """
-    Clients that have registered a public key sign a JWT using that key.
+    Clients that have registered a public key can sign a JWT using that key.
     """
 
-    def choose_algorithm(self, entity="private_key_jwt", **kwargs):
-        return JWSAuthnMethod.choose_algorithm(self, entity, **kwargs)
+    def choose_algorithm(self, context="private_key_jwt", **kwargs):
+        return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
 
     def get_signing_key(self, algorithm, cli_info=None):
         return cli_info.keyjar.get_signing_key(
             alg2keytype(algorithm), "", alg=algorithm)
 
 
+# Map from client authentication identifiers to corresponding class
 CLIENT_AUTHN_METHOD = {
     "client_secret_basic": ClientSecretBasic,
     "client_secret_post": ClientSecretPost,
@@ -408,73 +470,15 @@ TYPE_METHOD = [(JWT_BEARER, JWSAuthnMethod)]
 
 
 def valid_client_info(cinfo, when=0):
+    """
+    Check if the client_secret has expired
+
+    :param cinfo: A :py:class:`oiccli.client_info.ClientInfo` instance
+    :param when: A time stamp against which the expiration time is to be checked
+    :return: True if the client_secret is still valid
+    """
     eta = cinfo.get('client_secret_expires_at', 0)
     now = when or utc_time_sans_frac()
     if eta != 0 and eta < now:
         return False
     return True
-
-
-# This is server side
-# def get_client_id(cdb, req, authn):
-#     """
-#     Verify the client and return the client id
-#
-#     :param cdb: Client database
-#     :param req: The request
-#     :param authn: Authentication information from the HTTP header
-#     :return:
-#     """
-#
-#     logger.debug("REQ: %s" % sanitize(req.to_dict()))
-#     if authn:
-#         if authn.startswith("Basic "):
-#             logger.debug("Basic auth")
-#             (_id, _secret) = base64.b64decode(
-#                 authn[6:].encode("utf-8")).decode("utf-8").split(":")
-#
-#             _bid = as_bytes(_id)
-#             _cinfo = None
-#             try:
-#                 _cinfo = cdb[_id]
-#             except KeyError:
-#                 try:
-#                     _cinfo[_bid]
-#                 except AttributeError:
-#                     pass
-#
-#             if not _cinfo:
-#                 logger.debug("Unknown client_id")
-#                 raise FailedAuthentication("Unknown client_id")
-#             else:
-#                 if not valid_client_info(_cinfo):
-#                     logger.debug("Invalid Client info")
-#                     raise FailedAuthentication("Invalid Client")
-#
-#                 if _secret != _cinfo["client_secret"]:
-#                     logger.debug("Incorrect secret")
-#                     raise FailedAuthentication("Incorrect secret")
-#         else:
-#             if authn[:6].lower() == "bearer":
-#                 logger.debug("Bearer auth")
-#                 _token = authn[7:]
-#             else:
-#                 raise FailedAuthentication("AuthZ type I don't know")
-#
-#             try:
-#                 _id = cdb[_token]
-#             except KeyError:
-#                 logger.debug("Unknown access token")
-#                 raise FailedAuthentication("Unknown access token")
-#     else:
-#         try:
-#             _id = str(req["client_id"])
-#             if _id not in cdb:
-#                 logger.debug("Unknown client_id")
-#                 raise FailedAuthentication("Unknown client_id")
-#             if not valid_client_info(cdb[_id]):
-#                 raise FailedAuthentication("Invalid client_id")
-#         except KeyError:
-#             raise FailedAuthentication("Missing client_id")
-#
-#     return _id
