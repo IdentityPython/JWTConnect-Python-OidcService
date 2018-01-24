@@ -488,12 +488,13 @@ class Service(object):
             logger.error('Missing or faulty response')
             raise ResponseError("Missing or faulty response")
 
-        try:
-            self.do_post_parse_response(resp, client_info, state=state)
-        except Exception as err:
-            logger.error(
-                'Got exception on do_post_parse_result: {}'.format(err))
-            raise
+        if not isinstance(resp, ErrorResponse):
+            try:
+                self.do_post_parse_response(resp, client_info, state=state)
+            except Exception as err:
+                logger.error(
+                    'Got exception on do_post_parse_result: {}'.format(err))
+                raise
 
         return resp
 
