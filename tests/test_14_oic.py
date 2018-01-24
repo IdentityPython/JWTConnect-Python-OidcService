@@ -88,5 +88,6 @@ class TestClient(object):
         _srv.endpoint = "https://example.com/userinfo"
         _info = _srv.do_request_init(self.client.client_info, state='ABCDE')
         assert _info
-        assert _info['body'] is ''
         assert _info['cis'].to_dict() == {}
+        assert _info['http_args'] == {
+            'headers': {'Authorization': 'Bearer access'}}

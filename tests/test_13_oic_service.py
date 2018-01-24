@@ -2,6 +2,7 @@ import json
 import os
 
 import pytest
+from oiccli.state import UnknownState
 from oicmsg.jwt import JWT
 from oicmsg.key_jar import build_keyjar
 from oicmsg.key_jar import public_keys_keyjar
@@ -216,7 +217,7 @@ class TestAccessTokenRequest(object):
         _info = self.req.request_info(self.cli_info, request_args=req_args,
                                       state='state',
                                       authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'kwargs'}
+        assert set(_info.keys()) == {'body', 'uri', 'cis', 'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
@@ -234,7 +235,7 @@ class TestAccessTokenRequest(object):
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          state='state')
         assert set(_info.keys()) == {'body', 'cis', 'uri', 'http_args',
-                                     'kwargs'}
+                                     'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
@@ -289,7 +290,7 @@ class TestAccessTokenRequest(object):
         self.cli_info.state_db.bind_nonce_to_state('nonce', 'state')
         resp = AccessTokenResponse(verified_id_token={'nonce': 'nonce'})
         self.cli_info.state_db.bind_nonce_to_state('nonce2', 'state2')
-        with pytest.raises(ParameterError):
+        with pytest.raises(UnknownState):
             self.req.do_post_parse_response(resp, self.cli_info, state='state2')
 
 

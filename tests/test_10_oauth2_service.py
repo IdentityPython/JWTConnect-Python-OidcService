@@ -150,7 +150,7 @@ class TestAccessTokenRequest(object):
         _info = self.service.request_info(self.cli_info, request_args=req_args,
                                           state='state',
                                           authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'kwargs', 'body', 'uri', 'cis'}
+        assert set(_info.keys()) == {'kwargs', 'body', 'uri', 'cis', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
@@ -169,7 +169,7 @@ class TestAccessTokenRequest(object):
                                              request_args=req_args,
                                              state='state')
         assert set(_info.keys()) == {'body', 'cis', 'uri', 'http_args',
-                                     'kwargs'}
+                                     'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
         assert _info['cis'].to_dict() == {
             'client_id': 'client_id',
