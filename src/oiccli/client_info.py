@@ -144,7 +144,9 @@ class ClientInfo(object):
         :param webname: The published URL
         :return: local filename
         """
-        assert webname.startswith(self.base_url)
+        if not webname.startswith(self.base_url):
+            raise ValueError("Webname doesn't match base_url")
+
         _name = webname[len(self.base_url):]
         if _name.startswith('/'):
             return _name[1:]

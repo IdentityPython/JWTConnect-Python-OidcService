@@ -203,9 +203,7 @@ class ProviderInfoDiscovery(Service):
             try:
                 cli_info.allow['issuer_mismatch']
             except KeyError:
-                try:
-                    assert _issuer == _pcr_issuer
-                except AssertionError:
+                if _issuer != _pcr_issuer:
                     raise OicCliError(
                         "provider info issuer mismatch '%s' != '%s'" % (
                             _issuer, _pcr_issuer))

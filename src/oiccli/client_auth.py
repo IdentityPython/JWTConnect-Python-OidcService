@@ -274,7 +274,8 @@ def bearer_auth(request, authn):
     try:
         return request["access_token"]
     except KeyError:
-        assert authn.startswith("Bearer ")
+        if not authn.startswith("Bearer "):
+            raise ValueError('Not a bearer token')
         return authn[7:]
 
 
@@ -324,9 +325,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
         _key = cli_info.keyjar.get_key_by_kid(kid)
         if _key:
             ktype = alg2keytype(algorithm)
-            try:
-                assert _key.kty == ktype
-            except AssertionError:
+            if _key.kty != ktype:
                 raise NoMatchingKey("Wrong key type")
             else:
                 return _key
