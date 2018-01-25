@@ -17,8 +17,14 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVICES = ['Authorization', 'AccessToken', 'RefreshAccessToken',
-                    'ProviderInfoDiscovery', 'UserInfo', 'Registration']
+DEFAULT_SERVICES = [
+    ('ProviderInfoDiscovery', {}),
+    ('Registration', {}),
+    ('Authorization', {}),
+    ('AccessToken', {}),
+    ('RefreshAccessToken', {}),
+    ('UserInfo', {})
+]
 
 # -----------------------------------------------------------------------------
 
