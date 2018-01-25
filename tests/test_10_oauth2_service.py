@@ -159,6 +159,8 @@ class TestAccessTokenRequest(object):
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
         assert msg == _info['cis']
+        assert 'client_secret' not in msg
+        assert 'Authorization' in _info['h_args']['headers']
 
     def test_request_init(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -283,3 +285,25 @@ class TestRefreshAccessTokenRequest(object):
     def test_request_info(self):
         _info = self.service.request_info(self.cli_info, state='abcdef')
         assert set(_info.keys()) == {'uri', 'body', 'cis', 'kwargs'}
+
+
+def test_access_token_srv_conf():
+    service = factory('AccessToken',
+                      client_authn_method=CLIENT_AUTHN_METHOD,
+                      conf={'default_authn_method': 'client_secret_post'})
+    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                     'redirect_uris': ['https://example.com/cli/authz_cb']}
+    cli_info = ClientInfo(config=client_config)
+    cli_info.state_db['state'] = {'code': 'access_code'}
+
+    req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
+                'code': 'access_code'}
+    service.endpoint = 'https://example.com/authorize'
+    _info = service.request_info(cli_info, request_args=req_args,
+                                 state='state')
+
+    assert _info
+    msg = AccessTokenRequest().from_urlencoded(
+        service.get_urlinfo(_info['body']))
+    assert 'client_secret' in msg
+    assert 'Authorization' not in _info['kwargs']['headers']

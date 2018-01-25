@@ -112,6 +112,11 @@ class Service(object):
         self.default_request_args = {}
         if conf:
             self.conf = conf
+            for param in ['msg_type', 'response_cls', 'error_msg',
+                          'default_authn_method', 'http_method', 'body_type',
+                          'response_body_type']:
+                if param in conf:
+                    setattr(self, param, conf['param'])
         else:
             self.conf = {}
 
@@ -141,9 +146,12 @@ class Service(object):
                     ar_args[prop] = getattr(cli_info, prop)
                 except AttributeError:
                     try:
-                        ar_args[prop] = self.default_request_args[prop]
+                        ar_args[prop] = self.conf['request_args'][prop]
                     except KeyError:
-                        pass
+                        try:
+                            ar_args[prop] = self.default_request_args[prop]
+                        except KeyError:
+                            pass
 
         return ar_args
 
