@@ -103,13 +103,17 @@ class Service(object):
     response_body_type = 'json'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 **kwargs):
+                 conf=None, **kwargs):
         self.httplib = httplib
         self.keyjar = keyjar
         self.client_authn_method = client_authn_method
         self.events = None
         self.endpoint = ''
         self.default_request_args = {}
+        if conf:
+            self.conf = conf
+        else:
+            self.conf = {}
 
         # pull in all the modifiers
         self.pre_construct = []
@@ -618,3 +622,17 @@ class Service(object):
 
         return self.parse_request_response(resp, client_info,
                                            response_body_type, **kwargs)
+
+
+def build_services(srvs, service_factory, http, keyjar, client_authn_method):
+    service = {}
+    for serv, conf in srvs:
+        _srv = service_factory(serv, httplib=http, keyjar=keyjar,
+                               client_authn_method=client_authn_method,
+                               conf=conf)
+        service[_srv.request] = _srv
+
+    # For any unspecified service
+    service['any'] = Service(httplib=http, keyjar=keyjar,
+                             client_authn_method=client_authn_method)
+    return service

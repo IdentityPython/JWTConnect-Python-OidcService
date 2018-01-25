@@ -5,7 +5,7 @@ from oiccli.client_info import ClientInfo
 from oiccli.exception import OicCliError
 from oiccli.http import HTTPLib
 from oiccli.oauth2 import service
-from oiccli.service import Service
+from oiccli.service import Service, build_services
 
 from oicmsg.key_jar import KeyJar
 
@@ -24,19 +24,6 @@ class ExpiredToken(OicCliError):
 
 
 # =============================================================================
-
-
-def build_services(srvs, service_factory, http, keyjar, client_authn_method):
-    service = {}
-    for serv in srvs:
-        _srv = service_factory(serv, httplib=http, keyjar=keyjar,
-                               client_authn_method=client_authn_method)
-        service[_srv.request] = _srv
-
-    # For any unspecified service
-    service['any'] = Service(httplib=http, keyjar=keyjar,
-                             client_authn_method=client_authn_method)
-    return service
 
 
 class Client(object):

@@ -72,9 +72,10 @@ class Authorization(service.Authorization):
     response_cls = oic.AuthorizationResponse
     error_msg = oic.AuthorizationErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         service.Authorization.__init__(self, httplib, keyjar,
-                                       client_authn_method)
+                                       client_authn_method, conf=conf)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oic_pre_construct]
         self.post_construct = [self.oic_post_construct]
@@ -183,10 +184,12 @@ class AccessToken(service.AccessToken):
     response_cls = oic.AccessTokenResponse
     error_msg = oic.TokenErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         service.AccessToken.__init__(
             self, httplib=httplib, keyjar=keyjar,
-            client_authn_method=client_authn_method)
+            client_authn_method=client_authn_method,
+            conf=conf)
         self.post_parse_response = [self.oic_post_parse_response]
 
     def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
@@ -221,9 +224,11 @@ class WebFinger(Service):
     http_method = 'GET'
     response_body_type = 'json'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.webfinger = webfinger.WebFinger(httpd=self.httplib,
                                              default_rel=OIC_ISSUER)
         self.post_parse_response.append(self.wf_post_parse_response)
@@ -260,10 +265,11 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     response_cls = oic.ProviderConfigurationResponse
     error_msg = ErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         service.ProviderInfoDiscovery.__init__(
             self, httplib=httplib, keyjar=keyjar,
-            client_authn_method=client_authn_method)
+            client_authn_method=client_authn_method,conf=conf)
         # Should be done before any other
         self.post_parse_response.insert(0, self.oic_post_parse_response)
 
@@ -365,9 +371,11 @@ class Registration(Service):
     body_type = 'json'
     http_method = 'POST'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.pre_construct = [self.oic_pre_construct]
         self.post_parse_response.append(self.oic_post_parse_response)
 
@@ -442,9 +450,10 @@ class UserInfo(Service):
     default_authn_method = 'bearer_header'
     http_method = 'GET'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oic_pre_construct]
         self.post_parse_response.insert(0, self.oic_post_parse_response)
 
@@ -552,9 +561,10 @@ class CheckSession(Service):
     synchronous = True
     request = 'check_session'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oic_pre_construct]
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
@@ -570,9 +580,10 @@ class CheckID(Service):
     synchronous = True
     request = 'check_id'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oic_pre_construct]
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
@@ -588,9 +599,10 @@ class EndSession(Service):
     synchronous = True
     request = 'end_session'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oic_pre_construct]
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):

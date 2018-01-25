@@ -42,9 +42,11 @@ class Authorization(Service):
     synchronous = False
     request = 'authorization'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
@@ -106,9 +108,11 @@ class AccessToken(Service):
     default_authn_method = 'client_secret_basic'
     http_method = 'POST'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
@@ -137,9 +141,11 @@ class RefreshAccessToken(Service):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
@@ -162,9 +168,11 @@ class ProviderInfoDiscovery(Service):
     request = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None):
+    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+                 conf=None):
         Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method)
+                         client_authn_method=client_authn_method,
+                         conf=conf)
         self.post_parse_response.append(self.oauth_post_parse_response)
 
     def request_info(self, cli_info, method="GET", request_args=None,
