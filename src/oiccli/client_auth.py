@@ -467,7 +467,7 @@ def valid_client_info(cinfo, when=0):
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """
-    eta = cinfo.get('client_secret_expires_at', 0)
+    eta = getattr(cinfo, 'registration_expires', 0)
     now = when or utc_time_sans_frac()
     if eta != 0 and eta < now:
         return False
