@@ -1,18 +1,20 @@
 import logging
 
 from future.backports.urllib.parse import urlparse
-from oiccli.exception import HttpError
+from oiccli.exception import HttpError, WrongContentType
 from oiccli.exception import MissingEndpoint
 from oiccli.exception import OicCliError
 from oiccli.exception import ParseError
 from oiccli.exception import ResponseError
 from oiccli.util import get_or_post
+from oiccli.util import get_response_body_type
 from oiccli.util import JSON_ENCODED
 from oiccli.util import verify_header
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
 from oicmsg.oauth2 import TokenErrorResponse
+
 
 __author__ = 'Roland Hedberg'
 
@@ -562,9 +564,23 @@ class Service(object):
 
         if reqresp.status_code in SUCCESSFUL:
             logger.debug('response_body_type: "{}"'.format(response_body_type))
-            value_type = self.get_value_type(reqresp, response_body_type)
+            try:
+                _type = get_response_body_type(reqresp)
+            except ValueError as err:
+                logger.warning('Unknown content-type: {}'.format(err))
+                value_type = response_body_type
+            else:
+                if _type != response_body_type:
+                    logger.warning(
+                        'Not the body type I expected: {} != {}'.format(
+                            _type, response_body_type))
+                if _type in ['json', 'jwt', 'urlencoded']:
+                    value_type = _type
+                else:
+                    value_type = response_body_type
 
             logger.debug('Successful response: {}'.format(reqresp.text))
+
             try:
                 return self.parse_response(reqresp.text, client_info,
                                            value_type, state, **kwargs)
