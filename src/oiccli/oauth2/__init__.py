@@ -15,8 +15,12 @@ logger = logging.getLogger(__name__)
 
 Version = "2.0"
 
-DEFAULT_SERVICES = ['Authorization', 'AccessToken',
-                    'RefreshAccessToken', 'ProviderInfoDiscovery']
+DEFAULT_SERVICES = [
+    ('Authorization', {}),
+    ['AccessToken', {}],
+    ('RefreshAccessToken', {}),
+    ('ProviderInfoDiscovery', {})
+]
 
 
 class ExpiredToken(OicCliError):

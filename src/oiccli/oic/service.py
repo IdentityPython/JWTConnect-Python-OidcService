@@ -125,6 +125,14 @@ class Authorization(service.Authorization):
         return request_args, post_args
 
     def oic_post_construct(self, cli_info, req, **kwargs):
+        if 'openid' in req['scope']:
+            _response_type = req['response_type'][0]
+            if 'id_token' in _response_type or 'code' in _response_type:
+                if 'nonce' not in req:
+                    _nonce = rndstr(32)
+                    req['nonce'] = _nonce
+                    cli_info.state_db.bind_nonce_to_state(_nonce, req['state'])
+
         try:
             _request_param = kwargs['request_param']
         except KeyError:
@@ -203,7 +211,7 @@ class AccessToken(service.AccessToken):
                 if cli_info.state_db.nonce_to_state(_idt['nonce']) != state:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
-                pass
+                raise ValueError('Unknown nonce value')
 
 
 class RefreshAccessToken(service.RefreshAccessToken):

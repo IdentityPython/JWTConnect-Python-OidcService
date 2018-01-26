@@ -707,3 +707,27 @@ class TestWebFinger(object):
         resp = self.req.parse_response(json.dumps(_info), self.cli_info)
         assert resp.to_dict() == _info
         assert self.cli_info.issuer == _info['links'][0]['href']
+
+
+def test_authz_service_conf():
+    srv = factory(
+        'Authorization',
+        client_authn_method=CLIENT_AUTHN_METHOD,
+        conf={
+            'request_args': {
+                'claims': {
+                    "id_token":
+                        {
+                            "auth_time": {"essential": True},
+                            "acr": {"values": ["urn:mace:incommon:iap:silver"]}
+                        }}}})
+    client_config = {
+        'client_id': 'client_id',
+        'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'behaviour': {'response_types': ['code']}
+    }
+    cli_info = ClientInfo(keyjar, config=client_config)
+    req = srv.construct(cli_info)
+    assert 'claims' in req
+    assert set(req['claims'].keys()) == {'id_token'}

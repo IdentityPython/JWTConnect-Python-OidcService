@@ -127,7 +127,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         # then we should add client_id to the request if it's not already
         # there
         if isinstance(request, AccessTokenRequest) and request[
-            'grant_type'] == 'authorization_code':
+                'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
                     request['client_id'] = cli_info.client_id

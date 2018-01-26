@@ -179,6 +179,25 @@ def match_to_(val, vlist):
     return False
 
 
+def get_response_body_type(response):
+    try:
+        _ctype = response.headers["content-type"]
+    except KeyError:
+        raise ValueError('Missing Content-type specification')
+
+    body_type = ''
+
+    if match_to_("application/json", _ctype) or match_to_(
+            'application/jrd+json', _ctype):
+        body_type = 'json'
+    elif match_to_("application/jwt", _ctype):
+        body_type = "jwt"
+    elif match_to_(URL_ENCODED, _ctype):
+        body_type = 'urlencoded'
+
+    return body_type
+
+
 def verify_header(reqresp, body_type):
     """
     
