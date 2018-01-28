@@ -67,7 +67,7 @@ specification is::
         synchronous = True
         request = 'userinfo'
         default_authn_method = 'bearer_header'
-        http_method = 'POST'
+        http_method = 'GET'
 
 
 Now if you want to talk to GitHub they do things a bit differently so
@@ -77,14 +77,11 @@ I had to construct a GitHub UserInfo class that looked like this::
         response_cls = Message
         error_msg = ErrorResponse
         default_authn_method = ''
-        http_method = 'GET'
 
 First their set of user info doesn't contain a 'sub' claim which is a
 required claim according to OIDC. Since OAUth2 doesn't have any notion of
 user info there is of course no OAuth2 user info message to depend on.
-Furthermore the HTTP method used when asking for user info is according to
-GitHub *GET* and not *POST* which is the default method. And lastly there is
-no client authentication involved at all.
+And secondly there is no client authentication involved at all.
 Changing *error_msg* was just a safety precaution. I don't know what error
 types GitHub might return and if they are within the set OIDC defines for the
 userinfo endpoint.
@@ -105,7 +102,7 @@ The call sequence for the Service methods is this for constructing a request:
             * init_authentication_method
             * uri_and_body
                 - _endpoint
-    - update_http_args
+        + update_http_args
 
 and this for sending a request and parsing the response:
 
@@ -164,7 +161,7 @@ This is part of the source code::
             """
             <left out>
 
-First regarding the class attributes the values on some atttributes has been
+First regarding the class attributes the values on some attributes has been
 changed to something more appropriate for this specific service.
 
 Secondly, I rewrote the *request_info* method because the request has
@@ -186,3 +183,11 @@ above.
 
 **do_pre_construct** and **do_post_construct** works the same way.
 
+Pipelines
+---------
+
+Both the *do_request_init* and *service_request* methods are the starting
+points for a pipeline of where an incomming message is gradually modified
+and/or transformed.
+
+The *do_request_init* pipeline starts with a
