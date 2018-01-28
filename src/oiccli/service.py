@@ -48,6 +48,7 @@ service_request
 The methods marked with (*) are where service specific
 behaviour is implemented.
 
+
 """
 
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
@@ -140,6 +141,11 @@ class Service(object):
         ar_args = kwargs.copy()
 
         # Go through the list of claims defined for the message class
+        # there are a couple of places where informtation can be found
+        # access them in the order of priority
+        # 1. A keyword argument
+        # 2. configured set of default attribute values
+        # 3. default attribute values defined in the OIDC standard document
         for prop in self.msg_type.c_param.keys():
             if prop in ar_args:
                 continue
@@ -205,7 +211,9 @@ class Service(object):
 
     def construct(self, cli_info, request_args=None, **kwargs):
         """
-        Instantiate the request as a message class instance
+        Instantiate the request as a message class instance with
+        attribute values gathered in a pre_construct method or in the
+        gather_request_args method.
 
         :param cli_info: Information about the client
         :param request_args:
@@ -215,9 +223,14 @@ class Service(object):
         if request_args is None:
             request_args = {}
 
+        # run the pre_construct methods. Will return a possibly new
+        # set of request arguments but also a set of arguments to
+        # be used by the post_construct methods.
         request_args, post_args = self.do_pre_construct(cli_info, request_args,
                                                         **kwargs)
 
+        # If 'state' appears among the keyword argument and is not
+        # expected to appear in the request, remove it.
         if 'state' not in self.msg_type.c_param:
             try:
                 del kwargs['state']
@@ -228,11 +241,19 @@ class Service(object):
         _args = self.gather_request_args(cli_info, **request_args)
 
         # logger.debug("kwargs: %s" % sanitize(kwargs))
+        # initiate the request as in an instance of the self.msg_type
+        # message type
         request = self.msg_type(**_args)
 
         return self.do_post_construct(cli_info, request, **post_args)
 
     def _endpoint(self, **kwargs):
+        """
+        Find out which endpoint the request should be sent to
+
+        :param kwargs: A possibly empty set of keyword arguments
+        :return: The endpoint URL
+        """
         try:
             uri = kwargs['endpoint']
             if uri:
@@ -269,7 +290,12 @@ class Service(object):
 
         # This is where the message gets assigned to its proper place
         info = get_or_post(uri, method, request, **kwargs)
+
+        # this is just for logging purposes
         info['cis'] = request
+
+        # If there are HTTP header arguments add them to *info* using
+        # the key *h_args*
         try:
             info['h_args'] = {"headers": kwargs["headers"]}
         except KeyError:
@@ -280,8 +306,9 @@ class Service(object):
     def init_authentication_method(self, request, cli_info, authn_method,
                                    http_args=None, **kwargs):
         """
-        Place the necessary information in the necessary places depending on
-        client authentication method.
+        Will run the proper client authentication method.
+        Each such method will place the necessary information in the necessary
+        place. A method may modify the request.
 
         :param request: The request, a Message class instance
         :param cli_info: Client information, a
@@ -360,6 +387,15 @@ class Service(object):
         """
         Builds the request message and constructs the HTTP headers.
 
+        This is the starting pont for a pipeline that will:
+
+        - construct the request message
+        - add/remove information to/from the request message in the way a
+            specific client authentication method requires.
+        - gather a set of HTTP headers like Content-type and Authorization.
+        - serialize the request message into the necessary format (JSON,
+            urlencoded, signed JWT)
+
         :param cli_info: Client information
         :param body_type: Which serialization to use for the HTTP body
         :param method: HTTP method used.
@@ -387,6 +423,12 @@ class Service(object):
 
     @staticmethod
     def get_urlinfo(info):
+        """
+        Pick out the fragment or query part from a URL.
+
+        :param info: A URL possibly containing a query or a fragment part
+        :return: the query/fragment part
+        """
         # If info is a whole URL pick out the query or fragment part
         if '?' in info or '#' in info:
             parts = urlparse(info)
@@ -401,13 +443,14 @@ class Service(object):
     def parse_response(self, info, client_info, sformat="json", state="",
                        **kwargs):
         """
-        Deserializes a response into it's response message class.
-        Or :py:class:`oicmsg.oauth2.ErrorResponse` if it's an error message
+        This the start of a pipeline that will:
 
-        It then verifies the correctness of the response by running the
-        verify method belonging to the message class used.
-
-        And finally it runs the do_post_parse_response method.
+        - Deserializes a response into it's response message class.
+            Or :py:class:`oicmsg.oauth2.ErrorResponse` if it's an error message
+        - verifies the correctness of the response by running the
+            verify method belonging to the message class used.
+        - runs the do_post_parse_response method iff the response was not
+            an error response.
 
         :param info: The response, can be either in a JSON or an urlencoded
             format
@@ -441,7 +484,7 @@ class Service(object):
             self.events.store('Protocol Response', resp)
 
         # if it's an error message and I didn't expect it recast the
-        # response as an ErrorResponse
+        # response as a :py:class:`oicmsg.oauth2.ErrorResponse
         if "error" in resp and not isinstance(resp, ErrorResponse):
             resp = None
             # Gather error message classes that are expected if an
@@ -467,16 +510,22 @@ class Service(object):
             except KeyError:
                 pass
 
+            if not resp:
+                logger.debug('Could not map into an error message')
+                raise ValueError('No error message: {}'.format(info))
+
             logger.debug('Error response: {}'.format(resp))
         else:
             # Need to add some information before running verify()
             kwargs["client_id"] = client_info.client_id
             kwargs['iss'] = client_info.issuer
 
-            # If no keys where provided in the method call use the instance
+            # If no keys where provided in the method call use the instance's
             # keyjar as default
             if "key" not in kwargs and "keyjar" not in kwargs:
                 kwargs["keyjar"] = self.keyjar
+
+            # add extra verify keyword arguments
             try:
                 kwargs.update(self.conf['verify'])
             except KeyError:
@@ -484,6 +533,7 @@ class Service(object):
 
             logger.debug("Verify response with {}".format(kwargs))
             try:
+                # verify the message
                 verf = resp.verify(**kwargs)
             except Exception as err:
                 logger.error(
@@ -516,11 +566,11 @@ class Service(object):
 
         return resp
 
-    def parse_error_mesg(self, reqresp, body_type):
+    def parse_error_mesg(self, resp, body_type):
         """
         Parse an error message.
 
-        :param reqresp: The response
+        :param reqresp: The response text
         :param body_type: How the body is encoded
         :return: A :py:class:`oicmsg.message.Message` instance
         """
@@ -529,7 +579,7 @@ class Service(object):
         else:
             _body_type = body_type
 
-        err = self.error_msg().deserialize(reqresp.text, method=_body_type)
+        err = self.error_msg().deserialize(resp, method=_body_type)
         try:
             err.verify()
         except OicCliError:
@@ -541,10 +591,11 @@ class Service(object):
     def get_value_type(reqresp, body_type):
         """
         Get the HTML encoding of the response.
+        Will convert Content-type into the matching deserialization methods
 
         :param reqresp: The response
         :param body_type: Assumed body type
-        :return: The found body type
+        :return: The deserialization method
         """
         if body_type:
             return verify_header(reqresp, body_type)
@@ -555,7 +606,12 @@ class Service(object):
                                response_body_type='',
                                state="", **kwargs):
         """
-        Deal with a request response
+        Deal with a self.httplib response. The response are expected to
+        follow a special pattern, having the attributes:
+        - headers (list of tuples with headers attributes and their values)
+        - status_code (integer)
+        - text (The text version of the response)
+        - url (The calling URL)
          
         :param reqresp: The HTTP request response
         :param client_info: Information about the client/server session
@@ -603,7 +659,7 @@ class Service(object):
             value_type = self.get_value_type(reqresp, response_body_type)
 
             try:
-                err_resp = self.parse_error_mesg(reqresp, value_type)
+                err_resp = self.parse_error_mesg(reqresp.text, value_type)
             except OicCliError:
                 return reqresp.text
             else:
