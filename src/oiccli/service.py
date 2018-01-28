@@ -118,7 +118,7 @@ class Service(object):
                           'default_authn_method', 'http_method', 'body_type',
                           'response_body_type']:
                 if param in conf:
-                    setattr(self, param, conf['param'])
+                    setattr(self, param, conf[param])
         else:
             self.conf = {}
 
