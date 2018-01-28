@@ -61,6 +61,14 @@ PROVIDER_DEFAULT = {
 
 
 def store_id_token(resp, cli_info, **kwargs):
+    """
+    Store the verified ID Token in the state database.
+
+    :param resp: The response
+    :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
+    :param kwargs: Extra keyword arguments. In this case the state claim
+        is supposed to be represented.
+    """
     try:
         cli_info.state_db.add_info(
             kwargs['state'],
