@@ -477,6 +477,10 @@ class Service(object):
             # keyjar as default
             if "key" not in kwargs and "keyjar" not in kwargs:
                 kwargs["keyjar"] = self.keyjar
+            try:
+                kwargs.update(self.conf['verify'])
+            except KeyError:
+                pass
 
             logger.debug("Verify response with {}".format(kwargs))
             try:
@@ -646,6 +650,12 @@ class Service(object):
 
         return self.parse_request_response(resp, client_info,
                                            response_body_type, **kwargs)
+
+    def get_conf_attr(self, attr, default=None):
+        if attr in self.conf:
+            return self.conf[attr]
+        else:
+            return default
 
 
 def build_services(srvs, service_factory, http, keyjar, client_authn_method):

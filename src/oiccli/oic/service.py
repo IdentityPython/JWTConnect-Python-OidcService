@@ -241,8 +241,7 @@ class WebFinger(Service):
                                              default_rel=OIC_ISSUER)
         self.post_parse_response.append(self.wf_post_parse_response)
 
-    @staticmethod
-    def wf_post_parse_response(resp, client_info, state='', **kwargs):
+    def wf_post_parse_response(self, resp, client_info, state='', **kwargs):
         try:
             links = resp['links']
         except KeyError:
@@ -250,6 +249,11 @@ class WebFinger(Service):
         else:
             for link in links:
                 if link['rel'] == OIC_ISSUER:
+                    _href = link['href']
+                    if not self.get_conf_attr('allow_http_links'):
+                        if _href.startswith('http://'):
+                            raise ValueError(
+                                'http link not allowed ({})'.format(_href))
                     client_info.issuer = link['href']
                     break
         return resp
@@ -281,8 +285,16 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         # Should be done before any other
         self.post_parse_response.insert(0, self.oic_post_parse_response)
 
+        if 'pre_load_keys' in conf and conf['pre_load_keys']:
+            self.post_parse_response.append(self._pre_load_keys)
+
     def oic_post_parse_response(self, resp, cli_info, **kwargs):
         self.match_preferences(cli_info, resp, cli_info.issuer)
+
+    def _pre_load_keys(self, resp, cli_info, **kwargs):
+        _jwks = self.keyjar.export_jwks_as_json(issuer=resp['issuer'])
+        logger.info('Preloaded keys for {}: {}'.format(resp['issuer'], _jwks))
+        return resp
 
     @staticmethod
     def match_preferences(cli_info, pcr=None, issuer=None):
