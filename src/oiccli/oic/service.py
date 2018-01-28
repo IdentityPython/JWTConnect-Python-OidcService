@@ -4,13 +4,6 @@ import sys
 import six
 from cryptojwt import jws
 
-try:
-    from json import JSONDecodeError
-except ImportError:  # Only works for >= 3.5
-    _decode_err = ValueError
-else:
-    _decode_err = JSONDecodeError
-
 from oiccli import rndstr, webfinger
 from oiccli.exception import ConfigurationError
 from oiccli.exception import ParameterError
@@ -67,6 +60,15 @@ PROVIDER_DEFAULT = {
 }
 
 
+def store_id_token(resp, cli_info, **kwargs):
+    try:
+        cli_info.state_db.add_info(
+            kwargs['state'],
+            verified_id_token=resp['verified_id_token'].to_dict())
+    except KeyError:
+        pass
+
+
 class Authorization(service.Authorization):
     msg_type = oic.AuthorizationRequest
     response_cls = oic.AuthorizationResponse
@@ -79,6 +81,7 @@ class Authorization(service.Authorization):
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oic_pre_construct]
         self.post_construct = [self.oic_post_construct]
+        self.post_parse_response.append(store_id_token)
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
@@ -199,6 +202,7 @@ class AccessToken(service.AccessToken):
             client_authn_method=client_authn_method,
             conf=conf)
         self.post_parse_response = [self.oic_post_parse_response]
+        self.post_parse_response.append(store_id_token)
 
     def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
         cli_info.state_db.add_response(resp, state)
@@ -476,6 +480,7 @@ class UserInfo(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oic_pre_construct]
         self.post_parse_response.insert(0, self.oic_post_parse_response)
+        self.post_parse_response.append(self._verify_sub)
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
@@ -492,6 +497,12 @@ class UserInfo(Service):
     def oic_post_parse_response(self, resp, client_info, **kwargs):
         resp = self.unpack_aggregated_claims(resp, client_info)
         return self.fetch_distributed_claims(resp, client_info)
+
+    def _verify_sub(self, resp, client_info, **kwargs):
+        _sub = client_info.state_db[kwargs['state']]['verified_id_token']['sub']
+        if resp['sub'] != _sub:
+            raise ValueError('Incorrect "sub" value')
+        return resp
 
     def unpack_aggregated_claims(self, userinfo, cli_info):
         try:
