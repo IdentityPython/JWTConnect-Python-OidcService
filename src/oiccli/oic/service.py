@@ -145,11 +145,11 @@ class Authorization(service.Authorization):
                     cli_info.state_db.bind_nonce_to_state(_nonce, req['state'])
 
         try:
-            _request_param = kwargs['request_param']
+            _request_method = kwargs['request_method']
         except KeyError:
             return req
         else:
-            del kwargs['request_param']
+            del kwargs['request_method']
 
             alg = None
             for arg in ["request_object_signing_alg", "algorithm"]:
@@ -182,9 +182,9 @@ class Authorization(service.Authorization):
             # Should the request be encrypted
             _req = request_object_encryption(_req, cli_info, **kwargs)
 
-            if _request_param == "request":
+            if _request_method == "request":
                 req["request"] = _req
-            else:
+            else:  # MUST be request_uri
                 try:
                     _webname = cli_info.registration_response['request_uris'][0]
                     filename = cli_info.filename_from_webname(_webname)
