@@ -70,9 +70,6 @@ class ClientInfo(object):
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, '')
-            # else:
-            #     if attr == 'client_id':
-            #         self.state_db.client_id = config[attr]
 
         for attr in ['allow', 'client_prefs', 'behaviour', 'provider_info']:
             try:
@@ -216,7 +213,10 @@ class ClientInfo(object):
         except KeyError:
             m.update(as_bytes(self.issuer))
         m.update(as_bytes(self.base_url))
-        return ['{}{}/{}'.format(self.base_url, path, m.hexdigest())]
+        if not path.startswith('/'):
+            return ['{}/{}/{}'.format(self.base_url, path, m.hexdigest())]
+        else:
+            return ['{}{}/{}'.format(self.base_url, path, m.hexdigest())]
 
     def import_keys(self, keyspec):
         """
