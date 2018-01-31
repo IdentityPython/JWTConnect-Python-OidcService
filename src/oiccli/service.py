@@ -174,14 +174,20 @@ class Service(object):
         :return: A tuple of request_args and post_args. post_args are to be
             used by the post_construct methods.
         """
+        _args = kwargs.copy()
+        try:
+            _args.update(self.conf['pre_construct'])
+        except KeyError:
+            pass
+
         post_args = {}
         for meth in self.pre_construct:
-            request_args, _post_args = meth(cli_info, request_args, **kwargs)
+            request_args, _post_args = meth(cli_info, request_args, **_args)
             post_args.update(_post_args)
 
         return request_args, post_args
 
-    def do_post_construct(self, cli_info, request_args, **post_args):
+    def do_post_construct(self, cli_info, request_args, **kwargs):
         """
         Will run the post_construct methods one at the time in order.
 
@@ -191,8 +197,14 @@ class Service(object):
         :param post_args: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
         """
+        _args = kwargs.copy()
+        try:
+            _args.update(self.conf['post_construct'])
+        except KeyError:
+            pass
+
         for meth in self.post_construct:
-            request_args = meth(cli_info, request_args, **post_args)
+            request_args = meth(cli_info, request_args, **_args)
 
         return request_args
 
@@ -206,8 +218,14 @@ class Service(object):
         :param state: state value
         :param kwargs: Extra key word arguments
         """
+        _args = kwargs.copy()
+        try:
+            _args.update(self.conf['post_parse_response'])
+        except KeyError:
+            pass
+
         for meth in self.post_parse_response:
-            meth(resp, cli_info, state=state, **kwargs)
+            meth(resp, cli_info, state=state, **_args)
 
     def construct(self, cli_info, request_args=None, **kwargs):
         """
