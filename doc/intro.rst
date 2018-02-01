@@ -69,7 +69,7 @@ The class has a number of attributes:
         Default is oicmsg.message.Message
 
     error_msg
-        The message subclass that describes the response
+        The message subclass that describes an error response
         Default is oicmsg.message.oauth2.ErrorResponse
 
     endpoint_name
