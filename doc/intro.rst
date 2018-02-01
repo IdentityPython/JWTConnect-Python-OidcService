@@ -123,6 +123,27 @@ The overall call sequence looks like this:
                 - `endpoint`_
         + `update_http_args`_
 
+The result of the request pipeline is a dictionary that in its' simplest form
+will look something like this::
+
+    {
+        'uri' : 'https://example.com/authorize?response_type=code&state=state&client_id=client_id&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&nonce=P1B1nPCnzU4Mwg1hjzxkrA3DmnMQKPWl'
+    }
+
+It will look like that when the request is to be a urlendoded query part of a
+HTTP GET command. If instead a HTTP POST with a json body is expect the outcome
+of `do_request_init`_ will be something like this::
+
+    {
+        'uri': 'https://example.com/authorize',
+        'body': 'grant_type=authorization_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&code=access_code&client_id=client_id',
+        'kwargs': {'state': 'state', 'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}},
+        'h_args': {'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}}
+    }
+
+Here you have the url that the request should go to, the body of the request
+and header arguments to add to the HTTP request.
+
 do_request_init
 ===============
 
@@ -252,3 +273,34 @@ Implemented in :py:meth:`oiccli.service.Service.update_http_args`
 
 Will add the HTTP header arguments that has been added while the request
 has been travelling through the pipe line to a possible starting set.
+
+
+---------------------
+The response pipeline
+---------------------
+
+Below follows a desciption of the methods of the response pipeline in the order
+they are called.
+
+The overall call sequence looks like this:
+
+   - `parse_request_response`_
+        + `parse_response`_
+            * `get_urlinfo`_
+            * `do_post_parse_response`_ (#)
+        + `parse_error_mesg`_
+
+parse_request_response
+======================
+
+parse_response
+--------------
+
+get_urlinfo
+'''''''''''
+
+do_post_parse_response
+''''''''''''''''''''''
+
+parse_error_mesg
+----------------
