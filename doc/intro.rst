@@ -123,7 +123,7 @@ The overall call sequence looks like this:
                 - `endpoint`_
         + `update_http_args`_
 
-The result of the request pipeline is a dictionary that in its' simplest form
+The result of the request pipeline is a dictionary that in its simplest form
 will look something like this::
 
     {
@@ -131,11 +131,11 @@ will look something like this::
     }
 
 It will look like that when the request is to be a urlendoded query part of a
-HTTP GET command. If instead a HTTP POST with a json body is expect the outcome
-of `do_request_init`_ will be something like this::
+HTTP GET operation. If instead a HTTP POST with a json body is expected the
+outcome of `do_request_init`_ will be something like this::
 
     {
-        'uri': 'https://example.com/authorize',
+        'uri': 'https://example.com/token',
         'body': 'grant_type=authorization_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&code=access_code&client_id=client_id',
         'h_args': {'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}}
     }
