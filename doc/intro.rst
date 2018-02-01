@@ -168,8 +168,8 @@ request is decided.
 
 will do these things:
 
-    1. Remove request arguments that is know at this point should not appear in the
-        request
+    1. Remove request arguments that is know at this point should not appear in
+        the request
     2. Construct the request
     3. Do the client authentication setup if necessary
     4. Set the necessary HTTP headers
@@ -186,8 +186,9 @@ construct
 Implemented in :py:meth:`oiccli.service.Service.construct`
 
 Instantiate the request as a message class instance with attribute values
-from the message call and gathered by the pre_construct methods or the
-`gather_request_args`_ method.
+from the message call and gathered by the *pre_construct* methods and the
+`gather_request_args`_ method and possibly modified by a *post_construct*
+method.
 
 do_pre_construct
 ++++++++++++++++
@@ -219,12 +220,12 @@ In priority order:
 
     1. Arguments to the method call
     2. Information kept in the client information instance
-    3. Information in the client configuration targeted to this method.
+    3. Information in the client configuration targeted for this method.
     4. Standard protocol defaults.
 
 It will go through the list of possible (required/optional) attributes
 as specified in the oicmsg.message.Message class that is defined to be used
-for this request.
+for this request and add values to the attributes if any can be found.
 
 do_post_construct
 +++++++++++++++++
