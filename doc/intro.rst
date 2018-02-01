@@ -18,20 +18,22 @@ it is dealing with. I does the following when sending a request:
     2. If client authentication is involved it gathers the necessary data for that
     3. If the chosen client authentication method involved adding information to the
         request it does so.
-    4. Adds correct information to the HTTP headers
-    5. Serializes the request into the format used
+    4. Adds information to the HTTP headers like Content-Type
+    5. Serializes the request into the expected format
 
-after that follows actually sending the request and receiving the response.
+after that follows the act of sending the request to the server and receiving
+the response from it.
 Once the response have been received, The client will follow this path:
 
     1. Deserialize the received message into a internal format
-    2. verify that the message was correct. That it contains the required
-        claims and that all claims are of the correct data type.
-    3. stores the received information in a data base and/or passes it on to
+    2. Verify that the message was correct. That it contains the required
+        claims and that all claims are of the correct data type. If it's signed
+        and/or encrypted verify signature and/or decrypt.
+    3. Store the received information in a data base and/or passes it on to
         the application.
 
 oiccli is built to allow clients to be constructed that supports any number
-of request-response services. The basic Open ID Connect set is:
+and type of of request-response services. The basic Open ID Connect set is:
 
     - Webfinger
     - Dynamic provider information discovery
@@ -41,20 +43,20 @@ of request-response services. The basic Open ID Connect set is:
     - User info request
 
 To these one can add services like session management and token introspection.
-The only thing we can be sure of is that thhis is not the final set of
+The only thing we can be sure of is that this is not the final set of
 services, there will be more. And there will be variants of the standard ones.
-Like when you want to multi lateral federation support to provider information
-discovery and client registration.
+Like when you want to add multi lateral federation support to provider
+information discovery and client registration.
 
 Over all it seemed like a good idea to write a piece of code that implements
 all the functionality that is needed to support any of this services and
-any future services.
+any future services that follows the same pattern.
 
 That is the thought behind :py:class:`oiccli.service.Service` .
 
 This class contains 2 pipe lines, one for the request construction and one
-for request parsing. The interface to HTTP is kept to a minimum to allow
-users of this package to chose their favorite HTTP client/server libraries.
+for response parsing. The interface to HTTP is kept to a minimum to allow
+users of oiccli to chose their favorite HTTP client/server libraries.
 
 The class has a number of attributes:
 
