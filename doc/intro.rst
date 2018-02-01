@@ -133,9 +133,9 @@ will look something like this::
         'uri' : 'https://example.com/authorize?response_type=code&state=state&client_id=client_id&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&nonce=P1B1nPCnzU4Mwg1hjzxkrA3DmnMQKPWl'
     }
 
-It will look like that when the request is to be a urlendoded query part of a
-HTTP GET operation. If instead a HTTP POST with a json body is expected the
-outcome of `do_request_init`_ will be something like this::
+It will look like that when the request is to be transmitted as the urlencoded
+query part of a HTTP GET operation. If instead a HTTP POST with a json body is
+expected the outcome of `do_request_init`_ will be something like this::
 
     {
         'uri': 'https://example.com/token',
