@@ -12,14 +12,6 @@ Subpackages
 Submodules
 ----------
 
-oiccli\.aes module
-------------------
-
-.. automodule:: oiccli.aes
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 oiccli\.client\_auth module
 ---------------------------
 
@@ -36,6 +28,14 @@ oiccli\.client\_info module
     :undoc-members:
     :show-inheritance:
 
+oiccli\.cookie module
+---------------------
+
+.. automodule:: oiccli.cookie
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 oiccli\.exception module
 ------------------------
 
@@ -45,17 +45,9 @@ oiccli\.exception module
     :show-inheritance:
 
 oiccli\.http module
--------------------
-
-.. automodule:: oiccli.http
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-oiccli\.http\_util module
 -------------------------
 
-.. automodule:: oiccli.http_util
+.. automodule:: oiccli.http
     :members:
     :undoc-members:
     :show-inheritance:

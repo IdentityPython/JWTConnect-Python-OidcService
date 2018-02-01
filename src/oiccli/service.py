@@ -330,7 +330,7 @@ class Service(object):
 
         :param request: The request, a Message class instance
         :param cli_info: Client information, a
-            :py:class:`oiccli.clinet_info.ClientInfo`instance
+            :py:class:`oiccli.clinet_info.ClientInfo` instance
         :param authn_method: Client authentication method
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
@@ -372,6 +372,7 @@ class Service(object):
         if request_args is None:
             request_args = {}
 
+        # remove arguments that should not be included in the request
         _args = dict(
             [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
 
@@ -380,14 +381,17 @@ class Service(object):
         if self.events:
             self.events.store('Protocol request', request)
 
-        # If I'm to be lenient when verifying the message
+        # If I'm to be lenient when verifying the correctness of the request
+        # message
         request.lax = lax
         h_arg = None
 
+        # If I should deal with client authentication
         if authn_method:
             h_arg = self.init_authentication_method(
                 request, cli_info, authn_method, **kwargs)
 
+        # Set the necessary HTTP headers
         if h_arg:
             if "headers" in kwargs.keys():
                 kwargs["headers"].update(h_arg["headers"])

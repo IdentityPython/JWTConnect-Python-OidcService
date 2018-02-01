@@ -16,6 +16,7 @@ provides the API that most service implementers should use.
 .. toctree::
    :maxdepth: 2
 
+   intro
    howto/index
    modules
    oiccli.rst
