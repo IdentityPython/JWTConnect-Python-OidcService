@@ -79,29 +79,30 @@ The class has a number of attributes:
 
     synchronous
         *True* if the response will be returned as a direct response to the
-        request. The only exception right now is the Authorization request
-        where the response is delivered to the client a later date.
+        request. The only exception right now to this is the Authorization
+        request where the response is delivered to the client at some later
+        date.
         Default is *True*
 
     request
-        A name of the service. Later when a client is implemented instances
-        of different services are found by this name.
+        A name of the service. Later when a RP/client is implemented instances
+        of different services are found by using this name.
         No default
 
     default_authn_method
         The client authentication method to use if nothing else is specified.
-        No default.
+        Default is '' which means none.
 
     http_method
         Which HTTP method to use when sending the request.
         Default is **GET**
 
     body_type
-        The serlization method to be used for the request
+        The serialization method to be used for the request
         Default is *urlencoded*
 
     response_body_type
-        The deserialization method to used on the response
+        The deserialization method to use on the response
         Default is *json*
 
 
