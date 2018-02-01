@@ -137,7 +137,6 @@ of `do_request_init`_ will be something like this::
     {
         'uri': 'https://example.com/authorize',
         'body': 'grant_type=authorization_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&code=access_code&client_id=client_id',
-        'kwargs': {'state': 'state', 'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}},
         'h_args': {'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}}
     }
 
