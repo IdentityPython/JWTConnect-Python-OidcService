@@ -15,9 +15,10 @@ The client follows the same pattern disregarding which request/response
 it is dealing with. I does the following when sending a request:
 
     1. Gathers the request arguments
-    2. If client authentication is involved it gathers the necessary data for that
-    3. If the chosen client authentication method involved adding information to the
-        request it does so.
+    2. If client authentication is involved it gathers the necessary data for
+        that
+    3. If the chosen client authentication method involved adding information
+        to the request it does so.
     4. Adds information to the HTTP headers like Content-Type
     5. Serializes the request into the expected format
 
@@ -296,14 +297,61 @@ The overall call sequence looks like this:
 parse_request_response
 ======================
 
+Deal with a self.httplib response. The response are expected to
+follow a special pattern, having the attributes:
+    - headers (list of tuples with headers attributes and their values)
+    - status_code (integer)
+    - text (The text version of the response)
+    - url (The calling URL)
+
+Depending on the status_code in the HTTP response different things will happen.
+If it's in in the 200 <= x < 300 range then based on the value of Content-Type
+in the HTTP headers an appropriate deserializer method will be chosen and then
+*parse_response* will be called.
+
 parse_response
 --------------
 
+Will initiate a *response_cls* instance with the result of deserializing the
+result.
+If the response turned out to be an error response even though the status_code
+was in the 200 <= x < 300 range that is dealt with and an *error_msg* instance
+is instantiated with the response.
+
+Either way the response is verified (checked for required parameters and
+parameter values being of the correct data types) and if it was not an error
+response *do_post_parse_response* is called.
+
 get_urlinfo
 '''''''''''
+Picks out the query or fragment component from a URL
 
 do_post_parse_response
 ''''''''''''''''''''''
 
+Runs the list of *post_parse_response* methods in the order they appear in the
+list.
+
+The API of these methods are::
+
+    method(response, client_info, state=state, **_args)
+
+The parameters being:
+
+    response
+        A Message subclass instance
+    client_info
+        A :py:class:`oiccli.client_info.ClientInfo` instance
+    state
+        The state value that was used in the authorization request
+    _args
+        A set of extra keyword arguments
+
 parse_error_mesg
 ----------------
+
+Parses an error message return with a 4XX error message. OAuth2 expects
+400 errors, OpenID Connect also uses a 402 error. But we accept the full
+range since serves seems to be able to use them all.
+
+
