@@ -41,6 +41,7 @@ class Authorization(Service):
     endpoint_name = 'authorization_endpoint'
     synchronous = False
     request = 'authorization'
+    response_body_type = 'urlencoded'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
                  conf=None):

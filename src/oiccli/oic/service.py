@@ -297,8 +297,9 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         # Should be done before any other
         self.post_parse_response.insert(0, self.oic_post_parse_response)
 
-        if 'pre_load_keys' in conf and conf['pre_load_keys']:
-            self.post_parse_response.append(self._pre_load_keys)
+        if conf:
+            if 'pre_load_keys' in conf and conf['pre_load_keys']:
+                self.post_parse_response.append(self._pre_load_keys)
 
     def oic_post_parse_response(self, resp, cli_info, **kwargs):
         self.match_preferences(cli_info, resp, cli_info.issuer)
@@ -507,9 +508,14 @@ class UserInfo(Service):
         return self.fetch_distributed_claims(resp, client_info)
 
     def _verify_sub(self, resp, client_info, **kwargs):
-        _sub = client_info.state_db[kwargs['state']]['verified_id_token']['sub']
-        if resp['sub'] != _sub:
-            raise ValueError('Incorrect "sub" value')
+        try:
+            _sub = client_info.state_db[kwargs['state']]['verified_id_token']['sub']
+        except KeyError:
+            logger.warning("Can not verify value on sub")
+        else:
+            if resp['sub'] != _sub:
+                raise ValueError('Incorrect "sub" value')
+
         return resp
 
     def unpack_aggregated_claims(self, userinfo, cli_info):

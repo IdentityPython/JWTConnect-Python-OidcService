@@ -1,6 +1,6 @@
 import pytest
 from oiccli.exception import WrongContentType
-from oiccli.oauth2 import ClientInfo
+from oiccli.client_info import ClientInfo
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
 from oicmsg.oauth2 import SINGLE_OPTIONAL_INT
@@ -71,44 +71,6 @@ class TestDummyService(object):
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
-
-    def test_parse_request_response_urlencoded(self):
-        req_resp = Response(200, Message(foo='bar').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   state='state')
-        assert isinstance(resp, Message)
-        assert set(resp.keys()) == {'foo'}
-
-    def test_parse_request_response_200_error(self):
-        req_resp = Response(200, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   state='state')
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_400_error(self):
-        req_resp = Response(400, ErrorResponse(error='barsoap').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   state='state')
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_json(self):
-        req_resp = Response(200, Message(foo='bar').to_json(),
-                            headers={'content-type': 'application/json'})
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json',
-                                                   state='state')
-        assert isinstance(resp, Message)
-        assert set(resp.keys()) == {'foo'}
-
-    def test_parse_request_response_wrong_content_type(self):
-        req_resp = Response(200, Message(foo='bar').to_json(),
-                            headers={'content-type': "text/plain"})
-        with pytest.raises(WrongContentType):
-            resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                       response_body_type='json',
-                                                       state='state')
 
 
 class TestRequest(object):

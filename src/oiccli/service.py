@@ -1,15 +1,11 @@
 import logging
 
 from future.backports.urllib.parse import urlparse
-from oiccli.exception import HttpError
 from oiccli.exception import MissingEndpoint
 from oiccli.exception import OicCliError
-from oiccli.exception import ParseError
 from oiccli.exception import ResponseError
 from oiccli.util import get_or_post
-from oiccli.util import get_response_body_type
 from oiccli.util import JSON_ENCODED
-from oiccli.util import verify_header
 from oicmsg.oauth2 import AuthorizationErrorResponse
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
@@ -166,8 +162,8 @@ class Service(object):
         """
         Will run the pre_construct methods one by one in the order given.
 
-        :param client_info: Client Information as a :py:class:`oiccli.Client`
-            instance.
+        :param client_info: Client Information as a
+            :py:class:`oiccli.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param kwargs: Extra key word arguments
         :return: A tuple of request_args and post_args. post_args are to be
@@ -190,8 +186,8 @@ class Service(object):
         """
         Will run the post_construct methods one at the time in order.
 
-        :param client_info: Client Information as a :py:class:`oiccli.Client`
-            instance.
+        :param client_info: Client Information as a
+            :py:class:`oiccli.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param post_args: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
@@ -212,8 +208,8 @@ class Service(object):
         A method run after the response has been parsed and verified.
 
         :param resp: The response as a :py:class:`oicmsg.Message` instance
-        :param client_info: Client Information as a :py:class:`oiccli.Client`
-            instance.
+        :param client_info: Client Information as a
+            :py:class:`oiccli.client_info.ClientInfo` instance.
         :param state: state value
         :param kwargs: Extra key word arguments
         """
@@ -330,7 +326,7 @@ class Service(object):
 
         :param request: The request, a Message class instance
         :param client_info: Client information, a
-            :py:class:`oiccli.clinet_info.ClientInfo` instance
+            :py:class:`oiccli.client_info.ClientInfo` instance
         :param authn_method: Client authentication method
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
@@ -353,8 +349,8 @@ class Service(object):
         The request information is gathered and the where and how of sending the
         request is decided.
 
-        :param client_info: Client information as a :py:class:`oiccli.Client`
-            instance
+        :param client_info: Client information as a
+            :py:class:`oiccli.client_info.ClientInfo` instance
         :param method: The HTTP method to be used.
         :param request_args: Initial request arguments
         :param body_type: If the request is sent in the HTTP body this
@@ -610,125 +606,42 @@ class Service(object):
         else:
             return err
 
-    @staticmethod
-    def get_value_type(http_response, body_type):
-        """
-        Get the HTML encoding of the response.
-        Will convert Content-type into the matching deserialization methods
-
-        :param http_response: The HTTP response
-        :param body_type: Assumed body type
-        :return: The deserialization method
-        """
-        if body_type:
-            return verify_header(http_response, body_type)
-        else:
-            return 'urlencoded'
-
-    def parse_request_response(self, reqresp, client_info,
-                               response_body_type='',
-                               state="", **kwargs):
-        """
-        Deal with a self.httplib response. The response are expected to
-        follow a special pattern, having the attributes:
-        - headers (list of tuples with headers attributes and their values)
-        - status_code (integer)
-        - text (The text version of the response)
-        - url (The calling URL)
-         
-        :param reqresp: The HTTP request response
-        :param client_info: Information about the client/server session
-        :param response_body_type: If response in body one of 'json', 'jwt' or
-            'urlencoded'
-        :param state: Session identifier
-        :param kwargs: Extra keyword arguments
-        :return: 
-        """
-
-        if reqresp.status_code in SUCCESSFUL:
-            logger.debug('response_body_type: "{}"'.format(response_body_type))
-            try:
-                _type = get_response_body_type(reqresp)
-            except ValueError as err:
-                logger.warning('Unknown content-type: {}'.format(err))
-                value_type = response_body_type
-            else:
-                if _type != response_body_type:
-                    logger.warning(
-                        'Not the body type I expected: {} != {}'.format(
-                            _type, response_body_type))
-                if _type in ['json', 'jwt', 'urlencoded']:
-                    value_type = _type
-                else:
-                    value_type = response_body_type
-
-            logger.debug('Successful response: {}'.format(reqresp.text))
-
-            try:
-                return self.parse_response(reqresp.text, client_info,
-                                           value_type, state, **kwargs)
-            except Exception as err:
-                logger.error(err)
-                raise
-        elif reqresp.status_code in [302, 303]:  # redirect
-            return reqresp
-        elif reqresp.status_code == 500:
-            logger.error("(%d) %s" % (reqresp.status_code, reqresp.text))
-            raise ParseError("ERROR: Something went wrong: %s" % reqresp.text)
-        elif 400 <= reqresp.status_code < 500:
-            logger.error('Error response ({}): {}'.format(reqresp.status_code,
-                                                          reqresp.text))
-            # expecting an error response
-            value_type = self.get_value_type(reqresp, response_body_type)
-
-            try:
-                err_resp = self.parse_error_mesg(reqresp.text, value_type)
-            except OicCliError:
-                return reqresp.text
-            else:
-                return err_resp
-        else:
-            logger.error('Error response ({}): {}'.format(reqresp.status_code,
-                                                          reqresp.text))
-            raise HttpError("HTTP ERROR: %s [%s] on %s" % (
-                reqresp.text, reqresp.status_code, reqresp.url))
-
-    def service_request(self, url, method="GET", body=None,
-                        response_body_type="", http_args=None, client_info=None,
-                        **kwargs):
-        """
-        The method that sends the request and handles the response returned.
-        This assumes a synchronous request-response exchange.
-
-        :param url: The URL to which the request should be sent
-        :param method: Which HTTP method to use
-        :param body: A message body if any
-        :param response_body_type: The expected format of the body of the
-            return message
-        :param http_args: Arguments for the HTTP client
-        :param client_info: A py:class:`oiccli.client_info.ClientInfo` instance
-        :return: A cls or ErrorResponse instance or the HTTP response
-            instance if no response body was expected.
-        """
-
-        if http_args is None:
-            http_args = {}
-
-        logger.debug(REQUEST_INFO.format(url, method, body, http_args))
-
-        try:
-            resp = self.httplib(url, method, data=body, **http_args)
-        except Exception as err:
-            logger.error('Exception on request: {}'.format(err))
-            raise
-
-        if "keyjar" not in kwargs:
-            kwargs["keyjar"] = self.keyjar
-        if not response_body_type:
-            response_body_type = self.response_body_type
-
-        return self.parse_request_response(resp, client_info,
-                                           response_body_type, **kwargs)
+    # def service_request(self, url, method="GET", body=None,
+    #                     response_body_type="", http_args=None, client_info=None,
+    #                     **kwargs):
+    #     """
+    #     The method that sends the request and handles the response returned.
+    #     This assumes a synchronous request-response exchange.
+    #
+    #     :param url: The URL to which the request should be sent
+    #     :param method: Which HTTP method to use
+    #     :param body: A message body if any
+    #     :param response_body_type: The expected format of the body of the
+    #         return message
+    #     :param http_args: Arguments for the HTTP client
+    #     :param client_info: A py:class:`oiccli.client_info.ClientInfo` instance
+    #     :return: A cls or ErrorResponse instance or the HTTP response
+    #         instance if no response body was expected.
+    #     """
+    #
+    #     if http_args is None:
+    #         http_args = {}
+    #
+    #     logger.debug(REQUEST_INFO.format(url, method, body, http_args))
+    #
+    #     try:
+    #         resp = self.httplib(url, method, data=body, **http_args)
+    #     except Exception as err:
+    #         logger.error('Exception on request: {}'.format(err))
+    #         raise
+    #
+    #     if "keyjar" not in kwargs:
+    #         kwargs["keyjar"] = self.keyjar
+    #     if not response_body_type:
+    #         response_body_type = self.response_body_type
+    #
+    #     return self.parse_request_response(resp, client_info,
+    #                                        response_body_type, **kwargs)
 
     def get_conf_attr(self, attr, default=None):
         if attr in self.conf:

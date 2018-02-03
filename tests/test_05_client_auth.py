@@ -8,6 +8,11 @@ from cryptojwt.jwk import SYMKey
 from cryptojwt.jwk import rsa_load
 from cryptojwt.jws import JWS
 from cryptojwt.jwt import JWT
+from oiccli.client_info import ClientInfo
+
+from oiccli.oic import DEFAULT_SERVICES, service
+
+from oiccli.service import build_services
 
 from oiccli import JWT_BEARER
 from oiccli.client_auth import assertion_jwt
@@ -19,7 +24,6 @@ from oiccli.client_auth import ClientSecretJWT
 from oiccli.client_auth import ClientSecretPost
 from oiccli.client_auth import PrivateKeyJWT
 from oiccli.client_auth import valid_client_info
-from oiccli.oauth2 import Client
 from oicmsg.key_bundle import KeyBundle
 from oicmsg.oauth2 import AccessTokenRequest
 from oicmsg.oauth2 import AccessTokenResponse
@@ -41,43 +45,48 @@ def _eq(l1, l2):
 
 
 @pytest.fixture
-def client():
-    client = Client(client_authn_method=CLIENT_AUTHN_METHOD,
-                    config=CLIENT_CONF)
-    _sdb = client.client_info.state_db
+def services():
+    return build_services(DEFAULT_SERVICES, service.factory, None, None,
+                          client_authn_method=CLIENT_AUTHN_METHOD)
+
+
+@pytest.fixture
+def client_info():
+    ci = ClientInfo(keyjar=None, config=CLIENT_CONF)
+    _sdb = ci.state_db
     _sdb['ABCDE'] = {'code': 'access_code'}
-    client.client_info.client_secret = "boarding pass"
-    return client
+    ci.client_secret = "boarding pass"
+    return ci
 
 
 class TestClientSecretBasic(object):
-    def test_construct(self, client):
-        request = client.service['accesstoken'].construct(client.client_info,
-                                                      redirect_uri="http://example.com",
-                                                      state='ABCDE')
+    def test_construct(self, services, client_info):
+        request = services['accesstoken'].construct(
+            client_info, redirect_uri="http://example.com", state='ABCDE')
 
         csb = ClientSecretBasic()
-        http_args = csb.construct(request, cli_info=client.client_info)
+        http_args = csb.construct(request, cli_info=client_info)
 
         assert http_args == {"headers": {"Authorization": "Basic {}".format(
             base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
                 "utf-8"))}}
 
-    def test_does_not_remove_padding(self, client):
-        request = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
+    def test_does_not_remove_padding(self, client_info):
+        request = AccessTokenRequest(code="foo",
+                                     redirect_uri="http://example.com")
 
         csb = ClientSecretBasic()
-        http_args = csb.construct(request, cli_info=client.client_info, user="ab",
+        http_args = csb.construct(request, cli_info=client_info, user="ab",
                                   password="c")
 
         assert http_args["headers"]["Authorization"].endswith("==")
 
-    def test_construct_cc(self, client):
+    def test_construct_cc(self, client_info):
         """CC == Client Credentials, the 4th OAuth2 flow"""
         request = CCAccessTokenRequest(grant_type="client_credentials")
 
         csb = ClientSecretBasic()
-        http_args = csb.construct(request, cli_info=client.client_info,
+        http_args = csb.construct(request, cli_info=client_info,
                                   user="service1", password="secret")
 
         assert http_args["headers"]["Authorization"].startswith('Basic ')
@@ -110,46 +119,46 @@ class TestBearerHeader(object):
         assert _eq(http_args["headers"].keys(), ["Authorization", "x-foo"])
         assert http_args["headers"]["Authorization"] == "Bearer Sesame"
 
-    def test_construct_with_resource_request(self, client):
+    def test_construct_with_resource_request(self, client_info):
         bh = BearerHeader()
         request = ResourceRequest(access_token="Sesame")
 
-        http_args = bh.construct(request, cli_info=client.client_info)
+        http_args = bh.construct(request, cli_info=client_info)
 
         assert "access_token" not in request
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
-    def test_construct_with_token(self, client):
+    def test_construct_with_token(self, client_info, services):
         # Add a state and bind a code to it
-        client.client_info.state_db['AAAA'] = {}
+        client_info.state_db['AAAA'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
-        client.service['authorization'].parse_response(
-            resp1.to_urlencoded(), client.client_info, "urlencoded")
+        services['authorization'].parse_response(
+            resp1.to_urlencoded(), client_info, "urlencoded")
 
         # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="AAAA")
-        client.service['accesstoken'].parse_response(
-            resp2.to_urlencoded(), client.client_info, "urlencoded")
+        services['accesstoken'].parse_response(
+            resp2.to_urlencoded(), client_info, "urlencoded")
 
         # and finally use the access token, bound to a state, to
         # construct the authorization header
         http_args = BearerHeader().construct(
-            ResourceRequest(), cli_info=client.client_info, state="AAAA")
+            ResourceRequest(), cli_info=client_info, state="AAAA")
         assert http_args == {"headers": {"Authorization": "Bearer token1"}}
 
 
 class TestBearerBody(object):
-    def test_construct(self, client):
+    def test_construct(self, client_info):
         request = ResourceRequest(access_token="Sesame")
-        http_args = BearerBody().construct(request, cli_info=client.client_info)
+        http_args = BearerBody().construct(request, cli_info=client_info)
 
         assert request["access_token"] == "Sesame"
         assert http_args is None
 
-    def test_construct_with_state(self, client):
-        _sdb = client.client_info.state_db
+    def test_construct_with_state(self, client_info):
+        _sdb = client_info.state_db
         _sdb['FFFFF'] = {}
         resp = AuthorizationResponse(code="code", state="FFFFF")
         _sdb.add_response(resp)
@@ -162,42 +171,42 @@ class TestBearerBody(object):
 
         request = ResourceRequest()
         http_args = BearerBody().construct(
-            request, cli_info=client.client_info, state="FFFFF")
+            request, cli_info=client_info, state="FFFFF")
         assert request["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
-    def test_construct_with_request(self, client):
-        client.client_info.state_db['EEEE'] = {}
+    def test_construct_with_request(self, client_info, services):
+        client_info.state_db['EEEE'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
-        client.service['authorization'].parse_response(
-            resp1.to_urlencoded(), client.client_info, "urlencoded")
+        services['authorization'].parse_response(
+            resp1.to_urlencoded(), client_info, "urlencoded")
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="EEEE")
-        client.service['accesstoken'].parse_response(
-            resp2.to_urlencoded(), client.client_info, "urlencoded")
+        services['accesstoken'].parse_response(
+            resp2.to_urlencoded(), client_info, "urlencoded")
 
         request = ResourceRequest()
-        BearerBody().construct(request, cli_info=client.client_info, state="EEEE")
+        BearerBody().construct(request, cli_info=client_info, state="EEEE")
 
         assert "access_token" in request
         assert request["access_token"] == "token1"
 
 
 class TestClientSecretPost(object):
-    def test_construct(self, client):
-        request = client.service['accesstoken'].construct(
-            cli_info=client.client_info, redirect_uri="http://example.com",
-            state='ABCDE')
+    def test_construct(self, client_info, services):
+        request = services['accesstoken'].construct(
+            client_info, redirect_uri="http://example.com", state='ABCDE')
         csp = ClientSecretPost()
-        http_args = csp.construct(request, cli_info=client.client_info)
+        http_args = csp.construct(request, cli_info=client_info)
 
         assert request["client_id"] == "A"
         assert request["client_secret"] == "boarding pass"
         assert http_args is None
 
-        request = AccessTokenRequest(code="foo", redirect_uri="http://example.com")
-        http_args = csp.construct(request, cli_info=client.client_info,
+        request = AccessTokenRequest(code="foo",
+                                     redirect_uri="http://example.com")
+        http_args = csp.construct(request, cli_info=client_info,
                                   http_args={"client_secret": "another"})
         assert request["client_id"] == "A"
         assert request["client_secret"] == "another"
@@ -205,20 +214,20 @@ class TestClientSecretPost(object):
 
 
 class TestPrivateKeyJWT(object):
-    def test_construct(self, client):
+    def test_construct(self, client_info, services):
         _key = rsa_load(
             os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
                             {"key": _key, "kty": "RSA", "use": "sig"}])
-        client.client_info.keyjar[""] = kc_rsa
-        client.client_info.provider_info = {
+        client_info.keyjar[""] = kc_rsa
+        client_info.provider_info = {
             'issuer': 'https://example.com/',
             'token_endpoint': "https://example.com/token"}
-        client.service['accesstoken'].endpoint = "https://example.com/token"
+        services['accesstoken'].endpoint = "https://example.com/token"
 
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
-        http_args = pkj.construct(request, cli_info=client.client_info,
+        http_args = pkj.construct(request, cli_info=client_info,
                                   algorithm="RS256",
                                   authn_endpoint='token')
         assert http_args == {}
@@ -228,20 +237,21 @@ class TestPrivateKeyJWT(object):
             [{"key": _key.public_key(), "kty": "RSA", "use": "ver"},
              {"key": _key.public_key(), "kty": "RSA", "use": "sig"}])
 
-        jso = JWT(rec_keys={client.client_id: pub_kb.get('RSA')}).unpack(cas)
+        jso = JWT(rec_keys={client_info.client_id: pub_kb.get('RSA')}).unpack(
+            cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        #assert _jwt.headers == {'alg': 'RS256'}
+        # assert _jwt.headers == {'alg': 'RS256'}
         assert jso['aud'] == [
-            client.client_info.provider_info['token_endpoint']]
+            client_info.provider_info['token_endpoint']]
 
-    def test_construct_client_assertion(self, client):
+    def test_construct_client_assertion(self, client_info):
         _key = rsa_load(os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
                             {"key": _key, "kty": "RSA", "use": "sig"}])
 
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
-        _ca = assertion_jwt(client.client_id, kc_rsa.get('RSA'),
+        _ca = assertion_jwt(client_info.client_id, kc_rsa.get('RSA'),
                             "https://example.com/token", 'RS256')
         http_args = pkj.construct(request, client_assertion=_ca)
         assert http_args == {}
@@ -250,8 +260,8 @@ class TestPrivateKeyJWT(object):
 
 
 class TestClientSecretJWT_TE(object):
-    def test_client_secret_jwt(self, client):
-        _ci = client.client_info
+    def test_client_secret_jwt(self, client_info):
+        _ci = client_info
         _ci.token_endpoint = "https://example.com/token"
         _ci.provider_info = {'issuer': 'https://example.com/',
                              'token_endpoint': "https://example.com/token"}
@@ -259,14 +269,14 @@ class TestClientSecretJWT_TE(object):
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, cli_info=client.client_info, algorithm="HS256",
+        csj.construct(request, cli_info=client_info, algorithm="HS256",
                       authn_endpoint='token')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]
 
-        _skey =  [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
-        jso = JWT(rec_keys={client.client_id: _skey}).unpack(cas)
+        _skey = [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
+        jso = JWT(rec_keys={client_info.client_id: _skey}).unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "exp", "iat", 'jti'])
 
         _rj = JWS()
@@ -277,8 +287,8 @@ class TestClientSecretJWT_TE(object):
 
 
 class TestClientSecretJWT_UI(object):
-    def test_client_secret_jwt(self, client):
-        _ci = client.client_info
+    def test_client_secret_jwt(self, client_info):
+        _ci = client_info
         _ci.token_endpoint = "https://example.com/token"
         _ci.provider_info = {'issuer': 'https://example.com/',
                              'token_endpoint': "https://example.com/token"}
@@ -286,14 +296,14 @@ class TestClientSecretJWT_UI(object):
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, cli_info=client.client_info, algorithm="HS256",
+        csj.construct(request, cli_info=client_info, algorithm="HS256",
                       authn_endpoint='userinfo')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]
 
-        _skey =  [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
-        jso = JWT(rec_keys={client.client_id: _skey}).unpack(cas)
+        _skey = [SYMKey(k=b64e(as_bytes(_ci.client_secret)), use='sig')]
+        jso = JWT(rec_keys={client_info.client_id: _skey}).unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
 
         _rj = JWS()
@@ -305,20 +315,20 @@ class TestClientSecretJWT_UI(object):
 
 
 class TestValidClientInfo(object):
-    def test_valid_client_info(self):
+    def test_valid_client_info(self, client_info):
         _now = 123456  # At some time
         # Expiration time missing or 0, client_secret never expires
-        assert valid_client_info({}, _now)
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret': 'secret'}, _now)
-        assert valid_client_info({'client_secret_expires_at': 0}, _now)
+        # client_info.registration_expires
+        assert valid_client_info(client_info, _now)
+        client_info.registration_expires = 0
+        assert valid_client_info(client_info, _now)
         # Expired secret
-        assert valid_client_info({'client_secret_expires_at': 1},
-                                 _now) is not True
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret_expires_at': 123455},
-            _now) is not True
+        client_info.registration_expires = 1
+        assert valid_client_info(client_info, _now) is not True
+
+        client_info.registration_expires = 123455
+        assert valid_client_info(client_info, _now) is not True
+
         # Valid secret
-        assert valid_client_info({'client_secret_expires_at': 123460}, _now)
-        assert valid_client_info(
-            {'client_id': 'test', 'client_secret_expires_at': 123460}, _now)
+        client_info.registration_expires = 123460
+        assert valid_client_info({'registration_expires': 123460}, _now)

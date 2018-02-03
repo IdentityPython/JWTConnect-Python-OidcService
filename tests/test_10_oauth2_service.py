@@ -1,17 +1,13 @@
 import pytest
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
 
-from oiccli.exception import WrongContentType
-from oiccli.oauth2 import ClientInfo
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.oauth2 import ASConfigurationResponse
-from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import AuthorizationResponse
-from oicmsg.oauth2 import ErrorResponse
-from oicmsg.oauth2 import Message
+from oiccli.client_auth import CLIENT_AUTHN_METHOD
+from oiccli.client_info import ClientInfo
 from oiccli.oauth2.service import factory
 from oiccli.service import Service
+
+from oicmsg.oauth2 import AccessTokenRequest
+from oicmsg.oauth2 import AuthorizationRequest
+from oicmsg.oauth2 import Message
 
 
 class Response(object):
@@ -72,46 +68,6 @@ class TestAuthorization(object):
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
         assert msg == _info['cis']
-
-    def test_parse_request_response_urlencoded(self):
-        req_resp = Response(
-            200,
-            AuthorizationResponse(code='access_code',
-                                  state='state').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info)
-        assert isinstance(resp, AuthorizationResponse)
-        assert set(resp.keys()) == {'code', 'state'}
-
-    def test_parse_request_response_200_error(self):
-        req_resp = Response(
-            200, ErrorResponse(error='invalid_request').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info)
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_400_error(self):
-        req_resp = Response(
-            400, ErrorResponse(error='invalid_request').to_urlencoded())
-        resp = self.service.parse_request_response(req_resp, self.cli_info)
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_json(self):
-        req_resp = Response(200, AuthorizationResponse(code='access_code',
-                                                       state='state').to_json(),
-                            headers={'content-type': 'application/json'})
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json')
-        assert isinstance(resp, AuthorizationResponse)
-        assert set(resp.keys()) == {'code', 'state'}
-
-    def test_parse_request_response_wrong_content_type(self):
-        req_resp = Response(200, AuthorizationResponse(code='access_code',
-                                                       state='state').to_json(),
-                            headers={'content-type': "text/plain"})
-        with pytest.raises(WrongContentType):
-            resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                       response_body_type='json')
 
 
 class TestAccessTokenRequest(object):
@@ -181,47 +137,6 @@ class TestAccessTokenRequest(object):
             self.service.get_urlinfo(_info['body']))
         assert msg == _info['cis']
 
-    def test_parse_request_response_urlencoded(self):
-        req_resp = Response(
-            200,
-            AccessTokenResponse(access_token='access_token',
-                                state='state',
-                                token_type='Bearer').to_json(),
-            headers={'content-type': "application/json"}
-        )
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json')
-        assert isinstance(resp, AccessTokenResponse)
-        assert set(resp.keys()) == {'access_token', 'token_type', 'state'}
-
-    def test_parse_request_response_200_error(self):
-        req_resp = Response(
-            200, ErrorResponse(error='invalid_request').to_json(),
-            headers={'content-type': "application/json"}
-        )
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json')
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_400_error(self):
-        req_resp = Response(
-            400, ErrorResponse(error='invalid_request').to_json(),
-            headers={'content-type': "application/json"}
-        )
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json')
-        assert isinstance(resp, ErrorResponse)
-        assert set(resp.keys()) == {'error'}
-
-    def test_parse_request_response_wrong_content_type(self):
-        req_resp = Response(200, AccessTokenResponse(code='access_code',
-                                                     state='state').to_json(),
-                            headers={'content-type': "text/plain"})
-        with pytest.raises(WrongContentType):
-            resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                       response_body_type='json')
-
 
 class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
@@ -243,21 +158,6 @@ class TestProviderInfo(object):
         assert set(_info.keys()) == {'uri'}
         assert _info['uri'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
-
-    def test_parse_request_response(self):
-        req_resp = Response(
-            200,
-            ASConfigurationResponse(
-                issuer=self._iss, response_types_supported=['code'],
-                grant_types_supported=['Bearer']
-            ).to_json(),
-            headers={'content-type': "application/json"}
-        )
-        resp = self.service.parse_request_response(req_resp, self.cli_info,
-                                                   response_body_type='json')
-        assert isinstance(resp, ASConfigurationResponse)
-        assert set(resp.keys()) == {'issuer', 'response_types_supported',
-                                    'version', 'grant_types_supported'}
 
 
 class TestRefreshAccessTokenRequest(object):

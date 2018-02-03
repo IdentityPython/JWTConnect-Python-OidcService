@@ -28,26 +28,10 @@ oiccli\.client\_info module
     :undoc-members:
     :show-inheritance:
 
-oiccli\.cookie module
----------------------
-
-.. automodule:: oiccli.cookie
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 oiccli\.exception module
 ------------------------
 
 .. automodule:: oiccli.exception
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-oiccli\.http module
--------------------------
-
-.. automodule:: oiccli.http
     :members:
     :undoc-members:
     :show-inheritance:
