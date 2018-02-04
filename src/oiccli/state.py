@@ -54,7 +54,7 @@ class State(object):
                 self._db = {}
         self.lifetime = lifetime
 
-    def create_state(self, receiver, request):
+    def create_state(self, receiver, request, state=''):
         """
         Construct a state value. In this class it's just a random string.
         Also store information about the request using the state value
@@ -63,9 +63,14 @@ class State(object):
         :param receiver: Who is the receiver of a request with this
             state value.
         :param request: The request
+        :param state: state value that someone else has created
         :return: a random string
         """
-        _state = rndstr(24)
+        if state:
+            _state = state
+        else:
+            _state = rndstr(24)
+
         _now = utc_time_sans_frac()
 
         # gather the information I want to store

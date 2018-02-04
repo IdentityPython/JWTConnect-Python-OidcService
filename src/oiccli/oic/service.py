@@ -129,7 +129,10 @@ class Authorization(service.Authorization):
             if response_mod == 'form_post':
                 request_args['response_mode'] = response_mod
 
-        if 'state' not in request_args:
+        try:
+            cli_info.state_db.create_state(
+                cli_info.issuer, request_args, request_args['state'])
+        except KeyError:
             request_args['state'] = cli_info.state_db.create_state(
                 cli_info.issuer, request_args)
 
@@ -139,10 +142,13 @@ class Authorization(service.Authorization):
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
             if 'id_token' in _response_type or 'code' in _response_type:
-                if 'nonce' not in req:
+                try:
+                    _nonce = req['nonce']
+                except KeyError:
                     _nonce = rndstr(32)
                     req['nonce'] = _nonce
-                    cli_info.state_db.bind_nonce_to_state(_nonce, req['state'])
+
+                cli_info.state_db.bind_nonce_to_state(_nonce, req['state'])
 
         try:
             _request_method = kwargs['request_method']
@@ -441,13 +447,15 @@ class Registration(Service):
             except AttributeError:
                 raise MissingRequiredAttribute("redirect_uris", request_args)
 
-        try:
-            if cli_info.provider_info[
-                'require_request_uri_registration'] is True:
-                request_args['request_uris'] = cli_info.generate_request_uris(
-                    cli_info.requests_dir)
-        except KeyError:
-            pass
+        if cli_info.requests_dir:
+            try:
+                if cli_info.provider_info[
+                        'require_request_uri_registration'] is True:
+                    request_args[
+                        'request_uris'] = cli_info.generate_request_uris(
+                            cli_info.requests_dir)
+            except KeyError:
+                pass
 
         return request_args, {}
 
@@ -504,8 +512,7 @@ class UserInfo(Service):
         return request_args, {}
 
     def oic_post_parse_response(self, resp, client_info, **kwargs):
-        resp = self.unpack_aggregated_claims(resp, client_info)
-        return self.fetch_distributed_claims(resp, client_info)
+        return self.unpack_aggregated_claims(resp, client_info)
 
     def _verify_sub(self, resp, client_info, **kwargs):
         try:
@@ -535,44 +542,6 @@ class UserInfo(Service):
 
                     for key in claims:
                         userinfo[key] = aggregated_claims[key]
-
-        return userinfo
-
-    def fetch_distributed_claims(self, userinfo, cli_info, callback=None):
-        try:
-            _csrc = userinfo["_claim_sources"]
-        except KeyError:
-            pass
-        else:
-            for csrc, spec in _csrc.items():
-                if "endpoint" in spec:
-                    if "access_token" in spec:
-                        _uinfo = self.service_request(
-                            spec["endpoint"], method='GET',
-                            token=spec["access_token"], client_info=cli_info)
-                    else:
-                        if callback:
-                            _uinfo = self.service_request(
-                                spec["endpoint"],
-                                method='GET',
-                                token=callback(spec['endpoint']),
-                                client_info=cli_info)
-                        else:
-                            _uinfo = self.service_request(
-                                spec["endpoint"],
-                                method='GET',
-                                client_info=cli_info)
-
-                    claims = [value for value, src in
-                              userinfo["_claim_names"].items() if src == csrc]
-
-                    if set(claims) != set(list(_uinfo.keys())):
-                        logger.warning(
-                            "Claims from claim source doesn't match what's in "
-                            "the userinfo")
-
-                    for key, vals in _uinfo.items():
-                        userinfo[key] = vals
 
         return userinfo
 

@@ -9,10 +9,6 @@ class OicCliError(Exception):
         self.content_type = content_type
 
 
-class HttpError(OicCliError):
-    pass
-
-
 class MissingRequiredAttribute(OicCliError):
     pass
 

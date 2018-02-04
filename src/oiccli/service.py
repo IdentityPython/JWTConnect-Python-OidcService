@@ -1,6 +1,6 @@
 import logging
+from urllib.parse import urlparse
 
-from future.backports.urllib.parse import urlparse
 from oiccli.exception import MissingEndpoint
 from oiccli.exception import OicCliError
 from oiccli.exception import ResponseError
@@ -459,7 +459,7 @@ class Service(object):
                 info = fragment
         return info
 
-    def parse_response(self, info, client_info, sformat="json", state="",
+    def parse_response(self, info, client_info, sformat="", state="",
                        **kwargs):
         """
         This the start of a pipeline that will:
@@ -479,6 +479,9 @@ class Service(object):
         :param kwargs: Extra key word arguments
         :return: The parsed and to some extend verified response
         """
+
+        if not sformat:
+            sformat = self.response_body_type
 
         logger.debug('response format: {}'.format(sformat))
 
@@ -605,43 +608,6 @@ class Service(object):
             raise
         else:
             return err
-
-    # def service_request(self, url, method="GET", body=None,
-    #                     response_body_type="", http_args=None, client_info=None,
-    #                     **kwargs):
-    #     """
-    #     The method that sends the request and handles the response returned.
-    #     This assumes a synchronous request-response exchange.
-    #
-    #     :param url: The URL to which the request should be sent
-    #     :param method: Which HTTP method to use
-    #     :param body: A message body if any
-    #     :param response_body_type: The expected format of the body of the
-    #         return message
-    #     :param http_args: Arguments for the HTTP client
-    #     :param client_info: A py:class:`oiccli.client_info.ClientInfo` instance
-    #     :return: A cls or ErrorResponse instance or the HTTP response
-    #         instance if no response body was expected.
-    #     """
-    #
-    #     if http_args is None:
-    #         http_args = {}
-    #
-    #     logger.debug(REQUEST_INFO.format(url, method, body, http_args))
-    #
-    #     try:
-    #         resp = self.httplib(url, method, data=body, **http_args)
-    #     except Exception as err:
-    #         logger.error('Exception on request: {}'.format(err))
-    #         raise
-    #
-    #     if "keyjar" not in kwargs:
-    #         kwargs["keyjar"] = self.keyjar
-    #     if not response_body_type:
-    #         response_body_type = self.response_body_type
-    #
-    #     return self.parse_request_response(resp, client_info,
-    #                                        response_body_type, **kwargs)
 
     def get_conf_attr(self, attr, default=None):
         if attr in self.conf:
