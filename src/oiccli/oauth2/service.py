@@ -108,6 +108,8 @@ class AccessToken(Service):
     request = 'accesstoken'
     default_authn_method = 'client_secret_basic'
     http_method = 'POST'
+    body_type = 'urlencoded'
+    response_body_type = 'json'
 
     def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
                  conf=None):

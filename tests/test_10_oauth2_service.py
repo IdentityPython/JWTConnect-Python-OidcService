@@ -45,29 +45,29 @@ class TestAuthorization(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.request_info(self.cli_info, request_args=req_args,
                                           state='state')
-        assert set(_info.keys()) == {'uri', 'cis'}
-        assert _info['cis'].to_dict() == {
+        assert set(_info.keys()) == {'uri', 'request'}
+        assert _info['request'] == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
             'response_type': 'code', 'state': 'state'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.do_request_init(self.cli_info,
                                              request_args=req_args)
-        assert set(_info.keys()) == {'cis', 'http_args', 'uri', 'algs'}
-        assert _info['cis'].to_dict() == {
+        assert set(_info.keys()) == {'request', 'http_args', 'uri', 'algs'}
+        assert _info['request'] == {
             'client_id': 'client_id',
             'redirect_uri': 'https://example.com/cli/authz_cb',
             'response_type': 'code', 'state': 'state'}
         assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
 
 class TestAccessTokenRequest(object):
@@ -106,15 +106,15 @@ class TestAccessTokenRequest(object):
         _info = self.service.request_info(self.cli_info, request_args=req_args,
                                           state='state',
                                           authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'kwargs', 'body', 'uri', 'cis', 'h_args'}
+        assert set(_info.keys()) == {'kwargs', 'body', 'uri', 'request', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
-        assert _info['cis'].to_dict() == {
+        assert _info['request'] == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
         assert 'client_secret' not in msg
         assert 'Authorization' in _info['h_args']['headers']
 
@@ -126,16 +126,16 @@ class TestAccessTokenRequest(object):
         _info = self.service.do_request_init(self.cli_info,
                                              request_args=req_args,
                                              state='state')
-        assert set(_info.keys()) == {'body', 'cis', 'uri', 'http_args',
+        assert set(_info.keys()) == {'body', 'request', 'uri', 'http_args',
                                      'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
-        assert _info['cis'].to_dict() == {
+        assert _info['request'] == {
             'client_id': 'client_id',
             'code': 'access_code', 'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
 
 class TestProviderInfo(object):
@@ -184,7 +184,7 @@ class TestRefreshAccessTokenRequest(object):
 
     def test_request_info(self):
         _info = self.service.request_info(self.cli_info, state='abcdef')
-        assert set(_info.keys()) == {'uri', 'body', 'cis', 'kwargs'}
+        assert set(_info.keys()) == {'uri', 'body', 'request', 'kwargs'}
 
 
 def test_access_token_srv_conf():

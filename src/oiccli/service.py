@@ -305,8 +305,8 @@ class Service(object):
         # This is where the message gets assigned to its proper place
         info = get_or_post(uri, method, request, **kwargs)
 
-        # this is just for logging purposes
-        info['cis'] = request
+        # transport independent version of the request
+        info['request'] = request.to_dict()
 
         # If there are HTTP header arguments add them to *info* using
         # the key *h_args*
@@ -360,7 +360,7 @@ class Service(object):
             completely conform to the standard.
         :param kwargs: Extra keyword arguments
         :return: A dictionary with the keys 'uri' and possibly 'body', 'kwargs',
-            'cis' and 'ht_args'.
+            'request' and 'ht_args'.
         """
         if not method:
             method = self.http_method

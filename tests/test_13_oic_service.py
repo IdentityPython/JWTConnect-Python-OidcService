@@ -86,34 +86,34 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'cis'}
+        assert set(_info.keys()) == {'uri', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'cis', 'http_args', 'uri', 'algs'}
+        assert set(_info.keys()) == {'request', 'http_args', 'uri', 'algs'}
         assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_init_request_method(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          request_method='value')
-        assert set(_info.keys()) == {'cis', 'http_args', 'uri', 'algs'}
-        assert set(_info['cis'].keys()) == {
+        assert set(_info.keys()) == {'request', 'http_args', 'uri', 'algs'}
+        assert set(_info['request'].keys()) == {
             'client_id', 'redirect_uri', 'response_type', 'state', 'scope',
             'nonce'}
         assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
             self.req.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_param(self):
         req_args = {'response_type': 'code', 'state': 'state'}
@@ -155,15 +155,15 @@ class TestAccessTokenRequest(object):
         _info = self.req.request_info(self.cli_info, request_args=req_args,
                                       state='state',
                                       authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'uri', 'cis', 'kwargs', 'h_args'}
+        assert set(_info.keys()) == {'body', 'uri', 'request', 'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
-        assert _info['cis'].to_dict() == {
+        assert _info['request'] == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         msg = AccessTokenRequest().from_urlencoded(
             self.req.get_urlinfo(_info['body']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -172,16 +172,16 @@ class TestAccessTokenRequest(object):
 
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          state='state')
-        assert set(_info.keys()) == {'body', 'cis', 'uri', 'http_args',
+        assert set(_info.keys()) == {'body', 'request', 'uri', 'http_args',
                                      'kwargs', 'h_args'}
         assert _info['uri'] == 'https://example.com/authorize'
-        assert _info['cis'].to_dict() == {
+        assert _info['request'] == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         msg = AccessTokenRequest().from_urlencoded(
             self.req.get_urlinfo(_info['body']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_id_token_nonce_match(self):
         self.cli_info.state_db.bind_nonce_to_state('nonce', 'state')

@@ -1,7 +1,6 @@
 import pytest
-from oiccli.exception import WrongContentType
+
 from oiccli.client_info import ClientInfo
-from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
 from oicmsg.oauth2 import SINGLE_OPTIONAL_INT
 from oicmsg.oauth2 import SINGLE_OPTIONAL_STRING
@@ -52,25 +51,25 @@ class TestDummyService(object):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'cis'}
-        assert _info['cis'].to_dict() == {'foo': 'bar',
-                                          'req_str': 'some string'}
+        assert set(_info.keys()) == {'uri', 'request'}
+        assert _info['request'] == {'foo': 'bar',
+                                    'req_str': 'some string'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.do_request_init(self.cli_info,
                                              request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'cis', 'http_args'}
-        assert _info['cis'].to_dict() == {'foo': 'bar',
-                                          'req_str': 'some string'}
+        assert set(_info.keys()) == {'uri', 'request', 'http_args'}
+        assert _info['request'] == {'foo': 'bar',
+                                    'req_str': 'some string'}
         assert _info['http_args'] == {}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['uri']))
-        assert msg == _info['cis']
+        assert msg.to_dict() == _info['request']
 
 
 class TestRequest(object):
