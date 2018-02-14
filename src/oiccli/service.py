@@ -158,6 +158,15 @@ class Service(object):
 
         return ar_args
 
+    def method_args(self, context, **kwargs):
+        try:
+            _args = self.conf[context].copy()
+        except KeyError:
+            _args = kwargs
+        else:
+            _args.update(kwargs)
+        return _args
+
     def do_pre_construct(self, client_info, request_args, **kwargs):
         """
         Will run the pre_construct methods one by one in the order given.
@@ -169,12 +178,8 @@ class Service(object):
         :return: A tuple of request_args and post_args. post_args are to be
             used by the post_construct methods.
         """
-        _args = kwargs.copy()
-        try:
-            _args.update(self.conf['pre_construct'])
-        except KeyError:
-            pass
 
+        _args = self.method_args('pre_construct', **kwargs)
         post_args = {}
         for meth in self.pre_construct:
             request_args, _post_args = meth(client_info, request_args, **_args)
@@ -192,11 +197,7 @@ class Service(object):
         :param post_args: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
         """
-        _args = kwargs.copy()
-        try:
-            _args.update(self.conf['post_construct'])
-        except KeyError:
-            pass
+        _args = self.method_args('post_construct', **kwargs)
 
         for meth in self.post_construct:
             request_args = meth(client_info, request_args, **_args)
@@ -213,11 +214,7 @@ class Service(object):
         :param state: state value
         :param kwargs: Extra key word arguments
         """
-        _args = kwargs.copy()
-        try:
-            _args.update(self.conf['post_parse_response'])
-        except KeyError:
-            pass
+        _args = self.method_args('post_parse_response', **kwargs)
 
         for meth in self.post_parse_response:
             meth(resp, client_info, state=state, **_args)
