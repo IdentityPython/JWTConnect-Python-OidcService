@@ -299,6 +299,7 @@ parse_request_response
 
 Deal with a self.httplib response. The response are expected to
 follow a special pattern, having the attributes:
+
     - headers (list of tuples with headers attributes and their values)
     - status_code (integer)
     - text (The text version of the response)
@@ -370,7 +371,7 @@ And lastly the RP will ask for an access token and after that information
 about the user.
 
 Initial setup
--------------
+=============
 
 We need a couple of things initiated before we start.
 The first one is initiating the services that the RP is going to use.
@@ -394,7 +395,7 @@ and to initiate these we need to run::
     service = build_services(service_spec, factory, None, KEYJAR,
                          client_authn_method=CLIENT_AUTHN_METHOD)
 
-KEYJAR contains the RP's signing and encryting keys. It's an
+**KEYJAR** contains the RP's signing and encryting keys. It's an
 :py:class:`oicmsg.keyjar.KeyJar` instance
 
 **service** is a dictionary with services identifiers as keys and
@@ -431,7 +432,7 @@ That's all we have to do when it comes to setup so now on to the actual
 conversation.
 
 Webfinger
----------
+=========
 
 We will use WebFinger (RFC7033) to find out where we can learn more about the
 OP. What we have to start with is an user identifier provided by the user.
@@ -478,7 +479,7 @@ We now has this::
 And that is all we need to fetch the provider info
 
 Provider info discovery
------------------------
+=======================
 
 We use the same process as with webfinger but with another service instance::
 
@@ -487,6 +488,13 @@ We use the same process as with webfinger but with another service instance::
 *info* will now contain::
 
     {'uri': 'https://example.com/.well-known/openid-configuration'}
+
+And this is the first example of *magic* that you will see.
+
+*do_request_init knows how to get the OpenID Connect providers discovery URL
+from the client_info instance. Now, if you don't wanted to do webfinger because
+perhaps the other side did not provide that service. Then you would have to
+set *client_info.issuer* to the correct value.
 
 Doing HTTP GET on the provided URL should get us the provider info.
 It does and we get a JSON document that looks something like this::
@@ -576,36 +584,39 @@ It does and we get a JSON document that looks something like this::
     "end_session_endpoint": "https://example.com/end_session"}
 
 Quite a lot of information as you can see.
-We feed this information in *parse_response* and let is does is business::
+We feed this information into *parse_response* and let it do its business::
 
     resp = service['provider_info'].parse_response(json_document,
                                                    client_info)
 
-*json_document* contains the JSON document in the response.
+*json_document* contains the JSON document from the HTTP response.
 *parse_response* will parse and verify the response. One such verification is
-to check that the value provided on **issuer** is the same as the URL used
+to check that the value provided as **issuer** is the same as the URL used
 to fetch the information without the '.well-known' part. In our case the
 exact value that the webfinger query produced.
 
 As with the *webfinger* service this service also adds things to **client_info**.
-So we now have::
+So we now for instance have::
 
     client_info.provider_info['issuer']: https://example.com
     client_info.provider_info['authorization_endpoint']: https://example.com/authorization
 
-and so on.
+
+As you can guess from the above the whole response from the OP was stored in
+the client_info instance. Such that it is easily accessible in the future.
+
 Now we know what we need to know to register the RP with the OP.
 If the OP had not provided a 'registration_endpoint' it would not have
 supported dynamic client registration but this one has so it does.
 
 Client registration
--------------------
+===================
 
 By now you should recognize the pattern::
 
     info = service['registration'].do_request_init(client_info)
 
-Now info contains 3 parts:
+Now *info* contains 3 parts:
 
     uri
         The URL to which the HTTP request should be sent
@@ -614,7 +625,7 @@ Now info contains 3 parts:
     http_args:
         HTTP arguments to be used with the request
 
-and we have::
+and we got::
 
     uri: https://example.com/registration
     body: {
@@ -649,29 +660,29 @@ receive a response like this::
 Again a JSON document. This is the OP's response to the RP's registration
 request.
 
-We stuff the response into *json_document* and feed this it to
-*parse_response* and it will parse, verify and interpret the response::
+We stuff the response into *json_document* and feed it to
+*parse_response* which will parse, verify and interpret the response::
 
     response = service['registration'].parse_response(json_document,
                                                       client_info)
 
-The response will be stored in client_info. Most under the heading
-*registration_response* but some, more important, will be stored at an
-easier reachable place::
+The response will be stored in client_info as usual. Most under the heading
+*registration_response* but some, more important, will be stored at a
+directly reachable place::
 
     client_info.client_id: zls2qhN1jO6A
     client_info.client_secret: c8434f28cf9375d9a7f3b50dcfdf6a20d6e702e310066874f794817f
 
 By that we have finalized the dynamic discovery and registration now we can get
-down to doing the authentication/authorization bit
+down to doing the authentication/authorization bits.
 
 Authorization
--------------
+=============
 
 In the following example I'm using code flow since that allows me to show
 more of what the oiccli package can do.
 
-Like when I used the other service this one is no different::
+Like when I used the other services this one is no different::
 
     info = service['authorization'].do_request_init(client_info)
 
@@ -679,11 +690,15 @@ Like when I used the other service this one is no different::
 
     uri: https://example.com/authorization?state=Oh3w3gKlvoM2ehFqlxI3HIK5&nonce=UvudLKz287YByZdsY3AJoPAlEXQkJ0dK&response_type=code&client_id=zls2qhN1jO6A&scope=openid&redirect_uri=https%3A%2F%2Fexample.org%2Fauthz_cb
 
-Where did all the information come from ?
-Some of it like the authorization endpoint comes from the dynamic provider info
-discovery, some from the client registration (client_id).
-Some from the client configuration (response_type, scope and redirect_uri) and
-some dynamically created by the service instance (state and nonce).
+Where did all the information come from ?:
+
+    - the authorization endpoint comes from the dynamic provider info discovery,
+    - client_id from the client registration,
+    - response_type, scope and redirect_uri from the client configuration and
+    - state and nonce are dynamically created by the service instance.
+
+When this *service* instance creates a request it will also create a *session*
+instance in client_info keyed on the state value.
 
 I do HTTP GET on the provided URL and will eventually get redirected back to
 the RP with the response in the query part of the redirect URL.
@@ -697,9 +712,9 @@ service instance and hope for the best::
     _resp = service['authorization'].parse_response(query_part,
                                                     client_info)
 
-Now one thing that happened when the authorization request was constructed was
-that some information of that request got stored away with the *state* value
-as key. All in the client_info instance.
+Now as mentioned above one thing that happened when the authorization request
+was constructed was that some information of that request got stored away with
+the *state* value as key. All in the client_info instance.
 
 The response on the authorization query will be stored in the same place.
 To get the code I can now use::
@@ -710,18 +725,23 @@ State information will be use when we take the next step, which is to get
 an access token.
 
 Access token
-------------
+============
 
 When sending an access token request I have to use the correct *code* value.
-To get that *do_request_init* need to get state as an argument::
+To accomplish that *do_request_init* need to get state as an argument::
 
-    request_args = {'state': 'Oh3w3gKlvoM2ehFqlxI3HIK5',
-                    'redirect_uri': client_info.redirect_uris[0]}
+    _state = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
+    request_args = {
+        'state': _state,
+        'redirect_uri': client_info.state_db[_state]['redirect_uri']}
 
     info = service['accesstoken'].do_request_init(client_info,
                                                   request_args=request_args)
 
-This time info has these parts::
+The OIDC standard says that the *redirect_uri* used for the authorization request
+should be provided in the access token request so I need to add that too.
+
+This time *info* has these parts::
 
     uri: https://example.com/token
     body: grant_type=authorization_code&state=Oh3w3gKlvoM2ehFqlxI3HIK5&redirect_uri=https%3A%2F%2Fexample.org%2Fauthz_cb&code=Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01aQWJ1Y3Y1MWFfMTVXXzhEcll2a0lkd0Z2Qk9lOHYtTUZjRnRjUzhNc1FOdm9RMGJ5aXhNUUtYSkdldTItRnBFVFV5YkhIVE5Gbk1VY2x2YmRuQXhxTEFSV2d6Zi1IaHE3SklpdndGbzRHR2tfT0Rwck5RTW1TalRwRUg0SE5JSUJtSC1lZU5HTXRjdkZXWXUzT3VodF8tdFhtX2NURFNiRXVhX1pFTFk1SXZ6NWhvSEdyXzNQRXVfZU9uTS1GZnB1dnVkYmRZSkh4VDdPWENlQ240al9GSkdFa1I0Yz0%3D&client_id=zls2qhN1jO6A
@@ -747,8 +767,8 @@ We will deal with this in the now well know fashion::
     _resp = service['accesstoken'].parse_response(
         json_document, client_info, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
-Note that we need to provide the method with the state parameter so it will
-know where to find the correct information when verifying the response.
+Note that we need to provide the method with the *state* parameter so it will
+know where to find the correct information needed to verify the response.
 
 Once the verification has been done one parameter will be added to the
 response before it is stored in the state database, namely::
@@ -768,7 +788,7 @@ Here you have the content of the ID Token revealed.
 And finally the last step, getting the user info.
 
 User info
----------
+=========
 
 Again we have to provide the *do_request_init* method with the correct state
 value::
