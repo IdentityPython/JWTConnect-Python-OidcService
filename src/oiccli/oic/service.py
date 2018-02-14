@@ -280,7 +280,7 @@ class WebFinger(Service):
         return resp
 
     def request_info(self, cli_info, method="GET", request_args=None,
-            lax=False, **kwargs):
+                     lax=False, **kwargs):
 
         try:
             _resource = kwargs['resource']
@@ -302,7 +302,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                  conf=None):
         service.ProviderInfoDiscovery.__init__(
             self, httplib=httplib, keyjar=keyjar,
-            client_authn_method=client_authn_method,conf=conf)
+            client_authn_method=client_authn_method, conf=conf)
         # Should be done before any other
         self.post_parse_response.insert(0, self.oic_post_parse_response)
 
@@ -404,6 +404,30 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         logger.debug('cli_info behaviour: {}'.format(cli_info.behaviour))
 
 
+rt2gt = {
+    'code': 'authorization_code',
+    'id_token': 'implicit',
+    'id_token token': 'implicit',
+    'code id_token': ['authorization_code', 'implicit'],
+    'code token': ['authorization_code', 'implicit'],
+    'code id_token token': ['authorization_code', 'implicit']
+}
+
+
+def response_type_to_grant_type(response_types):
+    if isinstance(response_types, str):
+        response_types = response_types.split(' ')
+
+    response_types.sort()
+    _rt = " ".join(response_types)
+
+    try:
+        return rt2gt[response_types]
+    except KeyError:
+        raise ValueError(
+            'No such response type combination: {}'.format(response_types))
+
+
 class Registration(Service):
     msg_type = oic.RegistrationRequest
     response_cls = oic.RegistrationResponse
@@ -444,6 +468,12 @@ class Registration(Service):
                     cli_info.post_logout_redirect_uris
             except AttributeError:
                 pass
+
+        try:
+            request_args['grant_types'] = response_type_to_grant_type(
+                request_args['response_types'])
+        except KeyError:
+            pass
 
         if "redirect_uris" not in request_args:
             try:
@@ -520,7 +550,8 @@ class UserInfo(Service):
 
     def _verify_sub(self, resp, client_info, **kwargs):
         try:
-            _sub = client_info.state_db[kwargs['state']]['verified_id_token']['sub']
+            _sub = client_info.state_db[kwargs['state']]['verified_id_token'][
+                'sub']
         except KeyError:
             logger.warning("Can not verify value on sub")
         else:
