@@ -139,6 +139,9 @@ class Authorization(service.Authorization):
         return request_args, post_args
 
     def oic_post_construct(self, cli_info, req, **kwargs):
+        cli_info.state_db.add_info(req['state'],
+                                   redirect_uri=req['redirect_uri'])
+
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
             if 'id_token' in _response_type or 'code' in _response_type:
@@ -326,10 +329,11 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         If the Provider has left some claims out, defaults specified in the
         standard will be used.
 
-        :param cli_info: :py:class:`oiccli.client_info.ClientInfo' instance
+        :param cli_info: :py:class:`oiccli.client_info.ClientInfo` instance
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
         """
+
         if not pcr:
             pcr = cli_info.provider_info
 
