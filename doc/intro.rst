@@ -15,10 +15,8 @@ The client follows the same pattern disregarding which request/response
 it is dealing with. I does the following when sending a request:
 
     1. Gathers the request arguments
-    2. If client authentication is involved it gathers the necessary data for
-        that
-    3. If the chosen client authentication method involved adding information
-        to the request it does so.
+    2. If client authentication is involved it gathers the necessary data for that
+    3. If the chosen client authentication method involved adding information to the request it does so.
     4. Adds information to the HTTP headers like Content-Type
     5. Serializes the request into the expected format
 
@@ -27,11 +25,8 @@ the response from it.
 Once the response have been received, The client will follow this path:
 
     1. Deserialize the received message into a internal format
-    2. Verify that the message was correct. That it contains the required
-        claims and that all claims are of the correct data type. If it's signed
-        and/or encrypted verify signature and/or decrypt.
-    3. Store the received information in a data base and/or passes it on to
-        the application.
+    2. Verify that the message was correct. That it contains the required claims and that all claims are of the correct data type. If it's signed and/or encrypted verify signature and/or decrypt.
+    3. Store the received information in a data base and/or passes it on to the application.
 
 oiccli is built to allow clients to be constructed that supports any number
 and type of of request-response services. The basic Open ID Connect set is:
