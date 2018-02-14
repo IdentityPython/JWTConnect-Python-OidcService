@@ -3,13 +3,6 @@ from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
-from six import string_types
-from future.backports.http.cookiejar import Cookie
-from future.backports.http.cookiejar import http2time
-
-from oiccli import sanitize
-from oiccli.exception import TimeFormatError
-from oiccli.exception import WrongContentType
 from oicmsg.exception import UnSupported
 
 logger = logging.getLogger(__name__)
@@ -100,7 +93,7 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
 
 
 def match_to_(val, vlist):
-    if isinstance(vlist, string_types):
+    if isinstance(vlist, str):
         if vlist.startswith(val):
             return True
     else:
