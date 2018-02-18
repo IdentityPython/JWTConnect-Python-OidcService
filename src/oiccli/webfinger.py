@@ -1,16 +1,8 @@
 # coding=utf-8
-import json
 import logging
 import re
 
 from oiccli.exception import OicCliError
-from oicmsg.exception import MessageException
-from oicmsg.exception import OicMsgError
-from oicmsg.message import Message
-from oicmsg.message import OPTIONAL_LIST_OF_STRINGS
-from oicmsg.message import SINGLE_OPTIONAL_STRING
-from oicmsg.message import SINGLE_REQUIRED_STRING
-from oicmsg.oic import SINGLE_OPTIONAL_DICT
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.parse import urlparse
 
@@ -29,69 +21,6 @@ OIC_ISSUER = "http://openid.net/specs/connect/1.0/issuer"
 class WebFingerError(OicCliError):
     pass
 
-
-class LINK(Message):
-    """
-    https://tools.ietf.org/html/rfc5988
-    """
-    c_param = {
-        "rel": SINGLE_REQUIRED_STRING,
-        "type": SINGLE_OPTIONAL_STRING,
-        "href": SINGLE_OPTIONAL_STRING,
-        "titles": SINGLE_OPTIONAL_DICT,
-        "properties": SINGLE_OPTIONAL_DICT
-    }
-
-
-def link_deser(val, sformat="urlencoded"):
-    if isinstance(val, LINK):
-        return val
-    elif sformat in ["dict", "json"]:
-        if not isinstance(val, str):
-            val = json.dumps(val)
-            sformat = "json"
-    return LINK().deserialize(val, sformat)
-
-
-def msg_ser(inst, sformat, lev=0):
-    if sformat in ["urlencoded", "json"]:
-        if isinstance(inst, dict):
-            if sformat == 'json':
-                res = json.dumps(inst)
-            else:
-                res = urlencode([(k, v) for k, v in inst.items()])
-        elif isinstance(inst, LINK):
-            res = inst.serialize(sformat, lev)
-        else:
-            res = inst
-    elif sformat == "dict":
-        if isinstance(inst, LINK):
-            res = inst.serialize(sformat, lev)
-        elif isinstance(inst, dict):
-            res = inst
-        elif isinstance(inst, str):  # Iff ID Token
-            res = inst
-        else:
-            raise MessageException("Wrong type: %s" % type(inst))
-    else:
-        raise OicMsgError("Unknown sformat", inst)
-
-    return res
-
-
-REQUIRED_LINKS = ([LINK], True, msg_ser, link_deser, False)
-
-
-class JRD(Message):
-    """
-    JSON Resource Descriptor https://tools.ietf.org/html/rfc7033#section-4.4
-    """
-    claim = {
-        "subject": SINGLE_OPTIONAL_STRING,
-        "aliases": OPTIONAL_LIST_OF_STRINGS,
-        "properties": SINGLE_OPTIONAL_DICT,
-        "links": REQUIRED_LINKS
-    }
 
 
 # -- Normalization --

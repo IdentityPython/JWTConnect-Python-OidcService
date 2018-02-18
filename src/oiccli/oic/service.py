@@ -12,7 +12,6 @@ from oiccli.oauth2.service import get_state
 from oiccli.oic.utils import construct_request_uri
 from oiccli.oic.utils import request_object_encryption
 from oiccli.service import Service
-from oiccli.webfinger import JRD
 from oiccli.webfinger import OIC_ISSUER
 
 from oicmsg import oic
@@ -20,6 +19,7 @@ from oicmsg.exception import MissingParameter
 from oicmsg.exception import MissingRequiredAttribute
 from oicmsg.oauth2 import ErrorResponse
 from oicmsg.oauth2 import Message
+from oicmsg.oic import JRD
 from oicmsg.oic import make_openid_request
 
 __author__ = 'Roland Hedberg'
@@ -405,27 +405,30 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
 
 
 rt2gt = {
-    'code': 'authorization_code',
-    'id_token': 'implicit',
-    'id_token token': 'implicit',
+    'code': ['authorization_code'],
+    'id_token': ['implicit'],
+    'id_token token': ['implicit'],
     'code id_token': ['authorization_code', 'implicit'],
     'code token': ['authorization_code', 'implicit'],
     'code id_token token': ['authorization_code', 'implicit']
 }
 
 
-def response_type_to_grant_type(response_types):
-    if isinstance(response_types, str):
-        response_types = response_types.split(' ')
+def response_types_to_grant_types(response_types):
+    _res = set()
 
-    response_types.sort()
-    _rt = " ".join(response_types)
+    for response_type in response_types:
+        _rt = response_type.split(' ')
+        _rt.sort()
+        try:
+            _gt = rt2gt[" ".join(_rt)]
+        except KeyError:
+            raise ValueError(
+                'No such response type combination: {}'.format(response_types))
+        else:
+            _res.update(set(_gt))
 
-    try:
-        return rt2gt[response_types]
-    except KeyError:
-        raise ValueError(
-            'No such response type combination: {}'.format(response_types))
+    return list(_res)
 
 
 class Registration(Service):
@@ -444,6 +447,7 @@ class Registration(Service):
                          client_authn_method=client_authn_method,
                          conf=conf)
         self.pre_construct = [self.oic_pre_construct]
+        self.post_construct = [self.oic_post_construct]
         self.post_parse_response.append(self.oic_post_parse_response)
 
     def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
@@ -469,12 +473,6 @@ class Registration(Service):
             except AttributeError:
                 pass
 
-        try:
-            request_args['grant_types'] = response_type_to_grant_type(
-                request_args['response_types'])
-        except KeyError:
-            pass
-
         if "redirect_uris" not in request_args:
             try:
                 request_args["redirect_uris"] = cli_info.redirect_uris
@@ -492,6 +490,15 @@ class Registration(Service):
                 pass
 
         return request_args, {}
+
+    def oic_post_construct(self, cli_info, request_args=None, **kwargs):
+        try:
+            request_args['grant_types'] = response_types_to_grant_types(
+                request_args['response_types'])
+        except KeyError:
+            pass
+
+        return request_args
 
     def oic_post_parse_response(self, resp, cli_info, **kwargs):
         cli_info.registration_response = resp
