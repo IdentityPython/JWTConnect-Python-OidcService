@@ -37,8 +37,9 @@ class ClientInfo(object):
     from dynamic provider info discovery or client registration.
     But information is also picked up during the conversation with a server.
     """
-    def __init__(self, keyjar=None, config=None, events=None,
-                 db=None, db_name='', strict_on_preferences=False, **kwargs):
+    def __init__(self, keyjar=None, config=None, events=None, db=None,
+                 db_name='', strict_on_preferences=False, jwks_uri='',
+                 **kwargs):
         self.keyjar = keyjar or KeyJar()
         self.state_db = State('', db=db, db_name=db_name)
         self.events = events
@@ -46,6 +47,7 @@ class ClientInfo(object):
         self.provider_info = {}
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
+        self.jwks_uri = jwks_uri
 
         if config is None:
             config = {}
