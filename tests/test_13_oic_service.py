@@ -6,7 +6,7 @@ import pytest
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.client_info import ClientInfo
 from oiccli.oic import DEFAULT_SERVICES
-from oiccli.oic.service import factory
+from oiccli.oic.service import factory, response_types_to_grant_types
 from oiccli.service import build_services
 from oiccli.service import Service
 from oiccli.state import UnknownState
@@ -221,6 +221,20 @@ class TestProviderInfo(object):
             self._iss)
 
 
+def test_response_types_to_grant_types():
+    req_args = ['code']
+    assert set(
+        response_types_to_grant_types(req_args)) == {'authorization_code'}
+    req_args = ['code', 'code id_token']
+    assert set(
+        response_types_to_grant_types(req_args)) == {'authorization_code',
+                                                     'implicit'}
+    req_args = ['code', 'id_token code', 'code token id_token']
+    assert set(
+        response_types_to_grant_types(req_args)) == {'authorization_code',
+                                                     'implicit'}
+
+
 class TestRegistration(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
@@ -239,21 +253,21 @@ class TestRegistration(object):
     def test_construct(self):
         _req = self.req.construct(self.cli_info)
         assert isinstance(_req, RegistrationRequest)
-        assert len(_req) == 3
+        assert len(_req) == 4
 
     def test_config_with_post_logout(self):
         self.cli_info.post_logout_redirect_uris = [
             'https://example.com/post_logout']
         _req = self.req.construct(self.cli_info)
         assert isinstance(_req, RegistrationRequest)
-        assert len(_req) == 4
+        assert len(_req) == 5
         assert 'post_logout_redirect_uris' in _req
 
     def test_config_with_required_request_uri(self):
         self.cli_info.provider_info['require_request_uri_registration'] = True
         _req = self.req.construct(self.cli_info)
         assert isinstance(_req, RegistrationRequest)
-        assert len(_req) == 4
+        assert len(_req) == 5
         assert 'request_uris' in _req
 
 
