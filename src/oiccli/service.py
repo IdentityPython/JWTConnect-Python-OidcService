@@ -33,12 +33,11 @@ do_request_init
 
 and this for parsing the response.
 
-service_request
-    - parse_request_response
-        - parse_response
-             - get_urlinfo
-             - post_parse_response (*)
-        - parse_error_mesg
+parse_request_response
+    - parse_response
+         - get_urlinfo
+         - post_parse_response (*)
+    - parse_error_mesg
 
 The methods marked with (*) are where service specific
 behaviour is implemented.
