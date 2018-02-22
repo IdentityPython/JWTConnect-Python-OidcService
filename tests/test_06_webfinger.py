@@ -1,8 +1,9 @@
 import json
 
-from oiccli.webfinger import OIC_ISSUER, LINK, JRD
+from oiccli.webfinger import OIC_ISSUER
 from oiccli.webfinger import URINormalizer
 from oiccli.webfinger import WebFinger
+from oicmsg.oic import Link, JRD
 
 __author__ = 'Roland Hedberg'
 
@@ -73,7 +74,7 @@ class TestURINormalizer(object):
 
 
 def test_link1():
-    link = LINK(
+    link = Link(
         rel="http://webfinger.net/rel/avatar",
         type="image/jpeg",
         href="http://www.example.com/~bob/bob.jpg"
@@ -86,7 +87,7 @@ def test_link1():
 
 
 def test_link2():
-    link = LINK(rel="blog", type="text/html",
+    link = Link(rel="blog", type="text/html",
                 href="http://blogs.example.com/bob/",
                 titles={
                     "en-us": "The Magical World of Bob",
@@ -101,7 +102,7 @@ def test_link2():
 
 
 def test_link3():
-    link = LINK(rel="http://webfinger.net/rel/profile-page",
+    link = Link(rel="http://webfinger.net/rel/profile-page",
                 href="http://www.example.com/~bob/")
 
     assert set(link.keys()) == {'rel', 'href'}
@@ -119,12 +120,12 @@ def test_jrd():
             "http://example.com/ns/role/": "employee"
         },
         links=[
-            LINK(
+            Link(
                 rel="http://webfinger.net/rel/avatar",
                 type="image/jpeg",
                 href="http://www.example.com/~bob/bob.jpg"
             ),
-            LINK(
+            Link(
                 rel="http://webfinger.net/rel/profile-page",
                 href="http://www.example.com/~bob/"
             )])

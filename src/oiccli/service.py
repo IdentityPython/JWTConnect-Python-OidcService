@@ -541,7 +541,10 @@ class Service(object):
             # If no keys where provided in the method call use the instance's
             # keyjar as default
             if "key" not in kwargs and "keyjar" not in kwargs:
-                kwargs["keyjar"] = self.keyjar
+                if self.keyjar:
+                    kwargs["keyjar"] = self.keyjar
+                else:
+                    kwargs['keyjar'] = client_info.keyjar
 
             # add extra verify keyword arguments
             try:
