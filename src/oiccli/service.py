@@ -193,7 +193,7 @@ class Service(object):
         :param client_info: Client Information as a
             :py:class:`oiccli.client_info.ClientInfo` instance.
         :param request_args: Request arguments
-        :param post_args: Arguments used by the post_construct method
+        :param kwargs: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
         """
         _args = self.method_args('post_construct', **kwargs)
