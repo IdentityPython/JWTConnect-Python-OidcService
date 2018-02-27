@@ -8,8 +8,8 @@ OpenID Connect and OAuth2 (O/O) are both request-response protocols.
 The client sends a request and the server responds either direct on the
 same connection or after a while on another connection.
 
-The client here is a piece of software that implements O/O and works on behalf
-of an application.
+When I use *client* below I refer to a piece of software that implements O/O and
+works on behalf of an application.
 
 The client follows the same pattern disregarding which request/response
 it is dealing with. I does the following when sending a request:
