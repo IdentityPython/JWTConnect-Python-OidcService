@@ -2,11 +2,11 @@ import json
 import os
 import pytest
 
-
 from oiccli.client_auth import CLIENT_AUTHN_METHOD
 from oiccli.client_info import ClientInfo
 from oiccli.oic import DEFAULT_SERVICES
-from oiccli.oic.service import factory, response_types_to_grant_types
+from oiccli.oic.service import factory
+from oiccli.oic.service import response_types_to_grant_types
 from oiccli.service import build_services
 from oiccli.service import Service
 from oiccli.state import UnknownState
