@@ -49,8 +49,8 @@ def test_get():
 
     resp = util.get_or_post(uri, method, request)
 
-    assert set(resp.keys()) == {'uri'}
-    assert url_compare(resp['uri'],
+    assert set(resp.keys()) == {'url'}
+    assert url_compare(resp['url'],
                        u"https://localhost:8092/authorization?state=urn%3A"
                        "uuid%3A92d81fb3-72e8-4e6c-9173-c360b782148a&"
                        "redirect_uri=https%3A%2F%2Flocalhost%3A8666"
@@ -75,9 +75,9 @@ def test_post():
 
     resp = util.get_or_post(uri, method, request, content_type=JSON_ENCODED,
                             **kwargs)
-    assert set(resp.keys()) == {'uri', 'body', 'kwargs'}
+    assert set(resp.keys()) == {'url', 'body', 'kwargs'}
 
-    assert resp['uri'] == u'https://localhost:8092/token'
+    assert resp['url'] == u'https://localhost:8092/token'
     assert json.loads(resp['body']) == request.to_dict()
 
     assert resp['kwargs'] == {

@@ -87,9 +87,8 @@ class URINormalizer(object):
 
 
 class WebFinger(object):
-    def __init__(self, default_rel=None, httpd=None):
+    def __init__(self, default_rel=None, **kwargs):
         self.default_rel = default_rel
-        self.httpd = httpd
         self.jrd = None
         self.events = None
 

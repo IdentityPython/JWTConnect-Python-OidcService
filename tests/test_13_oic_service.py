@@ -86,19 +86,18 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'request'}
+        assert set(_info.keys()) == {'url', 'request', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
-            self.req.get_urlinfo(_info['uri']))
+            self.req.get_urlinfo(_info['url']))
         assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'request', 'http_args', 'uri', 'algs'}
-        assert _info['http_args'] == {}
+        assert set(_info.keys()) == {'request', 'url', 'algs', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
-            self.req.get_urlinfo(_info['uri']))
+            self.req.get_urlinfo(_info['url']))
         assert msg.to_dict() == _info['request']
 
     def test_request_init_request_method(self):
@@ -106,13 +105,12 @@ class TestAuthorization(object):
         self.req.endpoint = 'https://example.com/authorize'
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          request_method='value')
-        assert set(_info.keys()) == {'request', 'http_args', 'uri', 'algs'}
+        assert set(_info.keys()) == {'request', 'url', 'algs', 'method'}
         assert set(_info['request'].keys()) == {
             'client_id', 'redirect_uri', 'response_type', 'state', 'scope',
             'nonce'}
-        assert _info['http_args'] == {}
         msg = AuthorizationRequest().from_urlencoded(
-            self.req.get_urlinfo(_info['uri']))
+            self.req.get_urlinfo(_info['url']))
         assert msg.to_dict() == _info['request']
 
     def test_request_param(self):
@@ -155,8 +153,9 @@ class TestAccessTokenRequest(object):
         _info = self.req.request_info(self.cli_info, request_args=req_args,
                                       state='state',
                                       authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'uri', 'request', 'kwargs', 'h_args'}
-        assert _info['uri'] == 'https://example.com/authorize'
+        assert set(_info.keys()) == {'body', 'url', 'request', 'kwargs',
+                                     'method'}
+        assert _info['url'] == 'https://example.com/authorize'
         assert _info['request'] == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
@@ -172,9 +171,9 @@ class TestAccessTokenRequest(object):
 
         _info = self.req.do_request_init(self.cli_info, request_args=req_args,
                                          state='state')
-        assert set(_info.keys()) == {'body', 'request', 'uri', 'http_args',
-                                     'kwargs', 'h_args'}
-        assert _info['uri'] == 'https://example.com/authorize'
+        assert set(_info.keys()) == {'body', 'request', 'url', 'kwargs',
+                                     'method'}
+        assert _info['url'] == 'https://example.com/authorize'
         assert _info['request'] == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code',
@@ -216,8 +215,8 @@ class TestProviderInfo(object):
 
     def test_request_info(self):
         _info = self.req.request_info(self.cli_info)
-        assert set(_info.keys()) == {'uri'}
-        assert _info['uri'] == '{}/.well-known/openid-configuration'.format(
+        assert set(_info.keys()) == {'url'}
+        assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
 
 
@@ -415,8 +414,8 @@ class TestWebFinger(object):
 
     def test_request_info(self):
         _req = self.req.request_info(self.cli_info)
-        assert set(_req.keys()) == {'uri'}
-        assert _req['uri'] == \
+        assert set(_req.keys()) == {'url'}
+        assert _req['url'] == \
                'https://example.com/.well-known/webfinger?resource=acct%3Ajoe' \
                '%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect' \
                '%2F1.0%2Fissuer'

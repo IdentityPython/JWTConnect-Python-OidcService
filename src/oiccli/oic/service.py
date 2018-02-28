@@ -253,13 +253,12 @@ class WebFinger(Service):
     http_method = 'GET'
     response_body_type = 'json'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method,
-                         conf=conf)
-        self.webfinger = webfinger.WebFinger(httpd=self.httplib,
-                                             default_rel=OIC_ISSUER)
+    def __init__(self, keyjar=None, client_authn_method=None,
+                 conf=None, **kwargs):
+        Service.__init__(self, keyjar=keyjar,
+                         client_authn_method=client_authn_method, conf=conf,
+                         **kwargs)
+        self.webfinger = webfinger.WebFinger(default_rel=OIC_ISSUER)
         self.post_parse_response.append(self.wf_post_parse_response)
 
     def wf_post_parse_response(self, resp, client_info, state='', **kwargs):
@@ -290,7 +289,7 @@ class WebFinger(Service):
             except KeyError:
                 raise MissingRequiredAttribute('resource')
 
-        return {'uri': self.webfinger.query(_resource)}
+        return {'url': self.webfinger.query(_resource)}
 
 
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):

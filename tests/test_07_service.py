@@ -51,11 +51,11 @@ class TestDummyService(object):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'request'}
+        assert set(_info.keys()) == {'url', 'request', 'method'}
         assert _info['request'] == {'foo': 'bar',
                                     'req_str': 'some string'}
         msg = DummyMessage().from_urlencoded(
-            self.service.get_urlinfo(_info['uri']))
+            self.service.get_urlinfo(_info['url']))
         assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
@@ -63,12 +63,10 @@ class TestDummyService(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.do_request_init(self.cli_info,
                                              request_args=req_args)
-        assert set(_info.keys()) == {'uri', 'request', 'http_args'}
-        assert _info['request'] == {'foo': 'bar',
-                                    'req_str': 'some string'}
-        assert _info['http_args'] == {}
+        assert set(_info.keys()) == {'url', 'request', 'method'}
+        assert _info['request'] == {'foo': 'bar', 'req_str': 'some string'}
         msg = DummyMessage().from_urlencoded(
-            self.service.get_urlinfo(_info['uri']))
+            self.service.get_urlinfo(_info['url']))
         assert msg.to_dict() == _info['request']
 
 

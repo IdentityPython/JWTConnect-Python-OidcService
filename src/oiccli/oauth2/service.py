@@ -188,7 +188,7 @@ class ProviderInfoDiscovery(Service):
         else:
             _issuer = issuer
 
-        return {'uri': OIDCONF_PATTERN % _issuer}
+        return {'url': OIDCONF_PATTERN % _issuer}
 
     def oauth_post_parse_response(self, resp, cli_info, **kwargs):
         """

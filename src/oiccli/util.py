@@ -63,12 +63,12 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
                 _req.update(parse_qs(comp.query))
 
             _query = str(_req.to_urlencoded())
-            resp['uri'] = urlunsplit((comp.scheme, comp.netloc, comp.path,
+            resp['url'] = urlunsplit((comp.scheme, comp.netloc, comp.path,
                                       _query, comp.fragment))
         else:
-            resp['uri'] = uri
+            resp['url'] = uri
     elif method in ["POST", "PUT"]:
-        resp['uri'] = uri
+        resp['url'] = uri
         if content_type == URL_ENCODED:
             resp['body'] = req.to_urlencoded()
         elif content_type == JSON_ENCODED:

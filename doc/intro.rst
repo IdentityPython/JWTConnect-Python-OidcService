@@ -126,7 +126,7 @@ The result of the request pipeline is a dictionary that in its simplest form
 will look something like this::
 
     {
-        'uri' : 'https://example.com/authorize?response_type=code&state=state&client_id=client_id&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&nonce=P1B1nPCnzU4Mwg1hjzxkrA3DmnMQKPWl'
+        'url' : 'https://example.com/authorize?response_type=code&state=state&client_id=client_id&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&nonce=P1B1nPCnzU4Mwg1hjzxkrA3DmnMQKPWl'
     }
 
 It will look like that when the request is to be transmitted as the urlencoded
@@ -134,7 +134,7 @@ query part of a HTTP GET operation. If instead a HTTP POST with a json body is
 expected the outcome of `do_request_init`_ will be something like this::
 
     {
-        'uri': 'https://example.com/token',
+        'url': 'https://example.com/token',
         'body': 'grant_type=authorization_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&code=access_code&client_id=client_id',
         'h_args': {'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}}
     }
@@ -443,7 +443,7 @@ the method do_request_init will return the information necessary to do a
 HTTP request. In this case the value of *info* will be::
 
     {
-        'uri': 'https://example.com/.well-known/webfinger?resource=acct%3Afoobar%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
+        'url': 'https://example.com/.well-known/webfinger?resource=acct%3Afoobar%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
     }
 
 as you can see the *do_request_init* constructed a URL that can be used
@@ -482,7 +482,7 @@ We use the same process as with webfinger but with another service instance::
 
 *info* will now contain::
 
-    {'uri': 'https://example.com/.well-known/openid-configuration'}
+    {'url': 'https://example.com/.well-known/openid-configuration'}
 
 And this is the first example of *magic* that you will see.
 

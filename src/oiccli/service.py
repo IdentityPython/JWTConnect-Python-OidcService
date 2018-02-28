@@ -33,11 +33,13 @@ do_request_init
 
 and this for parsing the response.
 
-parse_request_response
-    - parse_response
-         - get_urlinfo
-         - post_parse_response (*)
-    - parse_error_mesg
+parse_response
+     - get_urlinfo
+     - post_parse_response (*)
+    
+or
+
+parse_error_mesg
 
 The methods marked with (*) are where service specific
 behaviour is implemented.
@@ -59,31 +61,18 @@ REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 def update_http_args(http_args, info):
     """
-    Extending the header with information gathered during the request
+    Extending the HTTP headers with information gathered during the request
     setup.
 
     :param http_args: Original HTTP header arguments
     :param info: Request info
     :return: Updated request info
     """
-    try:
-        h_args = info['h_args']
-    except KeyError:
-        h_args = {}
 
-    if http_args is None:
-        http_args = h_args
-    else:
-        http_args.update(info['h_args'])
+    if http_args:
+        http_args.update(info['kwargs'])
+        info['kwargs'] = http_args
 
-    try:
-        _headers = info['kwargs']['headers']
-    except KeyError:
-        pass
-    else:
-        http_args.update({'headers': _headers})
-
-    info['http_args'] = http_args
     return info
 
 
@@ -292,7 +281,7 @@ class Service(object):
         :param request: The request as a Message class instance
         :param method: HTTP method
         :param kwargs: Extra keyword argument
-        :return: Dictionary with 'uri' and possibly also 'body' and 'kwargs'
+        :return: Dictionary with 'url' and possibly also 'body' and 'kwargs'
             as keys
         """
         # Find out where to send this request
@@ -307,10 +296,11 @@ class Service(object):
         # If there are HTTP header arguments add them to *info* using
         # the key *h_args*
         try:
-            info['h_args'] = {"headers": kwargs["headers"]}
+            info['kwargs'] = {"headers": kwargs["headers"]}
         except KeyError:
             pass
 
+        info['method'] = method
         return info
 
     def init_authentication_method(self, request, client_info, authn_method,
@@ -355,7 +345,7 @@ class Service(object):
         :param lax: If it should be allowed to send a request that doesn't
             completely conform to the standard.
         :param kwargs: Extra keyword arguments
-        :return: A dictionary with the keys 'uri' and possibly 'body', 'kwargs',
+        :return: A dictionary with the keys 'url' and possibly 'body', 'kwargs',
             'request' and 'ht_args'.
         """
         if not method:

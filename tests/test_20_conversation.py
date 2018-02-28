@@ -119,8 +119,7 @@ def test_conversation():
     info = service['webfinger'].do_request_init(client_info,
                                                 resource='foobar@example.org')
 
-    assert info['uri'] == 'https://example.org/.well-known/webfinger?resource=acct%3Afoobar%40example.org&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
-    assert info['http_args'] == {}
+    assert info['url'] == 'https://example.org/.well-known/webfinger?resource=acct%3Afoobar%40example.org&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
 
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
@@ -142,8 +141,7 @@ def test_conversation():
 
     info = service['provider_info'].do_request_init(client_info)
 
-    assert info['uri'] == 'https://example.org/op/.well-known/openid-configuration'
-    assert info['http_args'] == {}
+    assert info['url'] == 'https://example.org/op/.well-known/openid-configuration'
 
     provider_info_response = json.dumps({
         "version": "3.0",
@@ -241,9 +239,9 @@ def test_conversation():
 
     info = service['registration'].do_request_init(client_info)
 
-    assert info['uri'] == 'https://example.org/op/registration'
+    assert info['url'] == 'https://example.org/op/registration'
     assert info['body'] == '{"application_type": "web", "response_types": ["code"], "contacts": ["ops@example.org"], "jwks_uri": "https://example.com/rp/static/jwks.json", "token_endpoint_auth_method": "client_secret_basic", "redirect_uris": ["https://example.com/rp/authz_cb"], "grant_types": ["authorization_code"]}'
-    assert info['http_args'] == {'headers': {'Content-Type': 'application/json'}}
+    assert info['kwargs'] == {'headers': {'Content-Type': 'application/json'}}
 
     now = int(time.time())
 
@@ -280,7 +278,7 @@ def test_conversation():
     info = service['authorization'].do_request_init(
         client_info, request_args={'state': STATE, 'nonce': NONCE})
 
-    assert info['uri'] == 'https://example.org/op/authorization?state=Oh3w3gKlvoM2ehFqlxI3HIK5&nonce=UvudLKz287YByZdsY3AJoPAlEXQkJ0dK&response_type=code&client_id=zls2qhN1jO6A&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Frp%2Fauthz_cb'
+    assert info['url'] == 'https://example.org/op/authorization?state=Oh3w3gKlvoM2ehFqlxI3HIK5&nonce=UvudLKz287YByZdsY3AJoPAlEXQkJ0dK&response_type=code&client_id=zls2qhN1jO6A&scope=openid&redirect_uri=https%3A%2F%2Fexample.com%2Frp%2Fauthz_cb'
 
     op_authz_resp = {
         'state': 'Oh3w3gKlvoM2ehFqlxI3HIK5',
@@ -305,9 +303,9 @@ def test_conversation():
     info = service['accesstoken'].do_request_init(client_info,
                                                   request_args=request_args)
 
-    assert info['uri'] == 'https://example.org/op/token'
+    assert info['url'] == 'https://example.org/op/token'
     assert info['body'] == 'grant_type=authorization_code&state=Oh3w3gKlvoM2ehFqlxI3HIK5&redirect_uri=https%3A%2F%2Fexample.com%2Frp%2Fauthz_cb&code=Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01&client_id=zls2qhN1jO6A'
-    assert info['http_args'] == {
+    assert info['kwargs'] == {
         'headers': {
             'Authorization': 'Basic emxzMnFoTjFqTzZBOmM4NDM0ZjI4Y2Y5Mzc1ZDlhNw==',
             'Content-Type': 'application/x-www-form-urlencoded'}}
@@ -343,8 +341,8 @@ def test_conversation():
 
     info = service['userinfo'].do_request_init(client_info, state=STATE)
 
-    assert info['uri'] == 'https://example.org/op/userinfo'
-    assert info['http_args'] == {
+    assert info['url'] == 'https://example.org/op/userinfo'
+    assert info['kwargs'] == {
         'headers': {'Authorization': 'Bearer Z0FBQUFBQmFkdFF'}}
 
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
