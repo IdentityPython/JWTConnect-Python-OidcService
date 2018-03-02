@@ -1,4 +1,4 @@
-.. _oiccli_oic_service:
+.. _oidccli_oidc_service:
 
 ************************
 The OIDC Service classes
