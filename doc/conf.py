@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# oiccli documentation build configuration file, created by
+# oidccli documentation build configuration file, created by
 # sphinx-quickstart on Sat Dec 30 17:32:48 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -48,7 +48,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'oiccli'
+project = u'oidccli'
 copyright = u'2017, Roland Hedberg'
 author = u'Roland Hedberg'
 
@@ -114,7 +114,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'oicclidoc'
+htmlhelp_basename = 'oidcclidoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -141,7 +141,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'oiccli.tex', u'oiccli Documentation',
+    (master_doc, 'oidccli.tex', u'oidccli Documentation',
      u'Roland Hedberg', 'manual'),
 ]
 
@@ -151,7 +151,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'oiccli', u'oiccli Documentation',
+    (master_doc, 'oidccli', u'oidccli Documentation',
      [author], 1)
 ]
 
@@ -162,8 +162,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'oiccli', u'oiccli Documentation',
-     author, 'oiccli', 'One line description of project.',
+    (master_doc, 'oidccli', u'oidccli Documentation',
+     author, 'oidccli', 'One line description of project.',
      'Miscellaneous'),
 ]
 

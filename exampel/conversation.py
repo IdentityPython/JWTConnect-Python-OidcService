@@ -3,18 +3,18 @@ import json
 
 import time
 
-from oicmsg.jwt import JWT
-from oicmsg.oic import AuthorizationResponse
+from oidcmsg.jwt import JWT
+from oidcmsg.oidc import AuthorizationResponse
 
-from oiccli.client_info import ClientInfo
+from oidccli.client_info import ClientInfo
 
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oicmsg.key_jar import KeyJar
+from oidccli.client_auth import CLIENT_AUTHN_METHOD
+from oidcmsg.key_jar import KeyJar
 
-from oiccli.oic import DEFAULT_SERVICES
-from oiccli.oic.service import factory
+from oidccli.oidc import DEFAULT_SERVICES
+from oidccli.oidc.service import factory
 
-from oiccli.service import build_services
+from oidccli.service import build_services
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
@@ -79,7 +79,7 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 service_spec = DEFAULT_SERVICES.copy()
 service_spec.append(('WebFinger', {}))
 
-service = build_services(service_spec, factory, None, RP_KEYJAR,
+service = build_services(service_spec, factory, RP_KEYJAR,
                          client_authn_method=CLIENT_AUTHN_METHOD)
 
 client_info = ClientInfo(

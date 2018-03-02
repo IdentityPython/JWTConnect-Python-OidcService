@@ -2,27 +2,27 @@ import json
 import os
 import pytest
 
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.client_info import ClientInfo
-from oiccli.oic import DEFAULT_SERVICES
-from oiccli.oic.service import factory
-from oiccli.oic.service import response_types_to_grant_types
-from oiccli.service import build_services
-from oiccli.service import Service
-from oiccli.state import UnknownState
+from oidccli.client_auth import CLIENT_AUTHN_METHOD
+from oidccli.client_info import ClientInfo
+from oidccli.oidc import DEFAULT_SERVICES
+from oidccli.oidc.service import factory
+from oidccli.oidc.service import response_types_to_grant_types
+from oidccli.service import build_services
+from oidccli.service import Service
+from oidccli.state import UnknownState
 
-from oicmsg.jwt import JWT
-from oicmsg.key_jar import build_keyjar
-from oicmsg.key_jar import public_keys_keyjar
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import Message
-from oicmsg.oic import CheckIDRequest
-from oicmsg.oic import CheckSessionRequest
-from oicmsg.oic import EndSessionRequest
-from oicmsg.oic import OpenIDSchema
-from oicmsg.oic import RegistrationRequest
+from oidcmsg.jwt import JWT
+from oidcmsg.key_jar import build_keyjar
+from oidcmsg.key_jar import public_keys_keyjar
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import Message
+from oidcmsg.oidc import CheckIDRequest
+from oidcmsg.oidc import CheckSessionRequest
+from oidcmsg.oidc import EndSessionRequest
+from oidcmsg.oidc import OpenIDSchema
+from oidcmsg.oidc import RegistrationRequest
 
 
 class Response(object):
@@ -204,9 +204,9 @@ class TestProviderInfo(object):
                              'userinfo_signed_response_alg': 'RS384'
                          }}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         _req = self.req.construct(self.cli_info)
@@ -245,9 +245,9 @@ class TestRegistration(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         _req = self.req.construct(self.cli_info)
@@ -281,9 +281,9 @@ class TestUserInfo(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         self.cli_info.state_db['abcde'] = {
@@ -343,9 +343,9 @@ class TestCheckSession(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
@@ -365,9 +365,9 @@ class TestCheckID(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
@@ -387,9 +387,9 @@ class TestEndSession(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         self.cli_info.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
@@ -408,9 +408,9 @@ class TestWebFinger(object):
                          'base_url': 'https://example.com/cli/',
                          'resource': 'joe@example.com'}
         self.cli_info = ClientInfo(config=client_config)
-        self.cli_info.service = build_services(DEFAULT_SERVICES,
-                                               factory, None, None,
-                                               CLIENT_AUTHN_METHOD)
+        self.cli_info.service = build_services(
+            DEFAULT_SERVICES, factory, keyjar=None,
+            client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_request_info(self):
         _req = self.req.request_info(self.cli_info)

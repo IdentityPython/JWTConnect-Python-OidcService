@@ -2,9 +2,9 @@
 import logging
 import re
 
-from oiccli.exception import OicCliError
-from six.moves.urllib.parse import urlencode
-from six.moves.urllib.parse import urlparse
+from oidccli.exception import OidcCliError
+from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 
 """
@@ -18,7 +18,7 @@ WF_URL = "https://%s/.well-known/webfinger"
 OIC_ISSUER = "http://openid.net/specs/connect/1.0/issuer"
 
 
-class WebFingerError(OicCliError):
+class WebFingerError(OidcCliError):
     pass
 
 

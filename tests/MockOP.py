@@ -1,6 +1,5 @@
-from oicmsg.exception import OicMsgError
-from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import AuthorizationResponse
+from oidcmsg.exception import OidcMsgError
+from oidcmsg.oauth2 import AuthorizationRequest
 
 
 class HTTPResponse(object):
@@ -38,7 +37,7 @@ class MockOP(object):
         areq = AuthorizationRequest().from_urlencoded(request)
 
         if not areq.verify():
-            raise OicMsgError()
+            raise OidcMsgError('Verification failed')
 
         resp = HTTPResponse('OK')
         return resp

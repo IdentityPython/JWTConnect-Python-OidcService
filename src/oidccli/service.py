@@ -1,15 +1,15 @@
 import logging
 from urllib.parse import urlparse
 
-from oiccli.exception import MissingEndpoint
-from oiccli.exception import OicCliError
-from oiccli.exception import ResponseError
-from oiccli.util import get_or_post
-from oiccli.util import JSON_ENCODED
-from oicmsg.oauth2 import AuthorizationErrorResponse
-from oicmsg.oauth2 import ErrorResponse
-from oicmsg.oauth2 import Message
-from oicmsg.oauth2 import TokenErrorResponse
+from oidccli.exception import MissingEndpoint
+from oidccli.exception import OidcCliError
+from oidccli.exception import ResponseError
+from oidccli.util import get_or_post
+from oidccli.util import JSON_ENCODED
+from oidcmsg.oauth2 import AuthorizationErrorResponse
+from oidcmsg.oauth2 import ErrorResponse
+from oidcmsg.oauth2 import Message
+from oidcmsg.oauth2 import TokenErrorResponse
 
 __author__ = 'Roland Hedberg'
 
@@ -88,9 +88,8 @@ class Service(object):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None, **kwargs):
-        self.httplib = httplib
         self.keyjar = keyjar
         self.client_authn_method = client_authn_method
         self.events = None
@@ -160,7 +159,7 @@ class Service(object):
         Will run the pre_construct methods one by one in the order given.
 
         :param client_info: Client Information as a
-            :py:class:`oiccli.client_info.ClientInfo` instance.
+            :py:class:`oidccli.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param kwargs: Extra key word arguments
         :return: A tuple of request_args and post_args. post_args are to be
@@ -180,7 +179,7 @@ class Service(object):
         Will run the post_construct methods one at the time in order.
 
         :param client_info: Client Information as a
-            :py:class:`oiccli.client_info.ClientInfo` instance.
+            :py:class:`oidccli.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param kwargs: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
@@ -196,9 +195,9 @@ class Service(object):
         """
         A method run after the response has been parsed and verified.
 
-        :param resp: The response as a :py:class:`oicmsg.Message` instance
+        :param resp: The response as a :py:class:`oidcmsg.Message` instance
         :param client_info: Client Information as a
-            :py:class:`oiccli.client_info.ClientInfo` instance.
+            :py:class:`oidccli.client_info.ClientInfo` instance.
         :param state: state value
         :param kwargs: Extra key word arguments
         """
@@ -312,7 +311,7 @@ class Service(object):
 
         :param request: The request, a Message class instance
         :param client_info: Client information, a
-            :py:class:`oiccli.client_info.ClientInfo` instance
+            :py:class:`oidccli.client_info.ClientInfo` instance
         :param authn_method: Client authentication method
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
@@ -336,7 +335,7 @@ class Service(object):
         request is decided.
 
         :param client_info: Client information as a
-            :py:class:`oiccli.client_info.ClientInfo` instance
+            :py:class:`oidccli.client_info.ClientInfo` instance
         :param method: The HTTP method to be used.
         :param request_args: Initial request arguments
         :param body_type: If the request is sent in the HTTP body this
@@ -451,7 +450,7 @@ class Service(object):
         This the start of a pipeline that will:
 
         - Deserializes a response into it's response message class.
-            Or :py:class:`oicmsg.oauth2.ErrorResponse` if it's an error message
+            Or :py:class:`oidcmsg.oauth2.ErrorResponse` if it's an error message
         - verifies the correctness of the response by running the
             verify method belonging to the message class used.
         - runs the do_post_parse_response method iff the response was not
@@ -492,7 +491,7 @@ class Service(object):
             self.events.store('Protocol Response', resp)
 
         # if it's an error message and I didn't expect it recast the
-        # response as a :py:class:`oicmsg.oauth2.ErrorResponse
+        # response as a :py:class:`oidcmsg.oauth2.ErrorResponse
         if "error" in resp and not isinstance(resp, ErrorResponse):
             resp = None
             # Gather error message classes that are expected if an
@@ -553,7 +552,7 @@ class Service(object):
 
             if not verf:
                 logger.error('Verification of the response failed')
-                raise OicCliError("Verification of the response failed")
+                raise OidcCliError("Verification of the response failed")
 
             # if it's an Authorization response and the scope claim was not
             # present in the response use the one I expected to be there.
@@ -583,7 +582,7 @@ class Service(object):
 
         :param response: The response text
         :param body_type: How the body is encoded
-        :return: A :py:class:`oicmsg.message.Message` instance
+        :return: A :py:class:`oidcmsg.message.Message` instance
         """
         if body_type == 'txt':
             _body_type = 'urlencoded'
@@ -593,7 +592,7 @@ class Service(object):
         err = self.error_msg().deserialize(response, method=_body_type)
         try:
             err.verify()
-        except OicCliError:
+        except OidcCliError:
             raise
         else:
             return err
@@ -605,15 +604,15 @@ class Service(object):
             return default
 
 
-def build_services(srvs, service_factory, http, keyjar, client_authn_method):
+def build_services(srvs, service_factory, keyjar, client_authn_method):
     service = {}
     for serv, conf in srvs:
-        _srv = service_factory(serv, httplib=http, keyjar=keyjar,
+        _srv = service_factory(serv, keyjar=keyjar,
                                client_authn_method=client_authn_method,
                                conf=conf)
         service[_srv.request] = _srv
 
     # For any unspecified service
-    service['any'] = Service(httplib=http, keyjar=keyjar,
+    service['any'] = Service(keyjar=keyjar,
                              client_authn_method=client_authn_method)
     return service

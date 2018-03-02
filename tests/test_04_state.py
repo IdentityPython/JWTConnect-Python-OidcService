@@ -1,9 +1,10 @@
 import pytest
-from oiccli.state import State, ExpiredToken
-from oicmsg.oauth2 import AuthorizationRequest, AccessTokenRequest
-from oicmsg.oauth2 import AuthorizationResponse
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.time_util import utc_time_sans_frac
+from oidccli.state import State, ExpiredToken
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AuthorizationResponse
+from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.time_util import utc_time_sans_frac
 
 ATR = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                           token_type="example",

@@ -2,15 +2,15 @@ import inspect
 import logging
 import sys
 
-from oiccli import OIDCONF_PATTERN
-from oiccli.exception import OicCliError
-from oiccli.service import Service
+from oidccli import OIDCONF_PATTERN
+from oidccli.exception import OidcCliError
+from oidccli.service import Service
 
-from oicmsg import oauth2
-from oicmsg.exception import MissingParameter
-from oicmsg.key_jar import KeyJar
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.oauth2 import AuthorizationResponse
+from oidcmsg import oauth2
+from oidcmsg.exception import MissingParameter
+from oidcmsg.key_jar import KeyJar
+from oidcmsg.oidc import AccessTokenResponse
+from oidcmsg.oidc import AuthorizationResponse
 
 __author__ = 'Roland Hedberg'
 
@@ -43,11 +43,9 @@ class Authorization(Service):
     request = 'authorization'
     response_body_type = 'urlencoded'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method,
-                         conf=conf)
+    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
+        Service.__init__(self, keyjar=keyjar,
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
@@ -111,11 +109,9 @@ class AccessToken(Service):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method,
-                         conf=conf)
+    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
+        Service.__init__(self, keyjar=keyjar,
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
         self.post_parse_response.append(_post_x_parse_response)
 
@@ -144,11 +140,9 @@ class RefreshAccessToken(Service):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method,
-                         conf=conf)
+    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
+        Service.__init__(self, keyjar=keyjar,
+                         client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
@@ -171,11 +165,9 @@ class ProviderInfoDiscovery(Service):
     request = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
-                         client_authn_method=client_authn_method,
-                         conf=conf)
+    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
+        Service.__init__(self, keyjar=keyjar,
+                         client_authn_method=client_authn_method, conf=conf)
         self.post_parse_response.append(self.oauth_post_parse_response)
 
     def request_info(self, cli_info, method="GET", request_args=None,
@@ -215,7 +207,7 @@ class ProviderInfoDiscovery(Service):
                 cli_info.allow['issuer_mismatch']
             except KeyError:
                 if _issuer != _pcr_issuer:
-                    raise OicCliError(
+                    raise OidcCliError(
                         "provider info issuer mismatch '%s' != '%s'" % (
                             _issuer, _pcr_issuer))
 

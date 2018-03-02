@@ -1,26 +1,26 @@
 import inspect
 import logging
 import sys
-import six
+
 from cryptojwt import jws
 
-from oiccli import rndstr, webfinger
-from oiccli.exception import ConfigurationError
-from oiccli.exception import ParameterError
-from oiccli.oauth2 import service
-from oiccli.oauth2.service import get_state
-from oiccli.oic.utils import construct_request_uri
-from oiccli.oic.utils import request_object_encryption
-from oiccli.service import Service
-from oiccli.webfinger import OIC_ISSUER
+from oidccli import rndstr, webfinger
+from oidccli.exception import ConfigurationError
+from oidccli.exception import ParameterError
+from oidccli.oauth2 import service
+from oidccli.oauth2.service import get_state
+from oidccli.oidc.utils import construct_request_uri
+from oidccli.oidc.utils import request_object_encryption
+from oidccli.service import Service
+from oidccli.webfinger import OIC_ISSUER
 
-from oicmsg import oic
-from oicmsg.exception import MissingParameter
-from oicmsg.exception import MissingRequiredAttribute
-from oicmsg.oauth2 import ErrorResponse
-from oicmsg.oauth2 import Message
-from oicmsg.oic import JRD
-from oicmsg.oic import make_openid_request
+from oidcmsg import oidc
+from oidcmsg.exception import MissingParameter
+from oidcmsg.exception import MissingRequiredAttribute
+from oidcmsg.oauth2 import ErrorResponse
+from oidcmsg.oauth2 import Message
+from oidcmsg.oidc import JRD
+from oidcmsg.oidc import make_openid_request
 
 __author__ = 'Roland Hedberg'
 
@@ -65,7 +65,7 @@ def store_id_token(resp, cli_info, **kwargs):
     Store the verified ID Token in the state database.
 
     :param resp: The response
-    :param cli_info: A :py:class:`oiccli.client_info.ClientInfo` instance
+    :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
     :param kwargs: Extra keyword arguments. In this case the state claim
         is supposed to be represented.
     """
@@ -78,20 +78,20 @@ def store_id_token(resp, cli_info, **kwargs):
 
 
 class Authorization(service.Authorization):
-    msg_type = oic.AuthorizationRequest
-    response_cls = oic.AuthorizationResponse
-    error_msg = oic.AuthorizationErrorResponse
+    msg_type = oidc.AuthorizationRequest
+    response_cls = oidc.AuthorizationResponse
+    error_msg = oidc.AuthorizationErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        service.Authorization.__init__(self, httplib, keyjar,
+        service.Authorization.__init__(self, keyjar,
                                        client_authn_method, conf=conf)
         self.default_request_args = {'scope': ['openid']}
-        self.pre_construct = [self.oic_pre_construct]
-        self.post_construct = [self.oic_post_construct]
+        self.pre_construct = [self.oidc_pre_construct]
+        self.post_construct = [self.oidc_post_construct]
         self.post_parse_response.append(store_id_token)
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -138,7 +138,7 @@ class Authorization(service.Authorization):
 
         return request_args, post_args
 
-    def oic_post_construct(self, cli_info, req, **kwargs):
+    def oidc_post_construct(self, cli_info, req, **kwargs):
         cli_info.state_db.add_info(req['state'],
                                    redirect_uri=req['redirect_uri'])
 
@@ -208,20 +208,20 @@ class Authorization(service.Authorization):
 
 
 class AccessToken(service.AccessToken):
-    msg_type = oic.AccessTokenRequest
-    response_cls = oic.AccessTokenResponse
-    error_msg = oic.TokenErrorResponse
+    msg_type = oidc.AccessTokenRequest
+    response_cls = oidc.AccessTokenResponse
+    error_msg = oidc.TokenErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
         service.AccessToken.__init__(
-            self, httplib=httplib, keyjar=keyjar,
+            self, keyjar=keyjar,
             client_authn_method=client_authn_method,
             conf=conf)
-        self.post_parse_response = [self.oic_post_parse_response]
+        self.post_parse_response = [self.oidc_post_parse_response]
         self.post_parse_response.append(store_id_token)
 
-    def oic_post_parse_response(self, resp, cli_info, state='', **kwargs):
+    def oidc_post_parse_response(self, resp, cli_info, state='', **kwargs):
         cli_info.state_db.add_response(resp, state)
         try:
             _idt = resp['verified_id_token']
@@ -236,9 +236,9 @@ class AccessToken(service.AccessToken):
 
 
 class RefreshAccessToken(service.RefreshAccessToken):
-    msg_type = oic.RefreshAccessTokenRequest
-    response_cls = oic.AccessTokenResponse
-    error_msg = oic.TokenErrorResponse
+    msg_type = oidc.RefreshAccessTokenRequest
+    response_cls = oidc.AccessTokenResponse
+    error_msg = oidc.TokenErrorResponse
 
 
 class WebFinger(Service):
@@ -293,23 +293,23 @@ class WebFinger(Service):
 
 
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
-    msg_type = oic.Message
-    response_cls = oic.ProviderConfigurationResponse
+    msg_type = oidc.Message
+    response_cls = oidc.ProviderConfigurationResponse
     error_msg = ErrorResponse
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
         service.ProviderInfoDiscovery.__init__(
-            self, httplib=httplib, keyjar=keyjar,
-            client_authn_method=client_authn_method, conf=conf)
+            self, keyjar=keyjar, client_authn_method=client_authn_method,
+            conf=conf)
         # Should be done before any other
-        self.post_parse_response.insert(0, self.oic_post_parse_response)
+        self.post_parse_response.insert(0, self.oidc_post_parse_response)
 
         if conf:
             if 'pre_load_keys' in conf and conf['pre_load_keys']:
                 self.post_parse_response.append(self._pre_load_keys)
 
-    def oic_post_parse_response(self, resp, cli_info, **kwargs):
+    def oidc_post_parse_response(self, resp, cli_info, **kwargs):
         self.match_preferences(cli_info, resp, cli_info.issuer)
 
     def _pre_load_keys(self, resp, cli_info, **kwargs):
@@ -328,7 +328,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         If the Provider has left some claims out, defaults specified in the
         standard will be used.
 
-        :param cli_info: :py:class:`oiccli.client_info.ClientInfo` instance
+        :param cli_info: :py:class:`oidccli.client_info.ClientInfo` instance
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
         """
@@ -336,7 +336,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         if not pcr:
             pcr = cli_info.provider_info
 
-        regreq = oic.RegistrationRequest
+        regreq = oidc.RegistrationRequest
 
         for _pref, _prov in PREFERENCE2PROVIDER.items():
             try:
@@ -363,7 +363,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                     else:
                         _pvals = vals
 
-            if isinstance(vals, six.string_types):
+            if isinstance(vals, str):
                 if vals in _pvals:
                     cli_info.behaviour[_pref] = vals
             else:
@@ -392,8 +392,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                 vtyp = regreq.c_param[key]
                 if isinstance(vtyp[0], list):
                     pass
-                elif isinstance(val, list) and not isinstance(val,
-                                                              six.string_types):
+                elif isinstance(val, list) and not isinstance(val, str):
                     val = val[0]
             except KeyError:
                 pass
@@ -431,8 +430,8 @@ def response_types_to_grant_types(response_types):
 
 
 class Registration(Service):
-    msg_type = oic.RegistrationRequest
-    response_cls = oic.RegistrationResponse
+    msg_type = oidc.RegistrationRequest
+    response_cls = oidc.RegistrationResponse
     error_msg = ErrorResponse
     endpoint_name = 'registration_endpoint'
     synchronous = True
@@ -440,16 +439,16 @@ class Registration(Service):
     body_type = 'json'
     http_method = 'POST'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method,
                          conf=conf)
-        self.pre_construct = [self.oic_pre_construct]
-        self.post_construct = [self.oic_post_construct]
-        self.post_parse_response.append(self.oic_post_parse_response)
+        self.pre_construct = [self.oidc_pre_construct]
+        self.post_construct = [self.oidc_post_construct]
+        self.post_parse_response.append(self.oidc_post_parse_response)
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         """
         Create a registration request
 
@@ -481,16 +480,16 @@ class Registration(Service):
         if cli_info.requests_dir:
             try:
                 if cli_info.provider_info[
-                        'require_request_uri_registration'] is True:
+                    'require_request_uri_registration'] is True:
                     request_args[
                         'request_uris'] = cli_info.generate_request_uris(
-                            cli_info.requests_dir)
+                        cli_info.requests_dir)
             except KeyError:
                 pass
 
         return request_args, {}
 
-    def oic_post_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_post_construct(self, cli_info, request_args=None, **kwargs):
         try:
             request_args['grant_types'] = response_types_to_grant_types(
                 request_args['response_types'])
@@ -499,7 +498,7 @@ class Registration(Service):
 
         return request_args
 
-    def oic_post_parse_response(self, resp, cli_info, **kwargs):
+    def oidc_post_parse_response(self, resp, cli_info, **kwargs):
         cli_info.registration_response = resp
         if "token_endpoint_auth_method" not in cli_info.registration_response:
             cli_info.registration_response[
@@ -523,23 +522,23 @@ class Registration(Service):
 
 class UserInfo(Service):
     msg_type = Message
-    response_cls = oic.OpenIDSchema
-    error_msg = oic.UserInfoErrorResponse
+    response_cls = oidc.OpenIDSchema
+    error_msg = oidc.UserInfoErrorResponse
     endpoint_name = 'userinfo_endpoint'
     synchronous = True
     request = 'userinfo'
     default_authn_method = 'bearer_header'
     http_method = 'GET'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct = [self.oic_pre_construct]
-        self.post_parse_response.insert(0, self.oic_post_parse_response)
+        self.pre_construct = [self.oidc_pre_construct]
+        self.post_parse_response.insert(0, self.oidc_post_parse_response)
         self.post_parse_response.append(self._verify_sub)
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -551,7 +550,7 @@ class UserInfo(Service):
 
         return request_args, {}
 
-    def oic_post_parse_response(self, resp, client_info, **kwargs):
+    def oidc_post_parse_response(self, resp, client_info, **kwargs):
         return self.unpack_aggregated_claims(resp, client_info)
 
     def _verify_sub(self, resp, client_info, **kwargs):
@@ -609,65 +608,66 @@ def set_id_token(cli_info, request_args, **kwargs):
 
 
 class CheckSession(Service):
-    msg_type = oic.CheckSessionRequest
+    msg_type = oidc.CheckSessionRequest
     response_cls = Message
     error_msg = ErrorResponse
     endpoint_name = ''
     synchronous = True
     request = 'check_session'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct = [self.oic_pre_construct]
+        self.pre_construct = [self.oidc_pre_construct]
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 
 
 class CheckID(Service):
-    msg_type = oic.CheckIDRequest
+    msg_type = oidc.CheckIDRequest
     response_cls = Message
     error_msg = ErrorResponse
     endpoint_name = ''
     synchronous = True
     request = 'check_id'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct = [self.oic_pre_construct]
+        self.pre_construct = [self.oidc_pre_construct]
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 
 
 class EndSession(Service):
-    msg_type = oic.EndSessionRequest
+    msg_type = oidc.EndSessionRequest
     response_cls = Message
     error_msg = ErrorResponse
     endpoint_name = 'end_session_endpoint'
     synchronous = True
     request = 'end_session'
 
-    def __init__(self, httplib=None, keyjar=None, client_authn_method=None,
+    def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
-        Service.__init__(self, httplib=httplib, keyjar=keyjar,
+        Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct = [self.oic_pre_construct]
+        self.pre_construct = [self.oidc_pre_construct]
 
-    def oic_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         request_args = set_id_token(cli_info, request_args, **kwargs)
         return request_args, {}
 
 
 def factory(req_name, **kwargs):
     for name, obj in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isclass(obj) and issubclass(obj, Service):
+        if inspect.isclass(obj) and (
+                issubclass(obj, Service) or issubclass(obj, service.Service)):
             try:
                 if obj.__name__ == req_name:
                     return obj(**kwargs)

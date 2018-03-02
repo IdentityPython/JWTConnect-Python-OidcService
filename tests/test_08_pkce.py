@@ -1,6 +1,6 @@
-from oiccli.client_info import ClientInfo
-from oiccli.oic.pkce import add_code_challenge
-from oiccli.oic.pkce import get_code_verifier
+from oidccli.client_info import ClientInfo
+from oidccli.oidc.pkce import add_code_challenge
+from oidccli.oidc.pkce import get_code_verifier
 
 
 def test_add_code_challenge_default_values():

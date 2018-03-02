@@ -1,10 +1,10 @@
-from oiccli.client_info import ClientInfo
-from oiccli.oic.utils import construct_request_uri
-from oiccli.oic.utils import request_object_encryption
+from oidccli.client_info import ClientInfo
+from oidcmsg.oidc import AuthorizationRequest
+from oidccli.oidc.utils import construct_request_uri
+from oidccli.oidc.utils import request_object_encryption
 
-from oicmsg.key_jar import build_keyjar
-from oicmsg.key_jar import public_keys_keyjar
-from oicmsg.oic import AuthorizationRequest
+from oidcmsg.key_jar import build_keyjar
+from oidcmsg.key_jar import public_keys_keyjar
 
 from cryptojwt.jwe import factory
 

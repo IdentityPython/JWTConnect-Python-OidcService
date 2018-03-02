@@ -1,10 +1,10 @@
-.. _oiccli_service:
+.. _oidccli_service:
 
 *****************
 The Service class
 *****************
 
-The :py:class:`oiccli.service.Service` class should probably never be used as
+The :py:class:`oidccli.service.Service` class should probably never be used as
 is. What you should use are subclasses of it.
 
 This packages contains service subclasses that covers all the services defined
@@ -19,15 +19,15 @@ Class attributes
 There is a number of attributes defined for special service class, these are:
 
 msg_type
-   The request message class. :py:class:`oicmsg.message.Message` is the most
+   The request message class. :py:class:`oidcmsg.message.Message` is the most
    general such class and is therefor the default.
 
 response_cls
-   The response message class. :py:class:`oicmsg.message.Message` is the default
+   The response message class. :py:class:`oidcmsg.message.Message` is the default
 
 error_msg
    The error message response class.
-   :py:class:`oicmsg.oauth2.message.ErrorResponse` is the default class.
+   :py:class:`oidcmsg.oauth2.message.ErrorResponse` is the default class.
 
 endpoint_name
    Which endpoint on the OP/AS this service is using.
@@ -56,13 +56,13 @@ response_body_type
    Default is 'json'
 
 
-Take :py:class:`oiccli.oic.service.UserInfo` as an example. The default
+Take :py:class:`oidccli.oidc.service.UserInfo` as an example. The default
 specification is::
 
     class UserInfo(Service):
         msg_type = Message
-        response_cls = oicmsg.oic.OpenIDSchema
-        error_msg = oicmsg.oic.UserInfoErrorResponse
+        response_cls = oidcmsg.oidc.OpenIDSchema
+        error_msg = oidcmsg.oidc.UserInfoErrorResponse
         endpoint_name = 'userinfo_endpoint'
         synchronous = True
         request = 'userinfo'
@@ -73,7 +73,7 @@ specification is::
 Now if you want to talk to GitHub they do things a bit differently so
 I had to construct a GitHub UserInfo class that looked like this::
 
-    class GitHubUserInfo(oiccli.oic.service.UserInfo):
+    class GitHubUserInfo(oidccli.oidc.service.UserInfo):
         response_cls = Message
         error_msg = ErrorResponse
         default_authn_method = ''
@@ -126,9 +126,9 @@ wrote above.
 
 This is part of the source code::
 
-    from oicmsg import oauth2
-    from oiccli import OIDCONF_PATTERN
-    from oiccli.service import Service
+    from oidcmsg import oauth2
+    from oidccli import OIDCONF_PATTERN
+    from oidccli.service import Service
 
     class ProviderInfoDiscovery(Service):
         msg_type = oauth2.Message
@@ -169,7 +169,7 @@ no parameters it is just a simple GET.
 
 Thirdly, I added a method that will be excecuted after the response has been
 parsed. This method will store the provider info in the
-:py:class:`oiccli.client_info.ClientInfo` instance the cli_info is pointing to.
+:py:class:`oidccli.client_info.ClientInfo` instance the cli_info is pointing to.
 It will also update the service instances such that they will contain the
 endpoint URLs given in the received provider info.
 

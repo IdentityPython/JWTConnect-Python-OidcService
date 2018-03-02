@@ -4,12 +4,12 @@ import pytest
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
-from oiccli import util
-from oiccli.util import JSON_ENCODED
+from oidccli import util
+from oidccli.util import JSON_ENCODED
 
-from oicmsg.exception import UnSupported
-from oicmsg.oic import AuthorizationRequest
-from oicmsg.oic import AccessTokenRequest
+from oidcmsg.exception import UnSupported
+from oidcmsg.oidc import AuthorizationRequest
+from oidcmsg.oidc import AccessTokenRequest
 
 __author__ = 'DIRG'
 

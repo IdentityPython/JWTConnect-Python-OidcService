@@ -1,13 +1,13 @@
 import shelve
 
-from oicmsg.message import Message
-from oicmsg.message import SINGLE_OPTIONAL_STRING
-from oicmsg.message import SINGLE_REQUIRED_STRING
-from oicmsg.oauth2 import AuthorizationResponse
-from oicmsg.oic import JsonWebToken
-from oicmsg.time_util import utc_time_sans_frac
+from oidcmsg.message import Message
+from oidcmsg.message import SINGLE_OPTIONAL_STRING
+from oidcmsg.message import SINGLE_REQUIRED_STRING
+from oidcmsg.oauth2 import AuthorizationResponse
+from oidcmsg.oidc import JsonWebToken
+from oidcmsg.time_util import utc_time_sans_frac
 
-from oiccli import rndstr
+from oidccli import rndstr
 
 
 # draft-bradley-oauth-jwt-encoded-state-05

@@ -3,7 +3,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
-from oicmsg.exception import UnSupported
+from oidcmsg.exception import UnSupported
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
 
     :param uri: The URL pointing to where the request should be sent
     :param method: Which method that should be used to send the request
-    :param req: The request as a :py:class:`oicmsg.message.Message` instance
+    :param req: The request as a :py:class:`oidcmsg.message.Message` instance
     :param content_type: Which content type to use for the body
     :param accept: Whether an Accept header should be added to the HTTP request
     :param kwargs: Extra keyword arguments.

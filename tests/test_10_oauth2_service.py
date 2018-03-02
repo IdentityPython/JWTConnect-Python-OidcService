@@ -1,13 +1,13 @@
 import pytest
 
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.client_info import ClientInfo
-from oiccli.oauth2.service import factory
-from oiccli.service import Service
+from oidccli.client_auth import CLIENT_AUTHN_METHOD
+from oidccli.client_info import ClientInfo
+from oidccli.oauth2.service import factory
+from oidccli.service import Service
 
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import AuthorizationRequest
-from oicmsg.oauth2 import Message
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import Message
 
 
 class Response(object):

@@ -1,11 +1,12 @@
 import pytest
 
-from oiccli.client_info import ClientInfo
-from oicmsg.oauth2 import Message
-from oicmsg.oauth2 import SINGLE_OPTIONAL_INT
-from oicmsg.oauth2 import SINGLE_OPTIONAL_STRING
-from oicmsg.oauth2 import SINGLE_REQUIRED_STRING
-from oiccli.service import Service
+from oidccli.client_info import ClientInfo
+from oidccli.service import Service
+
+from oidcmsg.oauth2 import Message
+from oidcmsg.oauth2 import SINGLE_OPTIONAL_INT
+from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
+from oidcmsg.oauth2 import SINGLE_REQUIRED_STRING
 
 
 class DummyMessage(Message):

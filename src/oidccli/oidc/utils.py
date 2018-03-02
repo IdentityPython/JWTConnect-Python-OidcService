@@ -1,10 +1,9 @@
-import hashlib
 import os
 
-from cryptojwt import jwe, as_bytes
+from cryptojwt import jwe
 from cryptojwt.jwe import JWE
-from oiccli import rndstr
-from oicmsg.exception import MissingRequiredAttribute
+from oidccli import rndstr
+from oidcmsg.exception import MissingRequiredAttribute
 
 
 def request_object_encryption(msg, client_info, **kwargs):
@@ -69,15 +68,3 @@ def construct_request_uri(local_dir, base_path, **kwargs):
         filename = os.path.join(_filedir, _name)
     _webname = "%s%s" % (_webpath, _name)
     return filename, _webname
-
-
-# def generate_request_uris(client_info, request_dir):
-#     """
-#     Need to generate a path that is unique for the OP combo
-#
-#     :return: A list of uris
-#     """
-#     m = hashlib.sha256()
-#     m.update(as_bytes(client_info.provider_info['issuer']))
-#     m.update(as_bytes(client_info.base_url))
-#     return '{}{}/{}'.format(client_info.base_url, request_dir, m.hexdigest())

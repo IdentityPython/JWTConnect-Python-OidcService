@@ -1,8 +1,9 @@
-from urllib.parse import urlsplit
-
 import os
 import pytest
-from oiccli.client_info import ClientInfo
+
+from urllib.parse import urlsplit
+
+from oidccli.client_info import ClientInfo
 
 
 def test_client_info_init():

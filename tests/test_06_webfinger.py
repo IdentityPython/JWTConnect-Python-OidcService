@@ -1,9 +1,9 @@
 import json
 
-from oiccli.webfinger import OIC_ISSUER
-from oiccli.webfinger import URINormalizer
-from oiccli.webfinger import WebFinger
-from oicmsg.oic import Link, JRD
+from oidccli.webfinger import OIC_ISSUER
+from oidccli.webfinger import URINormalizer
+from oidccli.webfinger import WebFinger
+from oidcmsg.oidc import Link, JRD
 
 __author__ = 'Roland Hedberg'
 

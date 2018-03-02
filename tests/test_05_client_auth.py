@@ -1,35 +1,35 @@
 import base64
 import os
-
 import pytest
+
 from cryptojwt import as_bytes
 from cryptojwt import b64e
 from cryptojwt.jwk import SYMKey
 from cryptojwt.jwk import rsa_load
 from cryptojwt.jws import JWS
 from cryptojwt.jwt import JWT
-from oiccli.client_info import ClientInfo
 
-from oiccli.oic import DEFAULT_SERVICES, service
+from oidccli import JWT_BEARER
+from oidccli.client_auth import assertion_jwt
+from oidccli.client_auth import BearerBody
+from oidccli.client_auth import BearerHeader
+from oidccli.client_auth import CLIENT_AUTHN_METHOD
+from oidccli.client_auth import ClientSecretBasic
+from oidccli.client_auth import ClientSecretJWT
+from oidccli.client_auth import ClientSecretPost
+from oidccli.client_auth import PrivateKeyJWT
+from oidccli.client_auth import valid_client_info
+from oidccli.client_info import ClientInfo
+from oidccli.oidc import DEFAULT_SERVICES
+from oidccli.oidc import service
+from oidccli.service import build_services
 
-from oiccli.service import build_services
-
-from oiccli import JWT_BEARER
-from oiccli.client_auth import assertion_jwt
-from oiccli.client_auth import BearerBody
-from oiccli.client_auth import BearerHeader
-from oiccli.client_auth import CLIENT_AUTHN_METHOD
-from oiccli.client_auth import ClientSecretBasic
-from oiccli.client_auth import ClientSecretJWT
-from oiccli.client_auth import ClientSecretPost
-from oiccli.client_auth import PrivateKeyJWT
-from oiccli.client_auth import valid_client_info
-from oicmsg.key_bundle import KeyBundle
-from oicmsg.oauth2 import AccessTokenRequest
-from oicmsg.oauth2 import AccessTokenResponse
-from oicmsg.oauth2 import AuthorizationResponse
-from oicmsg.oauth2 import CCAccessTokenRequest
-from oicmsg.oauth2 import ResourceRequest
+from oidcmsg.key_bundle import KeyBundle
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.oauth2 import AuthorizationResponse
+from oidcmsg.oauth2 import CCAccessTokenRequest
+from oidcmsg.oauth2 import ResourceRequest
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 CLIENT_ID = "A"
@@ -46,7 +46,7 @@ def _eq(l1, l2):
 
 @pytest.fixture
 def services():
-    return build_services(DEFAULT_SERVICES, service.factory, None, None,
+    return build_services(DEFAULT_SERVICES, service.factory, keyjar=None,
                           client_authn_method=CLIENT_AUTHN_METHOD)
 
 

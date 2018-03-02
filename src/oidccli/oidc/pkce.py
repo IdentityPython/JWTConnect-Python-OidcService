@@ -1,6 +1,6 @@
 from cryptojwt import b64e
-from oiccli import unreserved, CC_METHOD
-from oiccli.exception import Unsupported
+from oidccli import unreserved, CC_METHOD
+from oidccli.exception import Unsupported
 
 
 def add_code_challenge(client_info, state):

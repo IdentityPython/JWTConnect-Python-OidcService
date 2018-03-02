@@ -1,7 +1,7 @@
-oiccli
-======
+oidccli
+=======
 
 .. toctree::
    :maxdepth: 4
 
-   oiccli
+   oidccli

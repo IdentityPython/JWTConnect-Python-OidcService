@@ -43,20 +43,19 @@ if sys.version_info[0] == 2 and sys.version_info[1] == 6:
 else:
     extra_install_requires = []
 
-version = ''
-with open('src/oiccli/__init__.py', 'r') as fd:
+with open('src/oidccli/__init__.py', 'r') as fd:
     version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
                         fd.read(), re.MULTILINE).group(1)
 
 setup(
-    name="oiccli",
+    name="oidccli",
     version=version,
-    description="Python implementation of OAuth2 and OpenID Connect client",
+    description="Python implementation of OAuth2 and OpenID Connect Services",
     author="Roland Hedberg",
     author_email="roland@catalogix.se",
     license="Apache 2.0",
-    url='https://github.com/IdentityPython/oicmsg/',
-    packages=["oiccli", "oiccli/oauth2", "oiccli/oic"],
+    url='https://github.com/IdentityPython/oidccli/',
+    packages=["oidccli", "oidccli/oauth2", "oidccli/oidc"],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -66,9 +65,8 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
-        'oicmsg',
-        "future",
-        "six",
+        "cryptojwt",
+        'oidcmsg',
     ],
     tests_require=[
         "responses",
