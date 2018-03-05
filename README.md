@@ -1,2 +1,2 @@
 # oidccli
-Implementation of an OIDC RP library
+Implementation of OIDC/OAuth2 services
