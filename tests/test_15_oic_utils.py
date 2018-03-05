@@ -1,7 +1,7 @@
-from oidccli.client_info import ClientInfo
+from oidcservice.client_info import ClientInfo
 from oidcmsg.oidc import AuthorizationRequest
-from oidccli.oidc.utils import construct_request_uri
-from oidccli.oidc.utils import request_object_encryption
+from oidcservice.oidc.utils import construct_request_uri
+from oidcservice.oidc.utils import request_object_encryption
 
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import public_keys_keyjar

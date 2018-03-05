@@ -3,11 +3,11 @@ import logging
 
 from cryptojwt.jws import alg2keytype
 
-from oidccli import rndstr
-from oidccli import sanitize
-from oidccli import DEF_SIGN_ALG
-from oidccli import JWT_BEARER
-from oidccli.exception import MissingRequiredAttribute
+from oidcservice import rndstr
+from oidcservice import sanitize
+from oidcservice import DEF_SIGN_ALG
+from oidcservice import JWT_BEARER
+from oidcservice.exception import MissingRequiredAttribute
 from oidcmsg.message import VREQUIRED
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
@@ -81,7 +81,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         Construct a dictionary to be added to the HTTP request headers
 
         :param request: The request
-        :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
         :param http_args: HTTP arguments
         :return: dictionary of HTTP arguments
         """
@@ -236,7 +236,7 @@ class BearerBody(ClientAuthnMethod):
         Will add access_token to the request if not present
 
         :param request: The request
-        :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
         :param http_args: HTTP arguments
         :param kwargs: extra keyword arguments
         :return: A possibly modified dictionary with HTTP arguments.
@@ -307,7 +307,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
         Pick signing key based on signing algorithm to be used
 
         :param algorithm: Signing algorithm
-        :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
         :return: A key
         """
         return cli_info.keyjar.get_signing_key(
@@ -319,7 +319,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
 
         :param kid: Key ID
         :param algorithm: Signing algorithm
-        :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
         :return: A matching key
         """
         _key = cli_info.keyjar.get_key_by_kid(kid)
@@ -338,7 +338,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
         The request is modified as a side effect.
 
         :param request: The request
-        :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
         :param http_args: HTTP arguments
         :param kwargs: Extra arguments
         :return: Constructed HTTP arguments, in this case none
@@ -463,7 +463,7 @@ def valid_client_info(cinfo, when=0):
     """
     Check if the client_secret has expired
 
-    :param cinfo: A :py:class:`oidccli.client_info.ClientInfo` instance
+    :param cinfo: A :py:class:`oidcservice.client_info.ClientInfo` instance
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """

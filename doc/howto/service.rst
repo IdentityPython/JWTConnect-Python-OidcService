@@ -151,7 +151,7 @@ This is part of the source code::
             else:
                 _issuer = issuer
 
-            return {'url': OIDCONF_PATTERN % _issuer}
+            return {'url': OIDCONF_PATTERN.format(_issuer)}
 
         def oauth_post_parse_response(self, resp, cli_info, **kwargs):
             """

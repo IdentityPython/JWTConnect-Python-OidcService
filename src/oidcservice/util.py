@@ -39,8 +39,35 @@ ATTRS = {"version": None,
          "rfc2109": True}
 
 
+def get_http_url(uri, req, method='GET'):
+    if method in ["GET", "DELETE"]:
+        if req.keys():
+            _req = req.copy()
+            comp = urlsplit(str(uri))
+            if comp.query:
+                _req.update(parse_qs(comp.query))
+
+            _query = str(_req.to_urlencoded())
+            return urlunsplit((comp.scheme, comp.netloc, comp.path,
+                               _query, comp.fragment))
+        else:
+            return uri
+    else:
+        return uri
+
+
+def get_http_body(req, content_type):
+    if content_type == URL_ENCODED:
+        return req.to_urlencoded()
+    elif content_type == JSON_ENCODED:
+        return req.to_json()
+    else:
+        raise UnSupported(
+            "Unsupported content type: '%s'" % content_type)
+
+
 def get_or_post(uri, method, req, content_type=DEFAULT_POST_CONTENT_TYPE,
-        accept=None, **kwargs):
+                accept=None, **kwargs):
     """
     Create the information pieces necessary for sending a request.
     Depending on whether the request is done using GET or POST the request

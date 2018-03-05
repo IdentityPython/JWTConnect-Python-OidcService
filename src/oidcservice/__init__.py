@@ -11,7 +11,7 @@ __author__ = 'Roland Hedberg'
 __version__ = '0.2.0'
 
 
-OIDCONF_PATTERN = "%s/.well-known/openid-configuration"
+OIDCONF_PATTERN = "{}/.well-known/openid-configuration"
 CC_METHOD = {
     'S256': hashlib.sha256,
     'S384': hashlib.sha384,

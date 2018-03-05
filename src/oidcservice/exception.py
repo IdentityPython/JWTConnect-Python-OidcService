@@ -2,7 +2,7 @@
 __author__ = 'roland'
 
 
-# The base exception class for oidccli specific exceptions
+# The base exception class for oidcservice specific exceptions
 class OidcCliError(Exception):
     def __init__(self, errmsg, content_type="", *args):
         Exception.__init__(self, errmsg, *args)
@@ -109,4 +109,7 @@ class ConfigurationError(OidcCliError):
 
 
 class WrongContentType(OidcCliError):
+    pass
+
+class WebFingerError(OidcCliError):
     pass

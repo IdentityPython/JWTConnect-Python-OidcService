@@ -48,7 +48,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'oidccli'
+project = u'oidcservice'
 copyright = u'2017, Roland Hedberg'
 author = u'Roland Hedberg'
 
@@ -141,7 +141,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'oidccli.tex', u'oidccli Documentation',
+    (master_doc, 'oidcservice.tex', u'oidcservice Documentation',
      u'Roland Hedberg', 'manual'),
 ]
 
@@ -151,7 +151,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'oidccli', u'oidccli Documentation',
+    (master_doc, 'oidcservice', u'oidcservice Documentation',
      [author], 1)
 ]
 
@@ -162,8 +162,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'oidccli', u'oidccli Documentation',
-     author, 'oidccli', 'One line description of project.',
+    (master_doc, 'oidcservice', u'oidcservice Documentation',
+     author, 'oidcservice', 'One line description of project.',
      'Miscellaneous'),
 ]
 

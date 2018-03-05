@@ -3,7 +3,7 @@ import pytest
 
 from urllib.parse import urlsplit
 
-from oidccli.client_info import ClientInfo
+from oidcservice.client_info import ClientInfo
 
 
 def test_client_info_init():

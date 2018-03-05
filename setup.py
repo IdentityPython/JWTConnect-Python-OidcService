@@ -43,19 +43,19 @@ if sys.version_info[0] == 2 and sys.version_info[1] == 6:
 else:
     extra_install_requires = []
 
-with open('src/oidccli/__init__.py', 'r') as fd:
+with open('src/oidcservice/__init__.py', 'r') as fd:
     version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
                         fd.read(), re.MULTILINE).group(1)
 
 setup(
-    name="oidccli",
+    name="oidcservice",
     version=version,
     description="Python implementation of OAuth2 and OpenID Connect Services",
     author="Roland Hedberg",
     author_email="roland@catalogix.se",
     license="Apache 2.0",
-    url='https://github.com/IdentityPython/oidccli/',
-    packages=["oidccli", "oidccli/oauth2", "oidccli/oidc"],
+    url='https://github.com/IdentityPython/oidcservice/',
+    packages=["oidcservice", "oidcservice/oauth2", "oidcservice/oidc"],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 4 - Beta",

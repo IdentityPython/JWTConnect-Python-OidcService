@@ -7,10 +7,10 @@ from cryptojwt.exception import Invalid
 from cryptojwt.exception import MissingKey
 from cryptojwt.jws import alg2keytype
 
-from oidccli import JWT_BEARER
-from oidccli import rndstr
-from oidccli import sanitize
-from oidccli.client_auth import AuthnFailure
+from oidcservice import JWT_BEARER
+from oidcservice import rndstr
+from oidcservice import sanitize
+from oidcservice.client_auth import AuthnFailure
 from oidcmsg.exception import FailedAuthentication
 from oidcmsg.exception import NotForMe
 from oidcmsg.exception import UnknownAssertionType

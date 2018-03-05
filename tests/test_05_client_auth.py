@@ -9,20 +9,20 @@ from cryptojwt.jwk import rsa_load
 from cryptojwt.jws import JWS
 from cryptojwt.jwt import JWT
 
-from oidccli import JWT_BEARER
-from oidccli.client_auth import assertion_jwt
-from oidccli.client_auth import BearerBody
-from oidccli.client_auth import BearerHeader
-from oidccli.client_auth import CLIENT_AUTHN_METHOD
-from oidccli.client_auth import ClientSecretBasic
-from oidccli.client_auth import ClientSecretJWT
-from oidccli.client_auth import ClientSecretPost
-from oidccli.client_auth import PrivateKeyJWT
-from oidccli.client_auth import valid_client_info
-from oidccli.client_info import ClientInfo
-from oidccli.oidc import DEFAULT_SERVICES
-from oidccli.oidc import service
-from oidccli.service import build_services
+from oidcservice import JWT_BEARER
+from oidcservice.client_auth import assertion_jwt
+from oidcservice.client_auth import BearerBody
+from oidcservice.client_auth import BearerHeader
+from oidcservice.client_auth import CLIENT_AUTHN_METHOD
+from oidcservice.client_auth import ClientSecretBasic
+from oidcservice.client_auth import ClientSecretJWT
+from oidcservice.client_auth import ClientSecretPost
+from oidcservice.client_auth import PrivateKeyJWT
+from oidcservice.client_auth import valid_client_info
+from oidcservice.client_info import ClientInfo
+from oidcservice.oidc import DEFAULT_SERVICES
+from oidcservice.oidc import service
+from oidcservice.service import build_services
 
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.oauth2 import AccessTokenRequest
@@ -132,15 +132,18 @@ class TestBearerHeader(object):
         # Add a state and bind a code to it
         client_info.state_db['AAAA'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
-        services['authorization'].parse_response(
+        response = services['authorization'].parse_response(
             resp1.to_urlencoded(), client_info, "urlencoded")
+        services['authorization'].update_client_info(client_info, response)
 
         # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="AAAA")
-        services['accesstoken'].parse_response(
+        response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), client_info, "urlencoded")
+
+        services['accesstoken'].update_client_info(client_info, response)
 
         # and finally use the access token, bound to a state, to
         # construct the authorization header
@@ -178,13 +181,16 @@ class TestBearerBody(object):
     def test_construct_with_request(self, client_info, services):
         client_info.state_db['EEEE'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
-        services['authorization'].parse_response(
+        response = services['authorization'].parse_response(
             resp1.to_urlencoded(), client_info, "urlencoded")
+        services['authorization'].update_client_info(client_info, response)
+
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="EEEE")
-        services['accesstoken'].parse_response(
+        response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), client_info, "urlencoded")
+        services['accesstoken'].update_client_info(client_info, response)
 
         request = ResourceRequest()
         BearerBody().construct(request, cli_info=client_info, state="EEEE")

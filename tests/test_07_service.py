@@ -1,7 +1,7 @@
 import pytest
 
-from oidccli.client_info import ClientInfo
-from oidccli.service import Service
+from oidcservice.client_info import ClientInfo
+from oidcservice.service import Service
 
 from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_INT
@@ -48,27 +48,23 @@ class TestDummyService(object):
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
-    def test_request_info(self):
+    def test_get_request_information(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.request_info(self.cli_info, request_args=req_args)
-        assert set(_info.keys()) == {'url', 'request', 'method'}
-        assert _info['request'] == {'foo': 'bar',
-                                    'req_str': 'some string'}
+        _info = self.service.get_request_information(self.cli_info, request_args=req_args)
+        assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
-        assert msg.to_dict() == _info['request']
 
     def test_request_init(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.do_request_init(self.cli_info,
+        _info = self.service.get_request_information(self.cli_info,
                                              request_args=req_args)
-        assert set(_info.keys()) == {'url', 'request', 'method'}
-        assert _info['request'] == {'foo': 'bar', 'req_str': 'some string'}
+        assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
-        assert msg.to_dict() == _info['request']
+        assert msg.to_dict() == {'foo': 'bar', 'req_str': 'some string'}
 
 
 class TestRequest(object):

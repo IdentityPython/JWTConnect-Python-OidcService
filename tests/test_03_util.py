@@ -4,8 +4,8 @@ import pytest
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
-from oidccli import util
-from oidccli.util import JSON_ENCODED
+from oidcservice import util
+from oidcservice.util import JSON_ENCODED
 
 from oidcmsg.exception import UnSupported
 from oidcmsg.oidc import AuthorizationRequest

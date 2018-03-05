@@ -2,7 +2,7 @@ import os
 
 from cryptojwt import jwe
 from cryptojwt.jwe import JWE
-from oidccli import rndstr
+from oidcservice import rndstr
 from oidcmsg.exception import MissingRequiredAttribute
 
 

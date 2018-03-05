@@ -4,8 +4,8 @@ import os
 from cryptojwt import as_bytes
 from cryptojwt.jwk import import_private_rsa_key_from_file
 from cryptojwt.jwk import RSAKey
-from oidccli import DEF_SIGN_ALG
-from oidccli.state import State
+from oidcservice import DEF_SIGN_ALG
+from oidcservice.state import State
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import KeyJar

@@ -2,9 +2,9 @@ import inspect
 import logging
 import sys
 
-from oidccli import OIDCONF_PATTERN
-from oidccli.exception import OidcCliError
-from oidccli.service import Service
+from oidcservice import OIDCONF_PATTERN
+from oidcservice.exception import OidcCliError
+from oidcservice.service import Service
 
 from oidcmsg import oauth2
 from oidcmsg.exception import MissingParameter
@@ -15,11 +15,6 @@ from oidcmsg.oidc import AuthorizationResponse
 __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
-
-
-def _post_x_parse_response(resp, cli_info, state=''):
-    if isinstance(resp, (AuthorizationResponse, AccessTokenResponse)):
-        cli_info.state_db.add_response(resp, state)
 
 
 def get_state(request_args, kwargs):
@@ -47,7 +42,9 @@ class Authorization(Service):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
-        self.post_parse_response.append(_post_x_parse_response)
+
+    def update_client_info(self, cli_info, resp, state='', **kwargs):
+        cli_info.state_db.add_response(resp, state)
 
     def gather_request_args(self, cli_info, **kwargs):
         ar_args = Service.gather_request_args(self, cli_info, **kwargs)
@@ -59,27 +56,6 @@ class Authorization(Service):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
-
-    def do_request_init(self, cli_info, body_type="", method="GET",
-                        authn_method='', request_args=None, http_args=None,
-                        **kwargs):
-
-        try:
-            _algs = kwargs['algs']
-        except KeyError:
-            _algs = {}
-        else:
-            del kwargs['algs']
-
-        _info = Service.do_request_init(self, cli_info, body_type=body_type,
-                                        method=method,
-                                        authn_method=authn_method,
-                                        request_args=request_args,
-                                        http_args=http_args,
-                                        **kwargs)
-
-        _info['algs'] = _algs
-        return _info
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
 
@@ -113,7 +89,9 @@ class AccessToken(Service):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
-        self.post_parse_response.append(_post_x_parse_response)
+
+    def update_client_info(self, cli_info, resp, state='', **kwargs):
+        cli_info.state_db.add_response(resp, state)
 
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
@@ -145,6 +123,9 @@ class RefreshAccessToken(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
+    def update_client_info(self, cli_info, resp, state='', **kwargs):
+        cli_info.state_db.add_response(resp, state)
+
     def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
         req_args = cli_info.state_db.get_response_args(_state, self.msg_type)
@@ -168,7 +149,6 @@ class ProviderInfoDiscovery(Service):
     def __init__(self, keyjar=None, client_authn_method=None, conf=None):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
-        self.post_parse_response.append(self.oauth_post_parse_response)
 
     def request_info(self, cli_info, method="GET", request_args=None,
                      lax=False, **kwargs):
@@ -180,9 +160,9 @@ class ProviderInfoDiscovery(Service):
         else:
             _issuer = issuer
 
-        return {'url': OIDCONF_PATTERN % _issuer}
+        return {'url': OIDCONF_PATTERN.format(_issuer)}
 
-    def oauth_post_parse_response(self, resp, cli_info, **kwargs):
+    def update_client_info(self, cli_info, resp, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response

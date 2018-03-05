@@ -111,16 +111,15 @@ they are called.
 
 The overall call sequence looks like this:
 
-   - `do_request_init`_
-        + `request_info`_
-            * `construct`_
-                - `do_pre_construct`_ (#)
-                - `gather_request_args`_
-                - `do_post_construct`_ (#)
-            * `init_authentication_method`_
-            * `uri_and_body`_
-                - `endpoint`_
-        + `update_http_args`_
+    + get_request_information
+        - construct_request
+            - construct
+                - pre_construct (*)
+                - gather_request_args
+                - post_construct (*)
+        - get_http_url
+        - get_authn_header
+        - get_http_body
 
 The result of the request pipeline is a dictionary that in its simplest form
 will look something like this::
@@ -131,21 +130,21 @@ will look something like this::
 
 It will look like that when the request is to be transmitted as the urlencoded
 query part of a HTTP GET operation. If instead a HTTP POST with a json body is
-expected the outcome of `do_request_init`_ will be something like this::
+expected the outcome of `get_request_information`_ will be something like this::
 
     {
         'url': 'https://example.com/token',
         'body': 'grant_type=authorization_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcli%2Fauthz_cb&code=access_code&client_id=client_id',
-        'h_args': {'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}}
+        'headers': {'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk', 'Content-Type': 'application/x-www-form-urlencoded'}
     }
 
 Here you have the url that the request should go to, the body of the request
 and header arguments to add to the HTTP request.
 
-do_request_init
-===============
+get_request_information
+=======================
 
-Implmented in :py:meth:`oiccli.service.Service.do_request_init`
+Implemented in :py:meth:`oiccli.service.Service.get_request_information`
 
 Nothing much happens locally in this method, it starts with gathering
 information about which HTTP method is used, the client authentication method
@@ -153,28 +152,14 @@ and the how the request should be serialized.
 
 It the calls the next method
 
-request_info
-------------
+construct_request
+-----------------
 
-Implemented in :py:meth:`oiccli.service.Service.request_info`
+Implemented in :py:meth:`oiccli.service.Service.construct_request`
 
 The method where most is done leading up to the sending of the request.
 The request information is gathered and the where to and how of sending the
 request is decided.
-
-will do these things:
-
-    1. Remove request arguments that is know at this point should not appear in
-        the request
-    2. Construct the request
-    3. Do the client authentication setup if necessary
-    4. Set the necessary HTTP headers
-
-to do this the method will call 3 other methods:
-
-    1. `construct`_
-    2. `init_authentication_method`_
-    3. `uri_and_body`_
 
 construct
 '''''''''
@@ -233,9 +218,10 @@ until all request arguments have been gathered.
 The prime example of this is to construct a signed Jason Web Token to be
 add as value to the *request* parameter or referenced to by *request_uri*.
 
-init_authentication_method
-''''''''''''''''''''''''''
-Implemented in :py:meth:`oiccli.service.Service.init_authentication_method`
+get_authn_header
+----------------
+
+Implemented in :py:meth:`oiccli.service.Service.get_authn_header`
 
 oiccli supports 6 different client authentication/authorization methods
 
@@ -247,11 +233,13 @@ oiccli supports 6 different client authentication/authorization methods
     - private_key_jwt
 
 depending on which of these, if any, is supposed to be used different things
-has to happen. Thos things will happen when this method is called.
+has to happen. In the cases where something has to be added to the
+HTTP *Authorization* header
 
-uri_and_body
-''''''''''''
-Implemented in :py:meth:`oiccli.service.Service.uri_and_body`
+get_http_url
+------------
+
+Implemented in :py:meth:`oiccli.service.Service.get_http_url`
 
 Depending on where the request are to be placed in the request (part of the
 URL or as a POST body) and the serialization used the request in it's proper
@@ -283,11 +271,10 @@ they are called.
 
 The overall call sequence looks like this:
 
-   - `parse_request_response`_
-        + `parse_response`_
-            * `get_urlinfo`_
-            * `do_post_parse_response`_ (#)
-        + `parse_error_mesg`_
+    + `parse_response`_
+        * `get_urlinfo`_
+        * `do_post_parse_response`_ (#)
+    + `parse_error_mesg`_
 
 parse_request_response
 ======================
@@ -461,6 +448,7 @@ To parse and use it I can run another method provide by the service instance::
 
     response = service['webfinger'].parse_response(webfinger_response,
                                                    client_info)
+    service['webfinger'].update_client_info(client_info, response)
 
 It's assumed that *webfinger_response* contains the JSON document mentioned
 above.
@@ -581,8 +569,9 @@ It does and we get a JSON document that looks something like this::
 Quite a lot of information as you can see.
 We feed this information into *parse_response* and let it do its business::
 
-    resp = service['provider_info'].parse_response(json_document,
-                                                   client_info)
+    resp = service['provider_info'].parse_response(json_document, client_info)
+
+    service['provider_info'].update_client_info(client_info, resp)
 
 *json_document* contains the JSON document from the HTTP response.
 *parse_response* will parse and verify the response. One such verification is

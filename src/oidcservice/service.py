@@ -1,11 +1,13 @@
 import logging
 from urllib.parse import urlparse
 
-from oidccli.exception import MissingEndpoint
-from oidccli.exception import OidcCliError
-from oidccli.exception import ResponseError
-from oidccli.util import get_or_post
-from oidccli.util import JSON_ENCODED
+from oidcservice.exception import MissingEndpoint
+from oidcservice.exception import OidcCliError
+from oidcservice.exception import ResponseError
+from oidcservice.util import get_http_body
+from oidcservice.util import get_http_url
+from oidcservice.util import JSON_ENCODED
+from oidcservice.util import URL_ENCODED
 from oidcmsg.oauth2 import AuthorizationErrorResponse
 from oidcmsg.oauth2 import ErrorResponse
 from oidcmsg.oauth2 import Message
@@ -20,31 +22,28 @@ logger = logging.getLogger(__name__)
 method call structure for Services.
 This is for constructing requests:
 
-do_request_init
-    - request_info
+get_request_information
+    - construct_request
         - construct 
             - pre_construct (*)
             - gather_request_args
             - post_construct (*)
-        - init_authentication_method
-        - uri_and_body
-            - _endpoint
-    - update_http_args
+    - get_http_url
+    - get_authn_header
+    - get_http_body
 
 and this for parsing the response.
 
 parse_response
-     - get_urlinfo
-     - post_parse_response (*)
-    
+     - get_urlinfo 
+     - post_parse_response   
 or
-
 parse_error_mesg
 
 The methods marked with (*) are where service specific
 behaviour is implemented.
 
-
+update_client_info
 """
 
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
@@ -57,23 +56,6 @@ RESPONSE2ERROR = {
 SPECIAL_ARGS = ['authn_endpoint', 'algs']
 
 REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
-
-
-def update_http_args(http_args, info):
-    """
-    Extending the HTTP headers with information gathered during the request
-    setup.
-
-    :param http_args: Original HTTP header arguments
-    :param info: Request info
-    :return: Updated request info
-    """
-
-    if http_args:
-        http_args.update(info['kwargs'])
-        info['kwargs'] = http_args
-
-    return info
 
 
 class Service(object):
@@ -108,7 +90,6 @@ class Service(object):
         # pull in all the modifiers
         self.pre_construct = []
         self.post_construct = []
-        self.post_parse_response = []
 
     def gather_request_args(self, client_info, **kwargs):
         """
@@ -159,7 +140,7 @@ class Service(object):
         Will run the pre_construct methods one by one in the order given.
 
         :param client_info: Client Information as a
-            :py:class:`oidccli.client_info.ClientInfo` instance.
+            :py:class:`oidcservice.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param kwargs: Extra key word arguments
         :return: A tuple of request_args and post_args. post_args are to be
@@ -179,7 +160,7 @@ class Service(object):
         Will run the post_construct methods one at the time in order.
 
         :param client_info: Client Information as a
-            :py:class:`oidccli.client_info.ClientInfo` instance.
+            :py:class:`oidcservice.client_info.ClientInfo` instance.
         :param request_args: Request arguments
         :param kwargs: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
@@ -191,20 +172,17 @@ class Service(object):
 
         return request_args
 
-    def do_post_parse_response(self, resp, client_info, state='', **kwargs):
+    def update_client_info(self, client_info, resp, state='', **kwargs):
         """
         A method run after the response has been parsed and verified.
 
         :param resp: The response as a :py:class:`oidcmsg.Message` instance
         :param client_info: Client Information as a
-            :py:class:`oidccli.client_info.ClientInfo` instance.
+            :py:class:`oidcservice.client_info.ClientInfo` instance.
         :param state: state value
         :param kwargs: Extra key word arguments
         """
-        _args = self.method_args('post_parse_response', **kwargs)
-
-        for meth in self.post_parse_response:
-            meth(resp, client_info, state=state, **_args)
+        pass
 
     def construct(self, client_info, request_args=None, **kwargs):
         """
@@ -272,35 +250,8 @@ class Service(object):
 
         return uri
 
-    def uri_and_body(self, request, method="POST", **kwargs):
-        """
-        Based on the HTTP method place the protocol message in the right
-        place.
-
-        :param request: The request as a Message class instance
-        :param method: HTTP method
-        :param kwargs: Extra keyword argument
-        :return: Dictionary with 'url' and possibly also 'body' and 'kwargs'
-            as keys
-        """
-        # Find out where to send this request
-        uri = self._endpoint(**kwargs)
-
-        # This is where the message gets assigned to its proper place
-        info = get_or_post(uri, method, request, **kwargs)
-
-        # transport independent version of the request
-        info['request'] = request.to_dict()
-
-        # If there are HTTP header arguments add them to *info* using
-        # the key *h_args*
-        try:
-            info['kwargs'] = {"headers": kwargs["headers"]}
-        except KeyError:
-            pass
-
-        info['method'] = method
-        return info
+    def get_endpoint(self, **kwargs):
+        return self._endpoint(**kwargs)
 
     def init_authentication_method(self, request, client_info, authn_method,
                                    http_args=None, **kwargs):
@@ -311,7 +262,7 @@ class Service(object):
 
         :param request: The request, a Message class instance
         :param client_info: Client information, a
-            :py:class:`oidccli.client_info.ClientInfo` instance
+            :py:class:`oidcservice.client_info.ClientInfo` instance
         :param authn_method: Client authentication method
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
@@ -327,66 +278,46 @@ class Service(object):
         else:
             return http_args
 
-    def request_info(self, client_info, method="", request_args=None,
-                     body_type='', authn_method='', lax=False, **kwargs):
+    def construct_request(self, client_info, request_args=None, **kwargs):
         """
         The method where everything is setup for sending the request.
         The request information is gathered and the where and how of sending the
         request is decided.
 
         :param client_info: Client information as a
-            :py:class:`oidccli.client_info.ClientInfo` instance
-        :param method: The HTTP method to be used.
+            :py:class:`oidcservice.client_info.ClientInfo` instance
         :param request_args: Initial request arguments
-        :param body_type: If the request is sent in the HTTP body this
-            decides the encoding of the request
-        :param authn_method: The client authentication method
-        :param lax: If it should be allowed to send a request that doesn't
-            completely conform to the standard.
         :param kwargs: Extra keyword arguments
         :return: A dictionary with the keys 'url' and possibly 'body', 'kwargs',
             'request' and 'ht_args'.
         """
-        if not method:
-            method = self.http_method
-
         if request_args is None:
             request_args = {}
 
         # remove arguments that should not be included in the request
-        _args = dict(
-            [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
+        # _args = dict(
+        #    [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
 
-        request = self.construct(client_info, request_args, **_args)
+        return self.construct(client_info, request_args, **kwargs)
 
-        if self.events:
-            self.events.store('Protocol request', request)
+    def get_authn_header(self, request, client_info, authn_method, **kwargs):
 
-        # If I'm to be lenient when verifying the correctness of the request
-        # message
-        request.lax = lax
-        h_arg = None
-
+        headers = {}
         # If I should deal with client authentication
         if authn_method:
             h_arg = self.init_authentication_method(
                 request, client_info, authn_method, **kwargs)
+            try:
+                headers = h_arg['headers']
+            except KeyError:
+                pass
 
-        # Set the necessary HTTP headers
-        if h_arg:
-            if "headers" in kwargs.keys():
-                kwargs["headers"].update(h_arg["headers"])
-            else:
-                kwargs["headers"] = h_arg["headers"]
+        return headers
 
-        if body_type == 'json':
-            kwargs['content_type'] = JSON_ENCODED
-
-        return self.uri_and_body(request, method, **kwargs)
-
-    def do_request_init(self, client_info, body_type="", method="",
-                        authn_method='', request_args=None, http_args=None,
-                        **kwargs):
+    def get_request_information(self, client_info, body_type="", method="",
+                                     authn_method='', request_args=None,
+                                     http_args=None,
+                                     **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -416,12 +347,38 @@ class Service(object):
         if not body_type:
             body_type = self.body_type
 
-        _info = self.request_info(client_info, method=method,
-                                  body_type=body_type,
-                                  request_args=request_args,
-                                  authn_method=authn_method, **kwargs)
+        request = self.construct_request(client_info, method=method,
+                                         body_type=body_type,
+                                         request_args=request_args,
+                                         authn_method=authn_method, **kwargs)
 
-        return update_http_args(http_args, _info)
+        _info = {'method': method}
+
+        # Find out where to send this request
+        _args = kwargs.copy()
+        if client_info.issuer:
+            _args['iss'] = client_info.issuer
+
+        if body_type == 'urlencoded':
+            content_type = URL_ENCODED
+        else:  # body_type == 'json'
+            content_type = JSON_ENCODED
+
+        _headers = self.get_authn_header(request, client_info,
+                                                 authn_method, **kwargs)
+
+        endpoint_url = self.get_endpoint(**_args)
+        _info['url'] = get_http_url(endpoint_url, request, method=method)
+
+        if method in ['POST', 'PUT']:
+            _info['body'] = get_http_body(request, content_type)
+            _headers.update({'Content-Type': content_type})
+            # Collect HTTP headers
+
+        if _headers:
+            _info['headers'] = _headers
+
+        return _info
 
     # ------------------ response handling -----------------------
 
@@ -443,6 +400,9 @@ class Service(object):
             else:
                 info = fragment
         return info
+
+    def post_parse_response(self, client_info, response, **kwargs):
+        return response
 
     def parse_response(self, info, client_info, sformat="", state="",
                        **kwargs):
@@ -562,17 +522,11 @@ class Service(object):
                 except KeyError:
                     pass
 
+            resp = self.post_parse_response(client_info, resp)
+
         if not resp:
             logger.error('Missing or faulty response')
             raise ResponseError("Missing or faulty response")
-
-        if not isinstance(resp, ErrorResponse):
-            try:
-                self.do_post_parse_response(resp, client_info, state=state)
-            except Exception as err:
-                logger.error(
-                    'Got exception on do_post_parse_result: {}'.format(err))
-                raise
 
         return resp
 

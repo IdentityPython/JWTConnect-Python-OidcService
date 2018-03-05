@@ -6,15 +6,15 @@ import time
 from oidcmsg.jwt import JWT
 from oidcmsg.oidc import AuthorizationResponse
 
-from oidccli.client_info import ClientInfo
+from oidcservice.client_info import ClientInfo
 
-from oidccli.client_auth import CLIENT_AUTHN_METHOD
+from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcmsg.key_jar import KeyJar
 
-from oidccli.oidc import DEFAULT_SERVICES
-from oidccli.oidc.service import factory
+from oidcservice.oidc import DEFAULT_SERVICES
+from oidcservice.oidc.service import factory
 
-from oidccli.service import build_services
+from oidcservice.service import build_services
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},

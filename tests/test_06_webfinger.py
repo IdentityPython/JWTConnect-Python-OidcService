@@ -1,9 +1,9 @@
 import json
 
-from oidccli.webfinger import OIC_ISSUER
-from oidccli.webfinger import URINormalizer
-from oidccli.webfinger import WebFinger
 from oidcmsg.oidc import Link, JRD
+from oidcservice.oidc import OIC_ISSUER
+
+from oidcservice.oidc.service import WebFinger, URINormalizer
 
 __author__ = 'Roland Hedberg'
 
@@ -185,7 +185,7 @@ def test_extra_member_response():
         "properties": {
             "http://example.com/ns/role/": "employee"
         },
-        'dummy':'foo',
+        'dummy': 'foo',
         "links": [
             {
                 "rel": "http://webfinger.net/rel/avatar",
@@ -200,24 +200,30 @@ def test_extra_member_response():
 class TestWebFinger(object):
     def test_query_device(self):
         wf = WebFinger()
-        query = wf.query(resource="device:p1.example.com")
-        assert query == 'https://p1.example.com/.well-known/webfinger' \
-                        '?resource=device%3Ap1.example.com'
+        request_args = {'resource': "device:p1.example.com"}
+        _info = wf.get_request_information({}, request_args=request_args)
+        assert _info[
+                   'url'] == 'https://p1.example.com/.well-known/webfinger' \
+                             '?resource=device%3Ap1.example.com&rel=http%3A' \
+                             '%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
 
     def test_query_rel(self):
         wf = WebFinger()
-        query = wf.query("acct:bob@example.com",
-                         ["http://webfinger.net/rel/profile-page", "vcard"])
-        assert query == "https://example.com/.well-known/webfinger?resource" \
-                        "=acct%3Abob%40example.com&rel=http%3A%2F%2Fwebfinger" \
-                        ".net%2Frel%2Fprofile-page&rel=vcard"
+        request_args = {'resource': "acct:bob@example.com"}
+        _info = wf.get_request_information(
+            {}, request_args=request_args,
+            rel=["http://webfinger.net/rel/profile-page", "vcard"])
+        assert _info['url'] == \
+               "https://example.com/.well-known/webfinger?resource=acct%3Abob" \
+               "%40example.com&rel=http%3A%2F%2Fwebfinger.net%2Frel%2Fprofile" \
+               "-page&rel=vcard"
 
     def test_query_acct(self):
         wf = WebFinger(OIC_ISSUER)
-        query = wf.query("acct:carol@example.com")
+        request_args = {'resource': "acct:carol@example.com"}
+        _info = wf.get_request_information({}, request_args=request_args)
 
-        assert query == "https://example.com/.well-known/webfinger?resource" \
-                        "=acct%3Acarol%40example.com&rel=http%3A%2F%2Fopenid" \
-                        ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer"
-
-
+        assert _info['url'] == \
+               "https://example.com/.well-known/webfinger?resource" \
+               "=acct%3Acarol%40example.com&rel=http%3A%2F%2Fopenid" \
+               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer"

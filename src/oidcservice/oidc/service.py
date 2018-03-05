@@ -1,18 +1,21 @@
 import inspect
 import logging
+import re
 import sys
+from urllib.parse import urlencode, urlparse
 
 from cryptojwt import jws
 
-from oidccli import rndstr, webfinger
-from oidccli.exception import ConfigurationError
-from oidccli.exception import ParameterError
-from oidccli.oauth2 import service
-from oidccli.oauth2.service import get_state
-from oidccli.oidc.utils import construct_request_uri
-from oidccli.oidc.utils import request_object_encryption
-from oidccli.service import Service
-from oidccli.webfinger import OIC_ISSUER
+from oidcservice import rndstr, OIDCONF_PATTERN
+from oidcservice.exception import ConfigurationError, WebFingerError, \
+    MissingEndpoint
+from oidcservice.exception import ParameterError
+from oidcservice.oauth2 import service
+from oidcservice.oauth2.service import get_state
+from oidcservice.oidc import OIC_ISSUER, WF_URL
+from oidcservice.oidc.utils import construct_request_uri
+from oidcservice.oidc.utils import request_object_encryption
+from oidcservice.service import Service
 
 from oidcmsg import oidc
 from oidcmsg.exception import MissingParameter
@@ -60,12 +63,12 @@ PROVIDER_DEFAULT = {
 }
 
 
-def store_id_token(resp, cli_info, **kwargs):
+def store_id_token(cli_info, resp, **kwargs):
     """
     Store the verified ID Token in the state database.
 
     :param resp: The response
-    :param cli_info: A :py:class:`oidccli.client_info.ClientInfo` instance
+    :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
     :param kwargs: Extra keyword arguments. In this case the state claim
         is supposed to be represented.
     """
@@ -89,7 +92,10 @@ class Authorization(service.Authorization):
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.oidc_pre_construct]
         self.post_construct = [self.oidc_post_construct]
-        self.post_parse_response.append(store_id_token)
+
+    def update_client_info(self, cli_info, resp, state='', **kwargs):
+        cli_info.state_db.add_response(resp, state)
+        store_id_token(cli_info, resp, **kwargs)
 
     def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
@@ -101,7 +107,15 @@ class Authorization(service.Authorization):
             _rt = cli_info.behaviour['response_types'][0]
             request_args["response_type"] = _rt
 
-        if "token" in _rt or "id_token" in _rt:
+        # For OIDC 'openid' is required in scope
+        if 'scope' not in request_args:
+            request_args['scope'] = ['openid']
+        elif 'openid' not in request_args['scope']:
+            request_args['scope'].append('openid')
+
+        # 'code' and/or 'id_token' in response_type means an ID Roken
+        # will eventually be returnedm, hence the need for a nonce
+        if "code" in _rt or "id_token" in _rt:
             if "nonce" not in request_args:
                 request_args["nonce"] = rndstr(32)
 
@@ -218,11 +232,8 @@ class AccessToken(service.AccessToken):
             self, keyjar=keyjar,
             client_authn_method=client_authn_method,
             conf=conf)
-        self.post_parse_response = [self.oidc_post_parse_response]
-        self.post_parse_response.append(store_id_token)
 
-    def oidc_post_parse_response(self, resp, cli_info, state='', **kwargs):
-        cli_info.state_db.add_response(resp, state)
+    def update_client_info(self, cli_info, resp, state='', **kwargs):
         try:
             _idt = resp['verified_id_token']
         except KeyError:
@@ -234,11 +245,49 @@ class AccessToken(service.AccessToken):
             except KeyError:
                 raise ValueError('Unknown nonce value')
 
+        cli_info.state_db.add_response(resp, state)
+        store_id_token(cli_info, resp, **kwargs)
+
 
 class RefreshAccessToken(service.RefreshAccessToken):
     msg_type = oidc.RefreshAccessTokenRequest
     response_cls = oidc.AccessTokenResponse
     error_msg = oidc.TokenErrorResponse
+
+
+class URINormalizer(object):
+    @staticmethod
+    def has_scheme(inp):
+        if "://" in inp:
+            return True
+        else:
+            authority = inp.replace('/', '#').replace('?', '#').split("#")[0]
+
+            if ':' in authority:
+                scheme_or_host, host_or_port = authority.split(':', 1)
+                # Assert it's not a port number
+                if re.match('^\d+$', host_or_port):
+                    return False
+            else:
+                return False
+        return True
+
+    @staticmethod
+    def acct_scheme_assumed(inp):
+        if '@' in inp:
+            host = inp.split('@')[-1]
+            return not (':' in host or '/' in host or '?' in host)
+        else:
+            return False
+
+    def normalize(self, inp):
+        if self.has_scheme(inp):
+            pass
+        elif self.acct_scheme_assumed(inp):
+            inp = "acct:%s" % inp
+        else:
+            inp = "https://%s" % inp
+        return inp.split("#")[0]  # strip fragment
 
 
 class WebFinger(Service):
@@ -258,17 +307,16 @@ class WebFinger(Service):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf,
                          **kwargs)
-        self.webfinger = webfinger.WebFinger(default_rel=OIC_ISSUER)
-        self.post_parse_response.append(self.wf_post_parse_response)
+        self.rel = OIC_ISSUER
 
-    def wf_post_parse_response(self, resp, client_info, state='', **kwargs):
+    def update_client_info(self, client_info, resp, state='', **kwargs):
         try:
             links = resp['links']
         except KeyError:
             raise MissingRequiredAttribute('links')
         else:
             for link in links:
-                if link['rel'] == OIC_ISSUER:
+                if link['rel'] == self.rel:
                     _href = link['href']
                     if not self.get_conf_attr('allow_http_links'):
                         if _href.startswith('http://'):
@@ -278,19 +326,61 @@ class WebFinger(Service):
                     break
         return resp
 
-    def request_info(self, cli_info, method="GET", request_args=None,
-                     lax=False, **kwargs):
+    def query(self, resource, rel=None):
+        resource = URINormalizer().normalize(resource)
+
+        info = [("resource", resource)]
+
+        if rel is None:
+            if self.rel:
+                info.append(("rel", self.rel))
+        elif isinstance(rel, str):
+            info.append(("rel", rel))
+        else:
+            for val in rel:
+                info.append(("rel", val))
+
+        if resource.startswith("http"):
+            part = urlparse(resource)
+            host = part.hostname
+            if part.port is not None:
+                host += ":" + str(part.port)
+        elif resource.startswith("acct:"):
+            host = resource.split('@')[-1]
+            host = host.replace('/', '#').replace('?', '#').split("#")[0]
+        elif resource.startswith("device:"):
+            host = resource.split(':')[1]
+        else:
+            raise WebFingerError("Unknown schema")
+
+        return "%s?%s" % (WF_URL % host, urlencode(info))
+
+    def get_request_information(self, cli_info, request_args=None, **kwargs):
+
+        if request_args is None:
+            request_args = {}
 
         try:
-            _resource = kwargs['resource']
+            _resource = request_args['resource']
         except KeyError:
             try:
                 _resource = cli_info.config['resource']
             except KeyError:
                 raise MissingRequiredAttribute('resource')
 
-        return {'url': self.webfinger.query(_resource)}
+        if 'rel' in kwargs:
+            return {'url': self.query(_resource, rel=kwargs['rel'])}
+        else:
+            return {'url': self.query(_resource)}
 
+
+ENDPOINT2SERVICE = {
+    'authorization': ['authorization'],
+    'token': ['accesstoken', 'refresh_token'],
+    'userinfo': ['userinfo'],
+    'registration': ['registration'],
+    'end_sesssion': ['end_session']
+}
 
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oidc.Message
@@ -302,20 +392,38 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         service.ProviderInfoDiscovery.__init__(
             self, keyjar=keyjar, client_authn_method=client_authn_method,
             conf=conf)
-        # Should be done before any other
-        self.post_parse_response.insert(0, self.oidc_post_parse_response)
 
-        if conf:
-            if 'pre_load_keys' in conf and conf['pre_load_keys']:
-                self.post_parse_response.append(self._pre_load_keys)
+    def update_client_info(self, cli_info, resp, **kwargs):
+        cli_info.provider_info = resp
 
-    def oidc_post_parse_response(self, resp, cli_info, **kwargs):
+        for endp, srvs in ENDPOINT2SERVICE.items():
+            try:
+                endpoint_url = resp['{}_endpoint'.format(endp)]
+            except KeyError:
+                continue
+
+            for srv in srvs:
+                try:
+                    cli_info.service[srv].endpoint = endpoint_url
+                except KeyError:
+                    pass
+
         self.match_preferences(cli_info, resp, cli_info.issuer)
+        if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
+            _jwks = self.keyjar.export_jwks_as_json(issuer=resp['issuer'])
+            logger.info(
+                'Preloaded keys for {}: {}'.format(resp['issuer'], _jwks))
 
-    def _pre_load_keys(self, resp, cli_info, **kwargs):
-        _jwks = self.keyjar.export_jwks_as_json(issuer=resp['issuer'])
-        logger.info('Preloaded keys for {}: {}'.format(resp['issuer'], _jwks))
-        return resp
+    def get_endpoint(self, **kwargs):
+        try:
+            return self._endpoint(**kwargs)
+        except MissingEndpoint:
+            try:
+                issuer = kwargs['iss']
+            except KeyError:
+                raise MissingEndpoint
+            else:
+                return OIDCONF_PATTERN.format(issuer)
 
     @staticmethod
     def match_preferences(cli_info, pcr=None, issuer=None):
@@ -328,7 +436,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         If the Provider has left some claims out, defaults specified in the
         standard will be used.
 
-        :param cli_info: :py:class:`oidccli.client_info.ClientInfo` instance
+        :param cli_info: :py:class:`oidcservice.client_info.ClientInfo` instance
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
         """
@@ -446,7 +554,6 @@ class Registration(Service):
                          conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
         self.post_construct = [self.oidc_post_construct]
-        self.post_parse_response.append(self.oidc_post_parse_response)
 
     def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         """
@@ -498,23 +605,27 @@ class Registration(Service):
 
         return request_args
 
-    def oidc_post_parse_response(self, resp, cli_info, **kwargs):
-        cli_info.registration_response = resp
-        if "token_endpoint_auth_method" not in cli_info.registration_response:
-            cli_info.registration_response[
+    def update_client_info(self, client_info, resp, state='', **kwargs):
+        client_info.registration_response = resp
+        if "token_endpoint_auth_method" not in \
+                client_info.registration_response:
+            client_info.registration_response[
                 "token_endpoint_auth_method"] = "client_secret_basic"
-        cli_info.client_id = resp["client_id"]
+        client_info.client_id = resp["client_id"]
+
         try:
-            cli_info.client_secret = resp["client_secret"]
+            client_info.client_secret = resp["client_secret"]
         except KeyError:  # Not required
             pass
         else:
             try:
-                cli_info.registration_expires = resp["client_secret_expires_at"]
+                client_info.registration_expires = resp[
+                    "client_secret_expires_at"]
             except KeyError:
                 pass
+
         try:
-            cli_info.registration_access_token = resp[
+            client_info.registration_access_token = resp[
                 "registration_access_token"]
         except KeyError:
             pass
@@ -535,8 +646,6 @@ class UserInfo(Service):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
-        self.post_parse_response.insert(0, self.oidc_post_parse_response)
-        self.post_parse_response.append(self._verify_sub)
 
     def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
         if request_args is None:
@@ -545,29 +654,23 @@ class UserInfo(Service):
         if "access_token" in request_args:
             pass
         else:
-            _tinfo = cli_info.state_db.get_token_info(**kwargs)
+            _tinfo = cli_info.state_db.get_token_info(kwargs['state'])
             request_args["access_token"] = _tinfo['access_token']
 
         return request_args, {}
 
-    def oidc_post_parse_response(self, resp, client_info, **kwargs):
-        return self.unpack_aggregated_claims(resp, client_info)
-
-    def _verify_sub(self, resp, client_info, **kwargs):
+    def post_parse_response(self, client_info, response, **kwargs):
         try:
             _sub = client_info.state_db[kwargs['state']]['verified_id_token'][
                 'sub']
         except KeyError:
             logger.warning("Can not verify value on sub")
         else:
-            if resp['sub'] != _sub:
+            if response['sub'] != _sub:
                 raise ValueError('Incorrect "sub" value')
 
-        return resp
-
-    def unpack_aggregated_claims(self, userinfo, cli_info):
         try:
-            _csrc = userinfo["_claim_sources"]
+            _csrc = response["_claim_sources"]
         except KeyError:
             pass
         else:
@@ -575,15 +678,15 @@ class UserInfo(Service):
                 if "JWT" in spec:
                     aggregated_claims = Message().from_jwt(
                         spec["JWT"].encode("utf-8"),
-                        keyjar=cli_info.keyjar)
+                        keyjar=client_info.keyjar)
                     claims = [value for value, src in
-                              userinfo["_claim_names"].items() if
+                              response["_claim_names"].items() if
                               src == csrc]
 
                     for key in claims:
-                        userinfo[key] = aggregated_claims[key]
+                        response[key] = aggregated_claims[key]
 
-        return userinfo
+        return response
 
 
 def set_id_token(cli_info, request_args, **kwargs):

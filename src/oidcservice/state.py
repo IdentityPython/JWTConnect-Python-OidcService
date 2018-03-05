@@ -7,7 +7,7 @@ from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oidc import JsonWebToken
 from oidcmsg.time_util import utc_time_sans_frac
 
-from oidccli import rndstr
+from oidcservice import rndstr
 
 
 # draft-bradley-oauth-jwt-encoded-state-05

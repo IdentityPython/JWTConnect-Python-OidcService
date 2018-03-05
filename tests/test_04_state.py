@@ -1,5 +1,5 @@
 import pytest
-from oidccli.state import State, ExpiredToken
+from oidcservice.state import State, ExpiredToken
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import AuthorizationResponse
