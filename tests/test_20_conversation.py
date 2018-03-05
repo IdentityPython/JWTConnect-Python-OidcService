@@ -129,7 +129,7 @@ def test_conversation():
 
     # ======================== WebFinger ========================
 
-    info = service['webfinger'].get_request_information(
+    info = service['webfinger'].get_request_parameters(
         client_info, request_args={'resource':'foobar@example.org'})
 
     assert info[
@@ -158,7 +158,7 @@ def test_conversation():
 
     # =================== Provider info discovery ====================
 
-    info = service['provider_info'].get_request_information(client_info)
+    info = service['provider_info'].get_request_parameters(client_info)
 
     assert info[
                'url'] == 'https://example.org/op/.well-known/openid' \
@@ -263,7 +263,7 @@ def test_conversation():
 
     # =================== Client registration ====================
 
-    info = service['registration'].get_request_information(client_info)
+    info = service['registration'].get_request_parameters(client_info)
 
     assert info['url'] == 'https://example.org/op/registration'
     assert info[
@@ -312,7 +312,7 @@ def test_conversation():
     STATE = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
     NONCE = 'UvudLKz287YByZdsY3AJoPAlEXQkJ0dK'
 
-    info = service['authorization'].get_request_information(
+    info = service['authorization'].get_request_parameters(
         client_info, request_args={'state': STATE, 'nonce': NONCE})
 
     p = urlparse(info['url'])
@@ -344,7 +344,7 @@ def test_conversation():
     request_args = {'state': STATE,
                     'redirect_uri': client_info.redirect_uris[0]}
 
-    info = service['accesstoken'].get_request_information(client_info,
+    info = service['accesstoken'].get_request_parameters(client_info,
                                                           request_args=request_args)
 
     assert info['url'] == 'https://example.org/op/token'
@@ -391,7 +391,7 @@ def test_conversation():
 
     request_args = {'state': STATE}
 
-    info = service['userinfo'].get_request_information(client_info, state=STATE)
+    info = service['userinfo'].get_request_parameters(client_info, state=STATE)
 
     assert info['url'] == 'https://example.org/op/userinfo'
     assert info['headers'] == {'Authorization': 'Bearer Z0FBQUFBQmFkdFF'}

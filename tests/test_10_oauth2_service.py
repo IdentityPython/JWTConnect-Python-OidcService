@@ -40,10 +40,10 @@ class TestAuthorization(object):
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
                                     'redirect_uri', 'state'}
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         req_args = {'response_type': 'code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      state='state')
         assert set(_info.keys()) == {'url', 'method'}
@@ -57,7 +57,7 @@ class TestAuthorization(object):
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
@@ -97,11 +97,11 @@ class TestAccessTokenRequest(object):
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code'}
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      state='state',
                                                      authn_method='client_secret_basic')
@@ -121,7 +121,7 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
 
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      state='state')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
@@ -151,8 +151,8 @@ class TestProviderInfo(object):
         assert isinstance(_req, Message)
         assert len(_req) == 0
 
-    def test_get_request_information(self):
-        _info = self.service.get_request_information(self.cli_info)
+    def test_get_request_parameters(self):
+        _info = self.service.get_request_parameters(self.cli_info)
         assert set(_info.keys()) == {'url', 'method'}
         assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -180,8 +180,8 @@ class TestRefreshAccessTokenRequest(object):
         assert set(_req.keys()) == {'client_id', 'client_secret', 'grant_type',
                                     'refresh_token'}
 
-    def test_get_request_information(self):
-        _info = self.service.get_request_information(self.cli_info,
+    def test_get_request_parameters(self):
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      state='abcdef')
         assert set(_info.keys()) == {'url', 'body', 'headers', 'method'}
 
@@ -198,7 +198,7 @@ def test_access_token_srv_conf():
     req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                 'code': 'access_code'}
     service.endpoint = 'https://example.com/authorize'
-    _info = service.get_request_information(cli_info, request_args=req_args,
+    _info = service.get_request_parameters(cli_info, request_args=req_args,
                                             state='state')
 
     assert _info

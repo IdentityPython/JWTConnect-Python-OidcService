@@ -355,7 +355,7 @@ class WebFinger(Service):
 
         return "%s?%s" % (WF_URL % host, urlencode(info))
 
-    def get_request_information(self, cli_info, request_args=None, **kwargs):
+    def get_request_parameters(self, cli_info, request_args=None, **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -381,6 +381,7 @@ ENDPOINT2SERVICE = {
     'registration': ['registration'],
     'end_sesssion': ['end_session']
 }
+
 
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oidc.Message

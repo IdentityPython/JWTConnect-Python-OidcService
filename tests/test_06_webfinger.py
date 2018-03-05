@@ -201,7 +201,7 @@ class TestWebFinger(object):
     def test_query_device(self):
         wf = WebFinger()
         request_args = {'resource': "device:p1.example.com"}
-        _info = wf.get_request_information({}, request_args=request_args)
+        _info = wf.get_request_parameters({}, request_args=request_args)
         assert _info[
                    'url'] == 'https://p1.example.com/.well-known/webfinger' \
                              '?resource=device%3Ap1.example.com&rel=http%3A' \
@@ -210,7 +210,7 @@ class TestWebFinger(object):
     def test_query_rel(self):
         wf = WebFinger()
         request_args = {'resource': "acct:bob@example.com"}
-        _info = wf.get_request_information(
+        _info = wf.get_request_parameters(
             {}, request_args=request_args,
             rel=["http://webfinger.net/rel/profile-page", "vcard"])
         assert _info['url'] == \
@@ -221,7 +221,7 @@ class TestWebFinger(object):
     def test_query_acct(self):
         wf = WebFinger(OIC_ISSUER)
         request_args = {'resource': "acct:carol@example.com"}
-        _info = wf.get_request_information({}, request_args=request_args)
+        _info = wf.get_request_parameters({}, request_args=request_args)
 
         assert _info['url'] == \
                "https://example.com/.well-known/webfinger?resource" \

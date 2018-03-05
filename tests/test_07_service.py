@@ -48,10 +48,10 @@ class TestDummyService(object):
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info, request_args=req_args)
+        _info = self.service.get_request_parameters(self.cli_info, request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -59,7 +59,7 @@ class TestDummyService(object):
     def test_request_init(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                              request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(

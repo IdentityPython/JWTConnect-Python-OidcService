@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 method call structure for Services.
 This is for constructing requests:
 
-get_request_information
+get_request_parameters
     - construct_request
         - construct 
             - pre_construct (*)
@@ -64,7 +64,7 @@ class Service(object):
     error_msg = ErrorResponse
     endpoint_name = ''
     synchronous = True
-    request = ''
+    service_name = ''
     default_authn_method = ''
     http_method = 'GET'
     body_type = 'urlencoded'
@@ -314,7 +314,7 @@ class Service(object):
 
         return headers
 
-    def get_request_information(self, client_info, body_type="", method="",
+    def get_request_parameters(self, client_info, body_type="", method="",
                                      authn_method='', request_args=None,
                                      http_args=None,
                                      **kwargs):

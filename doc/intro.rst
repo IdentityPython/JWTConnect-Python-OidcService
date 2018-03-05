@@ -111,7 +111,7 @@ they are called.
 
 The overall call sequence looks like this:
 
-    + get_request_information
+    + get_request_parameters
         - construct_request
             - construct
                 - pre_construct (*)
@@ -130,7 +130,7 @@ will look something like this::
 
 It will look like that when the request is to be transmitted as the urlencoded
 query part of a HTTP GET operation. If instead a HTTP POST with a json body is
-expected the outcome of `get_request_information`_ will be something like this::
+expected the outcome of `get_request_parameters`_ will be something like this::
 
     {
         'url': 'https://example.com/token',
@@ -141,10 +141,10 @@ expected the outcome of `get_request_information`_ will be something like this::
 Here you have the url that the request should go to, the body of the request
 and header arguments to add to the HTTP request.
 
-get_request_information
+get_request_parameters
 =======================
 
-Implemented in :py:meth:`oiccli.service.Service.get_request_information`
+Implemented in :py:meth:`oiccli.service.Service.get_request_parameters`
 
 Nothing much happens locally in this method, it starts with gathering
 information about which HTTP method is used, the client authentication method

@@ -83,10 +83,10 @@ class TestAuthorization(object):
                                     'response_type', 'scope', 'state', 'nonce'}
         assert _req['nonce'] == 'nonce'
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
@@ -97,7 +97,7 @@ class TestAuthorization(object):
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
@@ -108,7 +108,7 @@ class TestAuthorization(object):
     def test_request_init_request_method(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      request_method='value')
         assert set(_info.keys()) == {'url', 'method'}
@@ -129,7 +129,7 @@ class TestAuthorization(object):
             'request_uris': ['https://example.com/request123456.jwt']
         }
         self.cli_info.base_url = 'https://example.com/'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      request_method='reference')
 
@@ -155,11 +155,11 @@ class TestAccessTokenRequest(object):
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code'}
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      state='state',
                                                      authn_method='client_secret_basic')
@@ -177,7 +177,7 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
 
-        _info = self.service.get_request_information(self.cli_info,
+        _info = self.service.get_request_parameters(self.cli_info,
                                                      request_args=req_args,
                                                      state='state')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
@@ -220,8 +220,8 @@ class TestProviderInfo(object):
         assert isinstance(_req, Message)
         assert len(_req) == 0
 
-    def test_get_request_information(self):
-        _info = self.service.get_request_information(self.cli_info)
+    def test_get_request_parameters(self):
+        _info = self.service.get_request_parameters(self.cli_info)
         assert set(_info.keys()) == {'url', 'method'}
         assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -420,9 +420,9 @@ class TestWebFinger(object):
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
 
-    def test_get_request_information(self):
+    def test_get_request_parameters(self):
         request_args = {'resource': 'acct:joe@example.com'}
-        _req = self.service.get_request_information(self.cli_info,
+        _req = self.service.get_request_parameters(self.cli_info,
                                                     request_args=request_args)
         assert set(_req.keys()) == {'url'}
         assert _req['url'] == \
