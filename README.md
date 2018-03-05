@@ -37,7 +37,7 @@ _info = service.get_request_parameters(client_info)
 
 http_resp = requests.request(_info['method'], _info['url'])
 
-``# assuming that we got a 200 response
+`# giassuming that we got a 200 response
 oidc_response = service.parse_response(http_resp.text, client_info)
 
 print(oidc_response.to_dict())
