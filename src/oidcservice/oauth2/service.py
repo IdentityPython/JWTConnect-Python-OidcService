@@ -3,7 +3,7 @@ import logging
 import sys
 
 from oidcservice import OIDCONF_PATTERN
-from oidcservice.exception import OidcCliError
+from oidcservice.exception import OidcServiceError
 from oidcservice.service import Service
 
 from oidcmsg import oauth2
@@ -187,7 +187,7 @@ class ProviderInfoDiscovery(Service):
                 cli_info.allow['issuer_mismatch']
             except KeyError:
                 if _issuer != _pcr_issuer:
-                    raise OidcCliError(
+                    raise OidcServiceError(
                         "provider info issuer mismatch '%s' != '%s'" % (
                             _issuer, _pcr_issuer))
 

@@ -39,6 +39,8 @@ KEYSPEC = [
 
 keyjar = build_keyjar(KEYSPEC)[1]
 
+_dirname = os.path.dirname(os.path.abspath(__file__))
+
 
 def test_request_factory():
     req = factory('Service', httplib=None, keyjar=None,
@@ -50,7 +52,7 @@ class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('Authorization',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         self.cli_info = ClientInfo(keyjar, config=client_config)
@@ -85,7 +87,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args)
+                                                     request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -96,7 +98,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args)
+                                                     request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -107,35 +109,38 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args,
-                                                 request_method='value')
+                                                     request_args=req_args,
+                                                     request_method='value')
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
-        assert set(msg.to_dict()) == {'client_id', 'redirect_uri', 'response_type',
-                                 'state', 'scope', 'nonce'}
+        assert set(msg.to_dict()) == {'client_id', 'redirect_uri',
+                                      'response_type',
+                                      'state', 'scope', 'nonce'}
 
     def test_request_param(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
+
+        assert os.path.isfile(os.path.join(_dirname, 'request123456.jwt'))
+
         self.cli_info.registration_response = {
             'redirect_uris': ['https://example.com/cb'],
-            'request_uris': ['https://example.com/request123456.json']
+            'request_uris': ['https://example.com/request123456.jwt']
         }
         self.cli_info.base_url = 'https://example.com/'
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args,
-                                                 request_method='reference')
+                                                     request_args=req_args,
+                                                     request_method='reference')
 
         assert set(_info.keys()) == {'url', 'method'}
-        assert os.path.isfile('request123456.json')
 
 
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('AccessToken',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         self.cli_info = ClientInfo(keyjar, config=client_config)
@@ -145,7 +150,7 @@ class TestAccessTokenRequest(object):
         req_args = {'foo': 'bar'}
 
         _req = self.service.construct(self.cli_info, request_args=req_args,
-                                  state='state')
+                                      state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code'}
@@ -155,9 +160,9 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args,
-                                                 state='state',
-                                                 authn_method='client_secret_basic')
+                                                     request_args=req_args,
+                                                     state='state',
+                                                     authn_method='client_secret_basic')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
@@ -173,8 +178,8 @@ class TestAccessTokenRequest(object):
         self.service.endpoint = 'https://example.com/authorize'
 
         _info = self.service.get_request_information(self.cli_info,
-                                                 request_args=req_args,
-                                                 state='state')
+                                                     request_args=req_args,
+                                                     state='state')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
@@ -196,7 +201,7 @@ class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('ProviderInfoDiscovery',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -240,7 +245,7 @@ class TestRegistration(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('Registration',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -276,7 +281,7 @@ class TestUserInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('UserInfo',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -300,7 +305,7 @@ class TestUserInfo(object):
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall')
         _resp = self.service.parse_response(resp.to_json(), self.cli_info,
-                                        state='abcde')
+                                            state='abcde')
         assert _resp
 
     def test_unpack_aggregated_response(self):
@@ -339,7 +344,7 @@ class TestCheckSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('CheckSession',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -361,7 +366,7 @@ class TestCheckID(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('CheckID',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -383,7 +388,7 @@ class TestEndSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('EndSession',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -405,7 +410,7 @@ class TestWebFinger(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self.service = factory('WebFinger',
-                           client_authn_method=CLIENT_AUTHN_METHOD)
+                               client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/',
@@ -418,7 +423,7 @@ class TestWebFinger(object):
     def test_get_request_information(self):
         request_args = {'resource': 'acct:joe@example.com'}
         _req = self.service.get_request_information(self.cli_info,
-                                                request_args=request_args)
+                                                    request_args=request_args)
         assert set(_req.keys()) == {'url'}
         assert _req['url'] == \
                'https://example.com/.well-known/webfinger?resource=acct%3Ajoe' \

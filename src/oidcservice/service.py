@@ -2,7 +2,7 @@ import logging
 from urllib.parse import urlparse
 
 from oidcservice.exception import MissingEndpoint
-from oidcservice.exception import OidcCliError
+from oidcservice.exception import OidcServiceError
 from oidcservice.exception import ResponseError
 from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
@@ -512,7 +512,7 @@ class Service(object):
 
             if not verf:
                 logger.error('Verification of the response failed')
-                raise OidcCliError("Verification of the response failed")
+                raise OidcServiceError("Verification of the response failed")
 
             # if it's an Authorization response and the scope claim was not
             # present in the response use the one I expected to be there.
@@ -546,7 +546,7 @@ class Service(object):
         err = self.error_msg().deserialize(response, method=_body_type)
         try:
             err.verify()
-        except OidcCliError:
+        except OidcServiceError:
             raise
         else:
             return err

@@ -3,61 +3,61 @@ __author__ = 'roland'
 
 
 # The base exception class for oidcservice specific exceptions
-class OidcCliError(Exception):
+class OidcServiceError(Exception):
     def __init__(self, errmsg, content_type="", *args):
         Exception.__init__(self, errmsg, *args)
         self.content_type = content_type
 
 
-class MissingRequiredAttribute(OidcCliError):
+class MissingRequiredAttribute(OidcServiceError):
     pass
 
 
-class VerificationError(OidcCliError):
+class VerificationError(OidcServiceError):
     pass
 
 
-class ResponseError(OidcCliError):
+class ResponseError(OidcServiceError):
     pass
 
 
-class TimeFormatError(OidcCliError):
+class TimeFormatError(OidcServiceError):
     pass
 
 
-class CapabilitiesMisMatch(OidcCliError):
+class CapabilitiesMisMatch(OidcServiceError):
     pass
 
 
-class MissingEndpoint(OidcCliError):
+class MissingEndpoint(OidcServiceError):
     pass
 
 
-class TokenError(OidcCliError):
+class TokenError(OidcServiceError):
     pass
 
 
-class GrantError(OidcCliError):
+class GrantError(OidcServiceError):
     pass
 
 
-class ParseError(OidcCliError):
+class ParseError(OidcServiceError):
     pass
 
 
-class OtherError(OidcCliError):
+class OtherError(OidcServiceError):
     pass
 
 
-class NoClientInfoReceivedError(OidcCliError):
+class NoClientInfoReceivedError(OidcServiceError):
     pass
 
 
-class InvalidRequest(OidcCliError):
+class InvalidRequest(OidcServiceError):
     pass
 
 
-class NonFatalException(OidcCliError):
+class NonFatalException(OidcServiceError):
     """
     :param resp: A response that the function/method would return on non-error
     :param msg: A message describing what error has occurred.
@@ -68,7 +68,7 @@ class NonFatalException(OidcCliError):
         self.msg = msg
 
 
-class Unsupported(OidcCliError):
+class Unsupported(OidcServiceError):
     pass
 
 
@@ -76,40 +76,40 @@ class UnsupportedResponseType(Unsupported):
     pass
 
 
-class AccessDenied(OidcCliError):
+class AccessDenied(OidcServiceError):
     pass
 
 
-class ImproperlyConfigured(OidcCliError):
+class ImproperlyConfigured(OidcServiceError):
     pass
 
 
-class UnsupportedMethod(OidcCliError):
+class UnsupportedMethod(OidcServiceError):
     pass
 
 
-class AuthzError(OidcCliError):
+class AuthzError(OidcServiceError):
     pass
 
 
-class AuthnToOld(OidcCliError):
+class AuthnToOld(OidcServiceError):
     pass
 
 
-class ParameterError(OidcCliError):
+class ParameterError(OidcServiceError):
     pass
 
 
-class SubMismatch(OidcCliError):
+class SubMismatch(OidcServiceError):
     pass
 
 
-class ConfigurationError(OidcCliError):
+class ConfigurationError(OidcServiceError):
     pass
 
 
-class WrongContentType(OidcCliError):
+class WrongContentType(OidcServiceError):
     pass
 
-class WebFingerError(OidcCliError):
+class WebFingerError(OidcServiceError):
     pass
