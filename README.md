@@ -33,11 +33,11 @@ client_info = ClientInfo
 client_info.issuer = "https://accounts.google.com"
 client_info.keyjar = None
 
-_info = service.get_request_parameters(client_info)
+args = service.get_request_parameters(client_info)
 
-http_resp = requests.request(_info['method'], _info['url'])
+http_resp = requests.request(**args)
 
-`# giassuming that we got a 200 response
+# giassuming that we got a 200 response
 oidc_response = service.parse_response(http_resp.text, client_info)
 
 print(oidc_response.to_dict())
