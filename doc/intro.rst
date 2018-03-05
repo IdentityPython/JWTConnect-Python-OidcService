@@ -421,19 +421,19 @@ OP. What we have to start with is an user identifier provided by the user.
 The identifier we got was: **foobar@example.com** .
 With this information we can do::
 
-    info = service['webfinger'].do_request_init(client_info,
+    info = service['webfinger'].get_request_parameters(client_info,
                                                 resource='foobar@example.com')
 
 
 service['webfinger'] will return the WebFinger service instance and running
-the method do_request_init will return the information necessary to do a
+the method get_request_parameters will return the information necessary to do a
 HTTP request. In this case the value of *info* will be::
 
     {
         'url': 'https://example.com/.well-known/webfinger?resource=acct%3Afoobar%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
     }
 
-as you can see the *do_request_init* constructed a URL that can be used
+as you can see the *get_request_parameters* constructed a URL that can be used
 to get the wanted information.
 
 Doing HTTP GET on this URL will return a JSON document that looks like this::
@@ -466,7 +466,7 @@ Provider info discovery
 
 We use the same process as with webfinger but with another service instance::
 
-    info = service['provider_info'].do_request_init(client_info)
+    info = service['provider_info'].get_request_parameters(client_info)
 
 *info* will now contain::
 
@@ -474,7 +474,7 @@ We use the same process as with webfinger but with another service instance::
 
 And this is the first example of *magic* that you will see.
 
-*do_request_init knows how to get the OpenID Connect providers discovery URL
+*get_request_parameters knows how to get the OpenID Connect providers discovery URL
 from the client_info instance. Now, if you don't wanted to do webfinger because
 perhaps the other side did not provide that service. Then you would have to
 set *client_info.issuer* to the correct value.
@@ -598,7 +598,7 @@ Client registration
 
 By now you should recognize the pattern::
 
-    info = service['registration'].do_request_init(client_info)
+    info = service['registration'].get_request_parameters(client_info)
 
 Now *info* contains 3 parts:
 
@@ -668,7 +668,7 @@ more of what the oiccli package can do.
 
 Like when I used the other services this one is no different::
 
-    info = service['authorization'].do_request_init(client_info)
+    info = service['authorization'].get_request_parameters(client_info)
 
 *info* will only contain one piece of data and that is a URL::
 
@@ -712,14 +712,14 @@ Access token
 ============
 
 When sending an access token request I have to use the correct *code* value.
-To accomplish that *do_request_init* need to get state as an argument::
+To accomplish that *get_request_parameters* need to get state as an argument::
 
     _state = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
     request_args = {
         'state': _state,
         'redirect_uri': client_info.state_db[_state]['redirect_uri']}
 
-    info = service['accesstoken'].do_request_init(client_info,
+    info = service['accesstoken'].get_request_parameters(client_info,
                                                   request_args=request_args)
 
 The OIDC standard says that the *redirect_uri* used for the authorization request
@@ -774,10 +774,10 @@ And finally the last step, getting the user info.
 User info
 =========
 
-Again we have to provide the *do_request_init* method with the correct state
+Again we have to provide the *get_request_parameters* method with the correct state
 value::
 
-    info = service['userinfo'].do_request_init(client_info,
+    info = service['userinfo'].get_request_parameters(client_info,
                                                state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
 And the response is a JSON document::
