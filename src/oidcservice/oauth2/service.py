@@ -35,7 +35,7 @@ class Authorization(Service):
     error_msg = oauth2.AuthorizationErrorResponse
     endpoint_name = 'authorization_endpoint'
     synchronous = False
-    request = 'authorization'
+    service_name = 'authorization'
     response_body_type = 'urlencoded'
 
     def __init__(self, keyjar=None, client_authn_method=None, conf=None):
@@ -79,7 +79,7 @@ class AccessToken(Service):
     error_msg = oauth2.TokenErrorResponse
     endpoint_name = 'token_endpoint'
     synchronous = True
-    request = 'accesstoken'
+    service_name = 'accesstoken'
     default_authn_method = 'client_secret_basic'
     http_method = 'POST'
     body_type = 'urlencoded'
@@ -114,7 +114,7 @@ class RefreshAccessToken(Service):
     error_msg = oauth2.TokenErrorResponse
     endpoint_name = 'token_endpoint'
     synchronous = True
-    request = 'refresh_token'
+    service_name = 'refresh_token'
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
@@ -143,7 +143,7 @@ class ProviderInfoDiscovery(Service):
     response_cls = oauth2.ASConfigurationResponse
     error_msg = oauth2.ErrorResponse
     synchronous = True
-    request = 'provider_info'
+    service_name = 'provider_info'
     http_method = 'GET'
 
     def __init__(self, keyjar=None, client_authn_method=None, conf=None):

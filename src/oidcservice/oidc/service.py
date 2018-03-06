@@ -298,7 +298,7 @@ class WebFinger(Service):
     response_cls = JRD
     error_msg = ErrorResponse
     synchronous = True
-    request = 'webfinger'
+    service_name = 'webfinger'
     http_method = 'GET'
     response_body_type = 'json'
 
@@ -544,7 +544,7 @@ class Registration(Service):
     error_msg = ErrorResponse
     endpoint_name = 'registration_endpoint'
     synchronous = True
-    request = 'registration'
+    service_name = 'registration'
     body_type = 'json'
     http_method = 'POST'
 
@@ -638,7 +638,7 @@ class UserInfo(Service):
     error_msg = oidc.UserInfoErrorResponse
     endpoint_name = 'userinfo_endpoint'
     synchronous = True
-    request = 'userinfo'
+    service_name = 'userinfo'
     default_authn_method = 'bearer_header'
     http_method = 'GET'
 
@@ -717,7 +717,7 @@ class CheckSession(Service):
     error_msg = ErrorResponse
     endpoint_name = ''
     synchronous = True
-    request = 'check_session'
+    service_name = 'check_session'
 
     def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
@@ -736,7 +736,7 @@ class CheckID(Service):
     error_msg = ErrorResponse
     endpoint_name = ''
     synchronous = True
-    request = 'check_id'
+    service_name = 'check_id'
 
     def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
@@ -755,7 +755,7 @@ class EndSession(Service):
     error_msg = ErrorResponse
     endpoint_name = 'end_session_endpoint'
     synchronous = True
-    request = 'end_session'
+    service_name = 'end_session'
 
     def __init__(self, keyjar=None, client_authn_method=None,
                  conf=None):
