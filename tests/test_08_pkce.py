@@ -1,4 +1,4 @@
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.pkce import add_code_challenge
 from oidcservice.oidc.pkce import get_code_verifier
 
@@ -9,7 +9,7 @@ def test_add_code_challenge_default_values():
         'client_secret': 'client_secret', 'base_url': 'https://example.com',
         'requests_dir': 'requests',
     }
-    ci = ClientInfo(config=config)
+    ci = ServiceContext(config=config)
     ci.state_db['state'] = {}
     spec = add_code_challenge(ci, 'state')
 
@@ -28,7 +28,7 @@ def test_add_code_challenge_spec_values():
         'requests_dir': 'requests',
         'code_challenge': {'length': 128, 'method': 'S384'}
     }
-    ci = ClientInfo(config=config)
+    ci = ServiceContext(config=config)
     ci.state_db['state'] = {}
 
     spec = add_code_challenge(ci, 'state')

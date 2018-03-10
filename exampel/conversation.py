@@ -6,7 +6,7 @@ import time
 from oidcmsg.jwt import JWT
 from oidcmsg.oidc import AuthorizationResponse
 
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcmsg.key_jar import KeyJar
@@ -82,7 +82,7 @@ service_spec.append(('WebFinger', {}))
 service = build_services(service_spec, factory, RP_KEYJAR,
                          client_authn_method=CLIENT_AUTHN_METHOD)
 
-client_info = ClientInfo(
+client_info = ServiceContext(
     RP_KEYJAR,
     {
         "client_prefs":

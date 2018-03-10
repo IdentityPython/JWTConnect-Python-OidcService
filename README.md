@@ -11,7 +11,7 @@ Each Service instance has 3 major methods:
 
   * get_request_parameters
   * parse_response
-  * update_client_information
+  * update_service_contextrmation
 
 ###get_request_parameters
 
@@ -24,21 +24,21 @@ look something like this:
 ```python
 import requests
 
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.service import ProviderInfoDiscovery
 
 service = ProviderInfoDiscovery()
 
-client_info = ClientInfo
-client_info.issuer = "https://accounts.google.com"
-client_info.keyjar = None
+service_context = ClientInfo
+service_context.issuer = "https://accounts.google.com"
+service_context.keyjar = None
 
-args = service.get_request_parameters(client_info)
+args = service.get_request_parameters(service_context)
 
 http_resp = requests.request(**args)
 
 # giassuming that we got a 200 response
-oidc_response = service.parse_response(http_resp.text, client_info)
+oidc_response = service.parse_response(http_resp.text, service_context)
 
 print(oidc_response.to_dict())
 ```

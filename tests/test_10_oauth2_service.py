@@ -1,7 +1,7 @@
 import pytest
 
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.oauth2.service import factory
 from oidcservice.service import Service
 
@@ -29,7 +29,7 @@ class TestAuthorization(object):
         self.service = factory('Authorization')
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.state_db['state'] = {}
 
     def test_construct(self):
@@ -75,7 +75,7 @@ class TestAccessTokenRequest(object):
                                client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.state_db['state'] = {'code': 'access_code'}
 
     def test_construct(self):
@@ -144,7 +144,7 @@ class TestProviderInfo(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
 
     def test_construct(self):
         _req = self.service.construct(self.cli_info)
@@ -166,7 +166,7 @@ class TestRefreshAccessTokenRequest(object):
         self.service.endpoint = 'https://example.com/token'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.state_db['abcdef'] = {'code': 'access_code'}
         self.cli_info.state_db.add_response(
             {'access_token': 'bearer_token', 'refresh_token': 'refresh'},
@@ -192,7 +192,7 @@ def test_access_token_srv_conf():
                       conf={'default_authn_method': 'client_secret_post'})
     client_config = {'client_id': 'client_id', 'client_secret': 'password',
                      'redirect_uris': ['https://example.com/cli/authz_cb']}
-    cli_info = ClientInfo(config=client_config)
+    cli_info = ServiceContext(config=client_config)
     cli_info.state_db['state'] = {'code': 'access_code'}
 
     req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',

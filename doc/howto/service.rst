@@ -93,16 +93,14 @@ Call sequence
 
 The call sequence for the Service methods is this for constructing a request:
 
-    - do_request_init
-        + request_info
-            * construct
-                - do_pre_construct (#)
-                - gather_request_args
-                - do_post_construct (#)
-            * init_authentication_method
-            * uri_and_body
-                - _endpoint
-        + update_http_args
+    + request_info
+        * construct
+            - do_pre_construct (#)
+            - gather_request_args
+            - do_post_construct (#)
+        * init_authentication_method
+        * uri_and_body
+            - _endpoint
 
 and this for sending a request and parsing the response:
 

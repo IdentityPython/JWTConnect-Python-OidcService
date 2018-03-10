@@ -14,7 +14,7 @@ from oidcmsg.oidc import ProviderConfigurationResponse
 from oidcmsg.oidc import RegistrationResponse
 
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
 from oidcservice.service import build_services
@@ -104,7 +104,7 @@ def test_conversation():
                                    'registration', 'any', 'refresh_token',
                                    'userinfo', 'provider_info'}
 
-    client_info = ClientInfo(
+    client_info = ServiceContext(
         RP_KEYJAR,
         {
             "client_prefs":
