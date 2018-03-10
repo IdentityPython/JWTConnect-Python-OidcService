@@ -32,11 +32,11 @@ def test_request_object_encryption():
         'client_id': 'client_1',
         'client_secret': 'abcdefghijklmnop',
     }
-    client_info = ServiceContext(keyjar=keyjar, config=conf)
-    client_info.behaviour["request_object_encryption_alg"] = 'RSA1_5'
-    client_info.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
+    service_context = ServiceContext(keyjar=keyjar, config=conf)
+    service_context.behaviour["request_object_encryption_alg"] = 'RSA1_5'
+    service_context.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
 
-    _jwe = request_object_encryption(msg.to_json(), client_info,
+    _jwe = request_object_encryption(msg.to_json(), service_context,
                                      target=RECEIVER)
     assert _jwe
 

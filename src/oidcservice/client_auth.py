@@ -76,12 +76,13 @@ class ClientSecretBasic(ClientAuthnMethod):
     together with a ':' in between and then URL safe base64 encoded.
     """
 
-    def construct(self, request, cli_info=None, http_args=None, **kwargs):
+    def construct(self, request, service_context=None, http_args=None, **kwargs):
         """
         Construct a dictionary to be added to the HTTP request headers
 
         :param request: The request
-        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context: A
+        :py:class:`oidcservice.service_context.ServiceContext` instance
         :param http_args: HTTP arguments
         :return: dictionary of HTTP arguments
         """
@@ -97,17 +98,14 @@ class ClientSecretBasic(ClientAuthnMethod):
             passwd = kwargs["password"]
         except KeyError:
             try:
-                passwd = http_args["password"]
+                passwd = request["client_secret"]
             except KeyError:
-                try:
-                    passwd = request["client_secret"]
-                except KeyError:
-                    passwd = cli_info.client_secret
+                passwd = service_context.client_secret
 
         try:
             user = kwargs["user"]
         except KeyError:
-            user = cli_info.client_id
+            user = service_context.client_id
 
         # The credential is username and password concatenated with a ':'
         # in between and then base 64 encoded becomes the authentication
@@ -130,7 +128,7 @@ class ClientSecretBasic(ClientAuthnMethod):
                 'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
-                    request['client_id'] = cli_info.client_id
+                    request['client_id'] = service_context.client_id
                 except AttributeError:
                     pass
         else:
@@ -160,7 +158,7 @@ class ClientSecretPost(ClientSecretBasic):
     These means putting both client_secret and client_id in the request body.
     """
 
-    def construct(self, request, cli_info=None, http_args=None, **kwargs):
+    def construct(self, request, service_context=None, http_args=None, **kwargs):
         # I MUST have a client_secret, there are 3 possible places
         # where I can find it. In the request, as an argument in http_args
         # or among the client information.
@@ -169,20 +167,20 @@ class ClientSecretPost(ClientSecretBasic):
                 request["client_secret"] = http_args["client_secret"]
                 del http_args["client_secret"]
             except (KeyError, TypeError):
-                if cli_info.client_secret:
-                    request["client_secret"] = cli_info.client_secret
+                if service_context.client_secret:
+                    request["client_secret"] = service_context.client_secret
                 else:
                     raise AuthnFailure("Missing client secret")
 
         # Add the client_id to the request
-        request["client_id"] = cli_info.client_id
+        request["client_id"] = service_context.client_id
 
         # return a possbly modified http_args dictionary
         return http_args
 
 
 class BearerHeader(ClientAuthnMethod):
-    def construct(self, request=None, cli_info=None, http_args=None, **kwargs):
+    def construct(self, request=None, service_context=None, http_args=None, **kwargs):
         """
         Constructing the Authorization header. The value of
         the Authorization header is "Bearer <access_token>".
@@ -205,7 +203,7 @@ class BearerHeader(ClientAuthnMethod):
                 try:
                     _acc_token = kwargs["access_token"]
                 except KeyError:
-                    _acc_token = cli_info.state_db.get_token_info(
+                    _acc_token = service_context.state_db.get_token_info(
                         **kwargs)['access_token']
         else:
             try:
@@ -231,12 +229,12 @@ class BearerHeader(ClientAuthnMethod):
 
 
 class BearerBody(ClientAuthnMethod):
-    def construct(self, request, cli_info=None, http_args=None, **kwargs):
+    def construct(self, request, service_context=None, http_args=None, **kwargs):
         """
         Will add access_token to the request if not present
 
         :param request: The request
-        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
         :param http_args: HTTP arguments
         :param kwargs: extra keyword arguments
         :return: A possibly modified dictionary with HTTP arguments.
@@ -251,11 +249,11 @@ class BearerBody(ClientAuthnMethod):
                 try:
                     kwargs["state"]
                 except KeyError:
-                    if not cli_info.state:
+                    if not service_context.state:
                         raise AuthnFailure("Missing state specification")
-                    kwargs["state"] = cli_info.state
+                    kwargs["state"] = service_context.state
 
-                request["access_token"] = cli_info.state_db.get_token_info(
+                request["access_token"] = service_context.state_db.get_token_info(
                     **kwargs)['access_token']
 
         return http_args
@@ -302,27 +300,27 @@ class JWSAuthnMethod(ClientAuthnMethod):
             raise AuthnFailure("Missing algorithm specification")
         return algorithm
 
-    def get_signing_key(self, algorithm, cli_info):
+    def get_signing_key(self, algorithm, service_context):
         """
         Pick signing key based on signing algorithm to be used
 
         :param algorithm: Signing algorithm
-        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
         :return: A key
         """
-        return cli_info.keyjar.get_signing_key(
+        return service_context.keyjar.get_signing_key(
             alg2keytype(algorithm), alg=algorithm)
 
-    def get_key_by_kid(self, kid, algorithm, cli_info):
+    def get_key_by_kid(self, kid, algorithm, service_context):
         """
         Pick a key that matches a given key ID and signing algorithm.
 
         :param kid: Key ID
         :param algorithm: Signing algorithm
-        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
         :return: A matching key
         """
-        _key = cli_info.keyjar.get_key_by_kid(kid)
+        _key = service_context.keyjar.get_key_by_kid(kid)
         if _key:
             ktype = alg2keytype(algorithm)
             if _key.kty != ktype:
@@ -332,13 +330,13 @@ class JWSAuthnMethod(ClientAuthnMethod):
         else:
             raise NoMatchingKey("No key with kid:%s" % kid)
 
-    def construct(self, request, cli_info=None, http_args=None, **kwargs):
+    def construct(self, request, service_context=None, http_args=None, **kwargs):
         """
         Constructs a client assertion and signs it with a key.
         The request is modified as a side effect.
 
         :param request: The request
-        :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
         :param http_args: HTTP arguments
         :param kwargs: Extra arguments
         :return: Constructed HTTP arguments, in this case none
@@ -360,13 +358,13 @@ class JWSAuthnMethod(ClientAuthnMethod):
             # we're talking to.
             if kwargs['authn_endpoint'] in ['token', 'refresh']:
                 try:
-                    algorithm = cli_info.registration_info[
+                    algorithm = service_context.registration_info[
                         'token_endpoint_auth_signing_alg']
                 except (KeyError, AttributeError):
                     pass
-                audience = cli_info.provider_info['token_endpoint']
+                audience = service_context.provider_info['token_endpoint']
             else:
-                audience = cli_info.provider_info['issuer']
+                audience = service_context.provider_info['issuer']
 
             if not algorithm:
                 algorithm = self.choose_algorithm(**kwargs)
@@ -375,15 +373,15 @@ class JWSAuthnMethod(ClientAuthnMethod):
             try:
                 if 'kid' in kwargs:
                     signing_key = [self.get_key_by_kid(kwargs["kid"], algorithm,
-                                                       cli_info)]
-                elif ktype in cli_info.kid["sig"]:
+                                                       service_context)]
+                elif ktype in service_context.kid["sig"]:
                     try:
                         signing_key = [self.get_key_by_kid(
-                            cli_info.kid["sig"][ktype], algorithm, cli_info)]
+                            service_context.kid["sig"][ktype], algorithm, service_context)]
                     except KeyError:
-                        signing_key = self.get_signing_key(algorithm, cli_info)
+                        signing_key = self.get_signing_key(algorithm, service_context)
                 else:
-                    signing_key = self.get_signing_key(algorithm, cli_info)
+                    signing_key = self.get_signing_key(algorithm, service_context)
             except NoMatchingKey as err:
                 logger.error("%s" % sanitize(err))
                 raise
@@ -396,7 +394,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
             # construct the signed JWT with the assertions and add
             # it as value to the 'client_assertion' claim of the request
             request["client_assertion"] = assertion_jwt(
-                cli_info.client_id, signing_key, audience,
+                service_context.client_id, signing_key, audience,
                 algorithm, **_args)
 
             request["client_assertion_type"] = JWT_BEARER
@@ -428,8 +426,8 @@ class ClientSecretJWT(JWSAuthnMethod):
     def choose_algorithm(self, context="client_secret_jwt", **kwargs):
         return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
 
-    def get_signing_key(self, algorithm, cli_info):
-        return cli_info.keyjar.get_signing_key(
+    def get_signing_key(self, algorithm, service_context):
+        return service_context.keyjar.get_signing_key(
             alg2keytype(algorithm), alg=algorithm)
 
 
@@ -441,8 +439,8 @@ class PrivateKeyJWT(JWSAuthnMethod):
     def choose_algorithm(self, context="private_key_jwt", **kwargs):
         return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
 
-    def get_signing_key(self, algorithm, cli_info=None):
-        return cli_info.keyjar.get_signing_key(
+    def get_signing_key(self, algorithm, service_context=None):
+        return service_context.keyjar.get_signing_key(
             alg2keytype(algorithm), "", alg=algorithm)
 
 
@@ -459,11 +457,11 @@ CLIENT_AUTHN_METHOD = {
 TYPE_METHOD = [(JWT_BEARER, JWSAuthnMethod)]
 
 
-def valid_client_info(cinfo, when=0):
+def valid_service_context(cinfo, when=0):
     """
     Check if the client_secret has expired
 
-    :param cinfo: A :py:class:`oidcservice.client_info.ClientInfo` instance
+    :param cinfo: A :py:class:`oidcservice.service_context.ServiceContext` instance
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """
