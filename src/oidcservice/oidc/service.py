@@ -364,14 +364,18 @@ class WebFinger(Service):
             _resource = request_args['resource']
         except KeyError:
             try:
-                _resource = cli_info.config['resource']
+                _resource = kwargs['resource']
             except KeyError:
-                raise MissingRequiredAttribute('resource')
+                try:
+                    _resource = cli_info.config['resource']
+                except KeyError:
+                    raise MissingRequiredAttribute('resource')
 
         if 'rel' in kwargs:
-            return {'url': self.query(_resource, rel=kwargs['rel'])}
+            return {'url': self.query(_resource, rel=kwargs['rel']),
+                    'method': 'GET'}
         else:
-            return {'url': self.query(_resource)}
+            return {'url': self.query(_resource), 'method': 'GET'}
 
 
 ENDPOINT2SERVICE = {

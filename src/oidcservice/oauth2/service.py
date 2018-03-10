@@ -2,15 +2,13 @@ import inspect
 import logging
 import sys
 
-from oidcservice import OIDCONF_PATTERN
-from oidcservice.exception import OidcServiceError
-from oidcservice.service import Service
-
 from oidcmsg import oauth2
 from oidcmsg.exception import MissingParameter
 from oidcmsg.key_jar import KeyJar
-from oidcmsg.oidc import AccessTokenResponse
-from oidcmsg.oidc import AuthorizationResponse
+
+from oidcservice import OIDCONF_PATTERN
+from oidcservice.exception import OidcServiceError
+from oidcservice.service import Service
 
 __author__ = 'Roland Hedberg'
 
