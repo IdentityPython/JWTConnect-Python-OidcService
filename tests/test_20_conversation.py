@@ -95,7 +95,7 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 def test_conversation():
     service_spec = DEFAULT_SERVICES.copy()
-    service_spec.append(('WebFinger', {}))
+    service_spec['WebFinger'] = {}
 
     service = build_services(service_spec, factory, keyjar=RP_KEYJAR,
                              client_authn_method=CLIENT_AUTHN_METHOD)

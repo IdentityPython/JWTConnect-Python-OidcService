@@ -560,13 +560,14 @@ class Service(object):
             return default
 
 
-def build_services(srvs, service_factory, keyjar, client_authn_method):
+def build_services(service_definitions, service_factory, keyjar,
+                   client_authn_method):
     service = {}
-    for serv, conf in srvs:
-        _srv = service_factory(serv, keyjar=keyjar,
+    for service_name, service_configuration in service_definitions.items():
+        _srv = service_factory(service_name, keyjar=keyjar,
                                client_authn_method=client_authn_method,
-                               conf=conf)
-        service[_srv.request] = _srv
+                               conf=service_configuration)
+        service[_srv.service_name] = _srv
 
     # For any unspecified service
     service['any'] = Service(keyjar=keyjar,
