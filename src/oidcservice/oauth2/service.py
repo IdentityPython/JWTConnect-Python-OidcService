@@ -41,21 +41,21 @@ class Authorization(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_client_info(self, cli_info, resp, state='', **kwargs):
-        cli_info.state_db.add_response(resp, state)
+    def update_service_context(self, service_context, resp, state='', **kwargs):
+        service_context.state_db.add_response(resp, state)
 
-    def gather_request_args(self, cli_info, **kwargs):
-        ar_args = Service.gather_request_args(self, cli_info, **kwargs)
+    def gather_request_args(self, service_context, **kwargs):
+        ar_args = Service.gather_request_args(self, service_context, **kwargs)
 
         if 'redirect_uri' not in ar_args:
             try:
-                ar_args['redirect_uri'] = cli_info.redirect_uris[0]
+                ar_args['redirect_uri'] = service_context.redirect_uris[0]
             except (KeyError, AttributeError):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
 
-    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -88,12 +88,12 @@ class AccessToken(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_client_info(self, cli_info, resp, state='', **kwargs):
-        cli_info.state_db.add_response(resp, state)
+    def update_service_context(self, service_context, resp, state='', **kwargs):
+        service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = cli_info.state_db.get_response_args(_state, self.msg_type)
+        req_args = service_context.state_db.get_response_args(_state, self.msg_type)
 
         if request_args is None:
             request_args = req_args
@@ -121,12 +121,12 @@ class RefreshAccessToken(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_client_info(self, cli_info, resp, state='', **kwargs):
-        cli_info.state_db.add_response(resp, state)
+    def update_service_context(self, service_context, resp, state='', **kwargs):
+        service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = cli_info.state_db.get_response_args(_state, self.msg_type)
+        req_args = service_context.state_db.get_response_args(_state, self.msg_type)
 
         if request_args is None:
             request_args = req_args
@@ -148,10 +148,10 @@ class ProviderInfoDiscovery(Service):
         Service.__init__(self, keyjar=keyjar,
                          client_authn_method=client_authn_method, conf=conf)
 
-    def request_info(self, cli_info, method="GET", request_args=None,
+    def request_info(self, service_context, method="GET", request_args=None,
                      lax=False, **kwargs):
 
-        issuer = cli_info.issuer
+        issuer = service_context.issuer
 
         if issuer.endswith("/"):
             _issuer = issuer[:-1]
@@ -160,13 +160,13 @@ class ProviderInfoDiscovery(Service):
 
         return {'url': OIDCONF_PATTERN.format(_issuer)}
 
-    def update_client_info(self, cli_info, resp, **kwargs):
+    def update_service_context(self, service_context, resp, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response
-        :param cli_info: Information about the client/server session
+        :param service_context: Information collected/used by services
         """
-        issuer = cli_info.issuer
+        issuer = service_context.issuer
 
         if "issuer" in resp:
             _pcr_issuer = resp["issuer"]
@@ -182,7 +182,7 @@ class ProviderInfoDiscovery(Service):
                     _issuer = issuer
 
             try:
-                cli_info.allow['issuer_mismatch']
+                service_context.allow['issuer_mismatch']
             except KeyError:
                 if _issuer != _pcr_issuer:
                     raise OidcServiceError(
@@ -192,22 +192,22 @@ class ProviderInfoDiscovery(Service):
         else:  # No prior knowledge
             _pcr_issuer = issuer
 
-        cli_info.issuer = _pcr_issuer
-        cli_info.provider_info = resp
+        service_context.issuer = _pcr_issuer
+        service_context.provider_info = resp
 
         for key, val in resp.items():
             if key.endswith("_endpoint"):
-                for _srv in cli_info.service.values():
+                for _srv in service_context.service.values():
                     if _srv.endpoint_name == key:
                         _srv.endpoint = val
 
         try:
-            kj = cli_info.keyjar
+            kj = service_context.keyjar
         except KeyError:
             kj = KeyJar()
 
         kj.load_keys(resp, _pcr_issuer)
-        cli_info.keyjar = kj
+        service_context.keyjar = kj
 
 
 def factory(req_name, **kwargs):

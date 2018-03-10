@@ -6,12 +6,12 @@ from oidcservice import rndstr
 from oidcmsg.exception import MissingRequiredAttribute
 
 
-def request_object_encryption(msg, client_info, **kwargs):
+def request_object_encryption(msg, service_context, **kwargs):
     try:
         encalg = kwargs["request_object_encryption_alg"]
     except KeyError:
         try:
-            encalg = client_info.behaviour["request_object_encryption_alg"]
+            encalg = service_context.behaviour["request_object_encryption_alg"]
         except KeyError:
             return msg
 
@@ -19,7 +19,7 @@ def request_object_encryption(msg, client_info, **kwargs):
         encenc = kwargs["request_object_encryption_enc"]
     except KeyError:
         try:
-            encenc = client_info.behaviour["request_object_encryption_enc"]
+            encenc = service_context.behaviour["request_object_encryption_enc"]
         except KeyError:
             raise MissingRequiredAttribute(
                 "No request_object_encryption_enc specified")
@@ -36,12 +36,12 @@ def request_object_encryption(msg, client_info, **kwargs):
         raise MissingRequiredAttribute("No target specified")
 
     if _kid:
-        _keys = client_info.keyjar.get_encrypt_key(_kty,
+        _keys = service_context.keyjar.get_encrypt_key(_kty,
                                                    owner=kwargs["target"],
                                                    kid=_kid)
         _jwe["kid"] = _kid
     else:
-        _keys = client_info.keyjar.get_encrypt_key(_kty,
+        _keys = service_context.keyjar.get_encrypt_key(_kty,
                                                    owner=kwargs["target"])
 
     return _jwe.encrypt(_keys)

@@ -29,13 +29,13 @@ class TestAuthorization(object):
         self.service = factory('Authorization')
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ServiceContext(config=client_config)
-        self.cli_info.state_db['state'] = {}
+        self.service_context = ServiceContext(config=client_config)
+        self.service_context.state_db['state'] = {}
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
-        _req = self.service.construct(self.cli_info, request_args=req_args,
-                                      state='state')
+        _req = self.service.construct(self.service_context,
+                                      request_args=req_args, state='state')
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
                                     'redirect_uri', 'state'}
@@ -43,9 +43,9 @@ class TestAuthorization(object):
     def test_get_request_parameters(self):
         req_args = {'response_type': 'code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.cli_info,
-                                                     request_args=req_args,
-                                                     state='state')
+        _info = self.service.get_request_parameters(self.service_context,
+                                                    request_args=req_args,
+                                                    state='state')
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -57,8 +57,8 @@ class TestAuthorization(object):
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.cli_info,
-                                                     request_args=req_args)
+        _info = self.service.get_request_parameters(self.service_context,
+                                                    request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -75,13 +75,14 @@ class TestAccessTokenRequest(object):
                                client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ServiceContext(config=client_config)
-        self.cli_info.state_db['state'] = {'code': 'access_code'}
+        self.service_context = ServiceContext(config=client_config)
+        self.service_context.state_db['state'] = {'code': 'access_code'}
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'state': 'state'}
 
-        _req = self.service.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(self.service_context,
+                                      request_args=req_args)
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
                                     'client_secret', 'code', 'state'}
@@ -91,7 +92,8 @@ class TestAccessTokenRequest(object):
         # request
         req_args = {'foo': 'bar'}
 
-        _req = self.service.construct(self.cli_info, request_args=req_args,
+        _req = self.service.construct(self.service_context,
+                                      request_args=req_args,
                                       state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
@@ -101,10 +103,9 @@ class TestAccessTokenRequest(object):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.cli_info,
-                                                     request_args=req_args,
-                                                     state='state',
-                                                     authn_method='client_secret_basic')
+        _info = self.service.get_request_parameters(
+            self.service_context, request_args=req_args, state='state',
+            authn_method='client_secret_basic')
         assert set(_info.keys()) == {'headers', 'body', 'url', 'method'}
         assert _info['url'] == 'https://example.com/authorize'
         assert 'Authorization' in _info['headers']
@@ -121,9 +122,8 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
 
-        _info = self.service.get_request_parameters(self.cli_info,
-                                                     request_args=req_args,
-                                                     state='state')
+        _info = self.service.get_request_parameters(
+            self.service_context, request_args=req_args, state='state')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
@@ -144,15 +144,15 @@ class TestProviderInfo(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss}
-        self.cli_info = ServiceContext(config=client_config)
+        self.service_context = ServiceContext(config=client_config)
 
     def test_construct(self):
-        _req = self.service.construct(self.cli_info)
+        _req = self.service.construct(self.service_context)
         assert isinstance(_req, Message)
         assert len(_req) == 0
 
     def test_get_request_parameters(self):
-        _info = self.service.get_request_parameters(self.cli_info)
+        _info = self.service.get_request_parameters(self.service_context)
         assert set(_info.keys()) == {'url', 'method'}
         assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -166,23 +166,23 @@ class TestRefreshAccessTokenRequest(object):
         self.service.endpoint = 'https://example.com/token'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ServiceContext(config=client_config)
-        self.cli_info.state_db['abcdef'] = {'code': 'access_code'}
-        self.cli_info.state_db.add_response(
+        self.service_context = ServiceContext(config=client_config)
+        self.service_context.state_db['abcdef'] = {'code': 'access_code'}
+        self.service_context.state_db.add_response(
             {'access_token': 'bearer_token', 'refresh_token': 'refresh'},
             'abcdef'
         )
 
     def test_construct(self):
-        _req = self.service.construct(self.cli_info, state='abcdef')
+        _req = self.service.construct(self.service_context, state='abcdef')
         assert isinstance(_req, Message)
         assert len(_req) == 4
         assert set(_req.keys()) == {'client_id', 'client_secret', 'grant_type',
                                     'refresh_token'}
 
     def test_get_request_parameters(self):
-        _info = self.service.get_request_parameters(self.cli_info,
-                                                     state='abcdef')
+        _info = self.service.get_request_parameters(self.service_context,
+                                                    state='abcdef')
         assert set(_info.keys()) == {'url', 'body', 'headers', 'method'}
 
 
@@ -192,14 +192,15 @@ def test_access_token_srv_conf():
                       conf={'default_authn_method': 'client_secret_post'})
     client_config = {'client_id': 'client_id', 'client_secret': 'password',
                      'redirect_uris': ['https://example.com/cli/authz_cb']}
-    cli_info = ServiceContext(config=client_config)
-    cli_info.state_db['state'] = {'code': 'access_code'}
+    service_context = ServiceContext(config=client_config)
+    service_context.state_db['state'] = {'code': 'access_code'}
 
     req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                 'code': 'access_code'}
     service.endpoint = 'https://example.com/authorize'
-    _info = service.get_request_parameters(cli_info, request_args=req_args,
-                                            state='state')
+    _info = service.get_request_parameters(service_context,
+                                           request_args=req_args,
+                                           state='state')
 
     assert _info
     msg = AccessTokenRequest().from_urlencoded(

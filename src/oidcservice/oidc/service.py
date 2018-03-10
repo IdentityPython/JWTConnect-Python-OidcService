@@ -63,17 +63,18 @@ PROVIDER_DEFAULT = {
 }
 
 
-def store_id_token(cli_info, resp, **kwargs):
+def store_id_token(service_context, resp, **kwargs):
     """
     Store the verified ID Token in the state database.
 
     :param resp: The response
-    :param cli_info: A :py:class:`oidcservice.client_info.ClientInfo` instance
+    :param service_context: A
+    :py:class:`oidcservice.service_context.ServiceContext` instance
     :param kwargs: Extra keyword arguments. In this case the state claim
         is supposed to be represented.
     """
     try:
-        cli_info.state_db.add_info(
+        service_context.state_db.add_info(
             kwargs['state'],
             verified_id_token=resp['verified_id_token'].to_dict())
     except KeyError:
@@ -93,18 +94,18 @@ class Authorization(service.Authorization):
         self.pre_construct = [self.oidc_pre_construct]
         self.post_construct = [self.oidc_post_construct]
 
-    def update_client_info(self, cli_info, resp, state='', **kwargs):
-        cli_info.state_db.add_response(resp, state)
-        store_id_token(cli_info, resp, **kwargs)
+    def update_service_context(self, service_context, resp, state='', **kwargs):
+        service_context.state_db.add_response(resp, state)
+        store_id_token(service_context, resp, **kwargs)
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
         try:
             _rt = request_args["response_type"]
         except KeyError:
-            _rt = cli_info.behaviour['response_types'][0]
+            _rt = service_context.behaviour['response_types'][0]
             request_args["response_type"] = _rt
 
         # For OIDC 'openid' is required in scope
@@ -136,7 +137,7 @@ class Authorization(service.Authorization):
             del kwargs["request_method"]
 
         try:
-            response_mod = cli_info.behaviour['response_mode']
+            response_mod = service_context.behaviour['response_mode']
         except KeyError:
             pass
         else:
@@ -144,17 +145,17 @@ class Authorization(service.Authorization):
                 request_args['response_mode'] = response_mod
 
         try:
-            cli_info.state_db.create_state(
-                cli_info.issuer, request_args, request_args['state'])
+            service_context.state_db.create_state(
+                service_context.issuer, request_args, request_args['state'])
         except KeyError:
-            request_args['state'] = cli_info.state_db.create_state(
-                cli_info.issuer, request_args)
+            request_args['state'] = service_context.state_db.create_state(
+                service_context.issuer, request_args)
 
         return request_args, post_args
 
-    def oidc_post_construct(self, cli_info, req, **kwargs):
-        cli_info.state_db.add_info(req['state'],
-                                   redirect_uri=req['redirect_uri'])
+    def oidc_post_construct(self, service_context, req, **kwargs):
+        service_context.state_db.add_info(req['state'],
+                                          redirect_uri=req['redirect_uri'])
 
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
@@ -165,7 +166,8 @@ class Authorization(service.Authorization):
                     _nonce = rndstr(32)
                     req['nonce'] = _nonce
 
-                cli_info.state_db.bind_nonce_to_state(_nonce, req['state'])
+                service_context.state_db.bind_nonce_to_state(_nonce,
+                                                             req['state'])
 
         try:
             _request_method = kwargs['request_method']
@@ -185,7 +187,8 @@ class Authorization(service.Authorization):
 
             if not alg:
                 try:
-                    alg = cli_info.behaviour["request_object_signing_alg"]
+                    alg = service_context.behaviour[
+                        "request_object_signing_alg"]
                 except KeyError:  # Use default
                     alg = "RS256"
 
@@ -196,21 +199,23 @@ class Authorization(service.Authorization):
                 try:
                     _kid = kwargs["sig_kid"]
                 except KeyError:
-                    _kid = cli_info.kid["sig"].get(_kty, None)
+                    _kid = service_context.kid["sig"].get(_kty, None)
 
-                kwargs["keys"] = cli_info.keyjar.get_signing_key(_kty, kid=_kid)
+                kwargs["keys"] = service_context.keyjar.get_signing_key(_kty,
+                                                                        kid=_kid)
 
             _req = make_openid_request(req, **kwargs)
 
             # Should the request be encrypted
-            _req = request_object_encryption(_req, cli_info, **kwargs)
+            _req = request_object_encryption(_req, service_context, **kwargs)
 
             if _request_method == "request":
                 req["request"] = _req
             else:  # MUST be request_uri
                 try:
-                    _webname = cli_info.registration_response['request_uris'][0]
-                    filename = cli_info.filename_from_webname(_webname)
+                    _webname = \
+                    service_context.registration_response['request_uris'][0]
+                    filename = service_context.filename_from_webname(_webname)
                 except KeyError:
                     filename, _webname = construct_request_uri(**kwargs)
                 fid = open(filename, mode="w")
@@ -233,20 +238,21 @@ class AccessToken(service.AccessToken):
             client_authn_method=client_authn_method,
             conf=conf)
 
-    def update_client_info(self, cli_info, resp, state='', **kwargs):
+    def update_service_context(self, service_context, resp, state='', **kwargs):
         try:
             _idt = resp['verified_id_token']
         except KeyError:
             pass
         else:
             try:
-                if cli_info.state_db.nonce_to_state(_idt['nonce']) != state:
+                if service_context.state_db.nonce_to_state(
+                        _idt['nonce']) != state:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 raise ValueError('Unknown nonce value')
 
-        cli_info.state_db.add_response(resp, state)
-        store_id_token(cli_info, resp, **kwargs)
+        service_context.state_db.add_response(resp, state)
+        store_id_token(service_context, resp, **kwargs)
 
 
 class RefreshAccessToken(service.RefreshAccessToken):
@@ -309,7 +315,7 @@ class WebFinger(Service):
                          **kwargs)
         self.rel = OIC_ISSUER
 
-    def update_client_info(self, client_info, resp, state='', **kwargs):
+    def update_service_context(self, service_context, resp, state='', **kwargs):
         try:
             links = resp['links']
         except KeyError:
@@ -322,7 +328,7 @@ class WebFinger(Service):
                         if _href.startswith('http://'):
                             raise ValueError(
                                 'http link not allowed ({})'.format(_href))
-                    client_info.issuer = link['href']
+                    service_context.issuer = link['href']
                     break
         return resp
 
@@ -355,7 +361,8 @@ class WebFinger(Service):
 
         return "%s?%s" % (WF_URL % host, urlencode(info))
 
-    def get_request_parameters(self, cli_info, request_args=None, **kwargs):
+    def get_request_parameters(self, service_context, request_args=None,
+                               **kwargs):
 
         if request_args is None:
             request_args = {}
@@ -367,7 +374,7 @@ class WebFinger(Service):
                 _resource = kwargs['resource']
             except KeyError:
                 try:
-                    _resource = cli_info.config['resource']
+                    _resource = service_context.config['resource']
                 except KeyError:
                     raise MissingRequiredAttribute('resource')
 
@@ -398,8 +405,8 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
             self, keyjar=keyjar, client_authn_method=client_authn_method,
             conf=conf)
 
-    def update_client_info(self, cli_info, resp, **kwargs):
-        cli_info.provider_info = resp
+    def update_service_context(self, service_context, resp, **kwargs):
+        service_context.provider_info = resp
 
         for endp, srvs in ENDPOINT2SERVICE.items():
             try:
@@ -409,11 +416,11 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
 
             for srv in srvs:
                 try:
-                    cli_info.service[srv].endpoint = endpoint_url
+                    service_context.service[srv].endpoint = endpoint_url
                 except KeyError:
                     pass
 
-        self.match_preferences(cli_info, resp, cli_info.issuer)
+        self.match_preferences(service_context, resp, service_context.issuer)
         if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
             _jwks = self.keyjar.export_jwks_as_json(issuer=resp['issuer'])
             logger.info(
@@ -431,7 +438,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                 return OIDCONF_PATTERN.format(issuer)
 
     @staticmethod
-    def match_preferences(cli_info, pcr=None, issuer=None):
+    def match_preferences(service_context, pcr=None, issuer=None):
         """
         Match the clients preferences against what the provider can do.
         This is to prepare for later client registration and or what 
@@ -441,19 +448,20 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
         If the Provider has left some claims out, defaults specified in the
         standard will be used.
 
-        :param cli_info: :py:class:`oidcservice.client_info.ClientInfo` instance
+        :param service_context:
+        :py:class:`oidcservice.service_context.ServiceContext` instance
         :param pcr: Provider configuration response if available
         :param issuer: The issuer identifier
         """
 
         if not pcr:
-            pcr = cli_info.provider_info
+            pcr = service_context.provider_info
 
         regreq = oidc.RegistrationRequest
 
         for _pref, _prov in PREFERENCE2PROVIDER.items():
             try:
-                vals = cli_info.client_prefs[_pref]
+                vals = service_context.client_prefs[_pref]
             except KeyError:
                 continue
 
@@ -470,7 +478,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                             _pref))
                     # Don't know what the right thing to do here
                     # Fail or hope for the best, made it configurable
-                    if cli_info.strict_on_preferences:
+                    if service_context.strict_on_preferences:
                         raise ConfigurationError(
                             "OP couldn't match preference:%s" % _pref, pcr)
                     else:
@@ -478,27 +486,27 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
 
             if isinstance(vals, str):
                 if vals in _pvals:
-                    cli_info.behaviour[_pref] = vals
+                    service_context.behaviour[_pref] = vals
             else:
                 vtyp = regreq.c_param[_pref]
 
                 if isinstance(vtyp[0], list):
-                    cli_info.behaviour[_pref] = []
+                    service_context.behaviour[_pref] = []
                     for val in vals:
                         if val in _pvals:
-                            cli_info.behaviour[_pref].append(val)
+                            service_context.behaviour[_pref].append(val)
                 else:
                     for val in vals:
                         if val in _pvals:
-                            cli_info.behaviour[_pref] = val
+                            service_context.behaviour[_pref] = val
                             break
 
-            if _pref not in cli_info.behaviour:
+            if _pref not in service_context.behaviour:
                 raise ConfigurationError(
                     "OP couldn't match preference:%s" % _pref, pcr)
 
-        for key, val in cli_info.client_prefs.items():
-            if key in cli_info.behaviour:
+        for key, val in service_context.client_prefs.items():
+            if key in service_context.behaviour:
                 continue
 
             try:
@@ -510,9 +518,10 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
             except KeyError:
                 pass
             if key not in PREFERENCE2PROVIDER:
-                cli_info.behaviour[key] = val
+                service_context.behaviour[key] = val
 
-        logger.debug('cli_info behaviour: {}'.format(cli_info.behaviour))
+        logger.debug(
+            'service_context behaviour: {}'.format(service_context.behaviour))
 
 
 rt2gt = {
@@ -560,7 +569,7 @@ class Registration(Service):
         self.pre_construct = [self.oidc_pre_construct]
         self.post_construct = [self.oidc_post_construct]
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
         """
         Create a registration request
 
@@ -571,7 +580,7 @@ class Registration(Service):
             if prop in request_args:
                 continue
             try:
-                request_args[prop] = cli_info.behaviour[prop]
+                request_args[prop] = service_context.behaviour[prop]
             except KeyError:
                 pass
 
@@ -579,29 +588,29 @@ class Registration(Service):
             try:
                 request_args[
                     "post_logout_redirect_uris"] = \
-                    cli_info.post_logout_redirect_uris
+                    service_context.post_logout_redirect_uris
             except AttributeError:
                 pass
 
         if "redirect_uris" not in request_args:
             try:
-                request_args["redirect_uris"] = cli_info.redirect_uris
+                request_args["redirect_uris"] = service_context.redirect_uris
             except AttributeError:
                 raise MissingRequiredAttribute("redirect_uris", request_args)
 
-        if cli_info.requests_dir:
+        if service_context.requests_dir:
             try:
-                if cli_info.provider_info[
+                if service_context.provider_info[
                     'require_request_uri_registration'] is True:
                     request_args[
-                        'request_uris'] = cli_info.generate_request_uris(
-                        cli_info.requests_dir)
+                        'request_uris'] = service_context.generate_request_uris(
+                        service_context.requests_dir)
             except KeyError:
                 pass
 
         return request_args, {}
 
-    def oidc_post_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_post_construct(self, service_context, request_args=None, **kwargs):
         try:
             request_args['grant_types'] = response_types_to_grant_types(
                 request_args['response_types'])
@@ -610,27 +619,27 @@ class Registration(Service):
 
         return request_args
 
-    def update_client_info(self, client_info, resp, state='', **kwargs):
-        client_info.registration_response = resp
+    def update_service_context(self, service_context, resp, state='', **kwargs):
+        service_context.registration_response = resp
         if "token_endpoint_auth_method" not in \
-                client_info.registration_response:
-            client_info.registration_response[
+                service_context.registration_response:
+            service_context.registration_response[
                 "token_endpoint_auth_method"] = "client_secret_basic"
-        client_info.client_id = resp["client_id"]
+        service_context.client_id = resp["client_id"]
 
         try:
-            client_info.client_secret = resp["client_secret"]
+            service_context.client_secret = resp["client_secret"]
         except KeyError:  # Not required
             pass
         else:
             try:
-                client_info.registration_expires = resp[
+                service_context.registration_expires = resp[
                     "client_secret_expires_at"]
             except KeyError:
                 pass
 
         try:
-            client_info.registration_access_token = resp[
+            service_context.registration_access_token = resp[
                 "registration_access_token"]
         except KeyError:
             pass
@@ -652,21 +661,22 @@ class UserInfo(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
         if "access_token" in request_args:
             pass
         else:
-            _tinfo = cli_info.state_db.get_token_info(kwargs['state'])
+            _tinfo = service_context.state_db.get_token_info(kwargs['state'])
             request_args["access_token"] = _tinfo['access_token']
 
         return request_args, {}
 
-    def post_parse_response(self, client_info, response, **kwargs):
+    def post_parse_response(self, service_context, response, **kwargs):
         try:
-            _sub = client_info.state_db[kwargs['state']]['verified_id_token'][
+            _sub = \
+            service_context.state_db[kwargs['state']]['verified_id_token'][
                 'sub']
         except KeyError:
             logger.warning("Can not verify value on sub")
@@ -683,7 +693,7 @@ class UserInfo(Service):
                 if "JWT" in spec:
                     aggregated_claims = Message().from_jwt(
                         spec["JWT"].encode("utf-8"),
-                        keyjar=client_info.keyjar)
+                        keyjar=service_context.keyjar)
                     claims = [value for value, src in
                               response["_claim_names"].items() if
                               src == csrc]
@@ -694,7 +704,7 @@ class UserInfo(Service):
         return response
 
 
-def set_id_token(cli_info, request_args, **kwargs):
+def set_id_token(service_context, request_args, **kwargs):
     if request_args is None:
         request_args = {}
 
@@ -707,7 +717,7 @@ def set_id_token(cli_info, request_args, **kwargs):
         pass
     else:
         _state = get_state(request_args, kwargs)
-        id_token = cli_info.state_db.get_id_token(_state)
+        id_token = service_context.state_db.get_id_token(_state)
         if id_token is None:
             raise MissingParameter("No valid id token available")
 
@@ -729,8 +739,8 @@ class CheckSession(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
-        request_args = set_id_token(cli_info, request_args, **kwargs)
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
+        request_args = set_id_token(service_context, request_args, **kwargs)
         return request_args, {}
 
 
@@ -748,8 +758,8 @@ class CheckID(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
-        request_args = set_id_token(cli_info, request_args, **kwargs)
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
+        request_args = set_id_token(service_context, request_args, **kwargs)
         return request_args, {}
 
 
@@ -767,8 +777,8 @@ class EndSession(Service):
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
-    def oidc_pre_construct(self, cli_info, request_args=None, **kwargs):
-        request_args = set_id_token(cli_info, request_args, **kwargs)
+    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
+        request_args = set_id_token(service_context, request_args, **kwargs)
         return request_args, {}
 
 

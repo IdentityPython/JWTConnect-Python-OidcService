@@ -3,14 +3,14 @@ from oidcservice import unreserved, CC_METHOD
 from oidcservice.exception import Unsupported
 
 
-def add_code_challenge(client_info, state):
+def add_code_challenge(service_context, state):
     """
     PKCE RFC 7636 support
 
     :return:
     """
     try:
-        cv_len = client_info.config['code_challenge']['length']
+        cv_len = service_context.config['code_challenge']['length']
     except KeyError:
         cv_len = 64  # Use default
 
@@ -19,7 +19,7 @@ def add_code_challenge(client_info, state):
     _cv = code_verifier.encode()
 
     try:
-        _method = client_info.config['code_challenge']['method']
+        _method = service_context.config['code_challenge']['method']
     except KeyError:
         _method = 'S256'
 
@@ -34,12 +34,12 @@ def add_code_challenge(client_info, state):
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
 
-    client_info.state_db.add_info(state, code_verifier=code_verifier,
+    service_context.state_db.add_info(state, code_verifier=code_verifier,
                                   code_challenge_method=_method)
 
     return {"code_challenge": code_challenge,
             "code_challenge_method": _method}
 
 
-def get_code_verifier(client_info, state):
-    return client_info.state_db[state]['code_verifier']
+def get_code_verifier(service_context, state):
+    return service_context.state_db[state]['code_verifier']

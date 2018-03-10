@@ -164,8 +164,7 @@ class ClientSecretPost(ClientSecretBasic):
         # or among the client information.
         if "client_secret" not in request:
             try:
-                request["client_secret"] = http_args["client_secret"]
-                del http_args["client_secret"]
+                request["client_secret"] = kwargs["client_secret"]
             except (KeyError, TypeError):
                 if service_context.client_secret:
                     request["client_secret"] = service_context.client_secret

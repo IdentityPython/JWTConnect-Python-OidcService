@@ -45,13 +45,13 @@ def _eq(l1, l2):
 
 
 @pytest.fixture
-def get_services():
+def services():
     return build_services(DEFAULT_SERVICES, service.factory, keyjar=None,
                           client_authn_method=CLIENT_AUTHN_METHOD)
 
 
 @pytest.fixture
-def get_service_context():
+def service_context():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
     _sdb = service_context.state_db
     _sdb['ABCDE'] = {'code': 'access_code'}
@@ -60,8 +60,7 @@ def get_service_context():
 
 
 class TestClientSecretBasic(object):
-    def test_construct(self, services=get_service_context,
-                       service_context=get_service_context):
+    def test_construct(self, services, service_context):
         request = services['accesstoken'].construct(
             service_context, redirect_uri="http://example.com", state='ABCDE')
 
@@ -72,7 +71,7 @@ class TestClientSecretBasic(object):
             base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
                 "utf-8"))}}
 
-    def test_does_not_remove_padding(self, service_context=get_service_context):
+    def test_does_not_remove_padding(self, service_context):
         request = AccessTokenRequest(code="foo",
                                      redirect_uri="http://example.com")
 
@@ -82,7 +81,7 @@ class TestClientSecretBasic(object):
 
         assert http_args["headers"]["Authorization"].endswith("==")
 
-    def test_construct_cc(self, service_context=get_service_context):
+    def test_construct_cc(self, service_context):
         """CC == Client Credentials, the 4th OAuth2 flow"""
         request = CCAccessTokenRequest(grant_type="client_credentials")
 
@@ -121,8 +120,7 @@ class TestBearerHeader(object):
         assert _eq(http_args["headers"].keys(), ["Authorization", "x-foo"])
         assert http_args["headers"]["Authorization"] == "Bearer Sesame"
 
-    def test_construct_with_resource_request(
-            self, service_context=get_service_context):
+    def test_construct_with_resource_request(self, service_context):
         bh = BearerHeader()
         request = ResourceRequest(access_token="Sesame")
 
@@ -131,8 +129,7 @@ class TestBearerHeader(object):
         assert "access_token" not in request
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
-    def test_construct_with_token(self, service_context=get_service_context,
-                                  services=get_services):
+    def test_construct_with_token(self, service_context, services):
         # Add a state and bind a code to it
         service_context.state_db['AAAA'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
@@ -159,7 +156,7 @@ class TestBearerHeader(object):
 
 
 class TestBearerBody(object):
-    def test_construct(self, service_context=get_service_context):
+    def test_construct(self, service_context):
         request = ResourceRequest(access_token="Sesame")
         http_args = BearerBody().construct(request,
                                            service_context=service_context)
@@ -167,7 +164,7 @@ class TestBearerBody(object):
         assert request["access_token"] == "Sesame"
         assert http_args is None
 
-    def test_construct_with_state(self, service_context=get_service_context):
+    def test_construct_with_state(self, service_context):
         _sdb = service_context.state_db
         _sdb['FFFFF'] = {}
         resp = AuthorizationResponse(code="code", state="FFFFF")
@@ -185,8 +182,8 @@ class TestBearerBody(object):
         assert request["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
-    def test_construct_with_request(self, service_context=get_service_context,
-                                    services=get_services):
+    def test_construct_with_request(self, service_context,
+                                    services):
         service_context.state_db['EEEE'] = {}
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
         response = services['authorization'].parse_response(
@@ -211,8 +208,8 @@ class TestBearerBody(object):
 
 
 class TestClientSecretPost(object):
-    def test_construct(self, service_context=get_service_context,
-                       services=get_services):
+    def test_construct(self, service_context,
+                       services):
         request = services['accesstoken'].construct(
             service_context, redirect_uri="http://example.com", state='ABCDE')
         csp = ClientSecretPost()
@@ -228,12 +225,11 @@ class TestClientSecretPost(object):
                                   client_secret="another")
         assert request["client_id"] == "A"
         assert request["client_secret"] == "another"
-        assert http_args == {}
 
 
 class TestPrivateKeyJWT(object):
-    def test_construct(self, service_context=get_service_context,
-                       services=get_services):
+    def test_construct(self, service_context,
+                       services):
         _key = rsa_load(
             os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
@@ -265,7 +261,7 @@ class TestPrivateKeyJWT(object):
             service_context.provider_info['token_endpoint']]
 
     def test_construct_client_assertion(self,
-                                        service_context=get_service_context):
+                                        service_context):
         _key = rsa_load(os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
                             {"key": _key, "kty": "RSA", "use": "sig"}])
@@ -281,7 +277,7 @@ class TestPrivateKeyJWT(object):
 
 
 class TestClientSecretJWT_TE(object):
-    def test_client_secret_jwt(self, service_context=get_service_context):
+    def test_client_secret_jwt(self, service_context):
         service_context.token_endpoint = "https://example.com/token"
         service_context.provider_info = {'issuer': 'https://example.com/',
                                          'token_endpoint':
@@ -310,7 +306,7 @@ class TestClientSecretJWT_TE(object):
 
 
 class TestClientSecretJWT_UI(object):
-    def test_client_secret_jwt(self, service_context=get_service_context):
+    def test_client_secret_jwt(self, service_context):
         service_context.token_endpoint = "https://example.com/token"
         service_context.provider_info = {'issuer': 'https://example.com/',
                                          'token_endpoint':
@@ -341,7 +337,7 @@ class TestClientSecretJWT_UI(object):
 
 
 class TestValidClientInfo(object):
-    def test_valid_service_context(self, service_context=get_service_context):
+    def test_valid_service_context(self, service_context):
         _now = 123456  # At some time
         # Expiration time missing or 0, client_secret never expires
         # service_context.registration_expires
