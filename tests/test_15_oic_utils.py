@@ -1,4 +1,4 @@
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcmsg.oidc import AuthorizationRequest
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
@@ -32,7 +32,7 @@ def test_request_object_encryption():
         'client_id': 'client_1',
         'client_secret': 'abcdefghijklmnop',
     }
-    client_info = ClientInfo(keyjar=keyjar, config=conf)
+    client_info = ServiceContext(keyjar=keyjar, config=conf)
     client_info.behaviour["request_object_encryption_alg"] = 'RSA1_5'
     client_info.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
 

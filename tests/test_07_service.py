@@ -1,6 +1,6 @@
 import pytest
 
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.service import Service
 
 from oidcmsg.oauth2 import Message
@@ -32,8 +32,8 @@ class TestDummyService(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
         self.service = DummyService()
-        self.cli_info = ClientInfo(client_id='client_id',
-                                   issuer='https://www.example.org/as')
+        self.cli_info = ServiceContext(client_id='client_id',
+                                       issuer='https://www.example.org/as')
         self.cli_info.state_db['state'] = {}
 
     def test_construct(self):
@@ -72,7 +72,7 @@ class TestRequest(object):
     def create_service(self):
         self.service = Service(httplib=None, keyjar=None,
                                client_authn_method=None)
-        self.cli_info = ClientInfo(None)
+        self.cli_info = ServiceContext(None)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}

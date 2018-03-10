@@ -19,7 +19,7 @@ from oidcservice.client_auth import ClientSecretJWT
 from oidcservice.client_auth import ClientSecretPost
 from oidcservice.client_auth import PrivateKeyJWT
 from oidcservice.client_auth import valid_client_info
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc import service
 from oidcservice.service import build_services
@@ -52,7 +52,7 @@ def services():
 
 @pytest.fixture
 def client_info():
-    ci = ClientInfo(keyjar=None, config=CLIENT_CONF)
+    ci = ServiceContext(keyjar=None, config=CLIENT_CONF)
     _sdb = ci.state_db
     _sdb['ABCDE'] = {'code': 'access_code'}
     ci.client_secret = "boarding pass"

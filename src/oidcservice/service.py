@@ -43,6 +43,8 @@ parse_error_mesg
 The methods marked with (*) are where service specific
 behaviour is implemented.
 
+And this for storing information from the response in the client.
+
 update_client_info
 """
 

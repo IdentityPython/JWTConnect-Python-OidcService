@@ -30,7 +30,7 @@ ATTRMAP = {
 }
 
 
-class ClientInfo(object):
+class ServiceContext(object):
     """
     This class keeps information that a client needs to be able to talk
     to a server. Some of this information comes from configuration and some

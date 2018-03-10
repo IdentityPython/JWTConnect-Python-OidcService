@@ -3,7 +3,7 @@ import os
 import pytest
 
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 from oidcservice.exception import ParameterError
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
@@ -55,7 +55,7 @@ class TestAuthorization(object):
                                client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ClientInfo(keyjar, config=client_config)
+        self.cli_info = ServiceContext(keyjar, config=client_config)
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'response_type': 'code',
@@ -143,7 +143,7 @@ class TestAccessTokenRequest(object):
                                client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.cli_info = ClientInfo(keyjar, config=client_config)
+        self.cli_info = ServiceContext(keyjar, config=client_config)
         self.cli_info.state_db['state'] = {'code': 'access_code'}
 
     def test_construct(self):
@@ -210,7 +210,7 @@ class TestProviderInfo(object):
                              'id_token_signed_response_alg': 'RS384',
                              'userinfo_signed_response_alg': 'RS384'
                          }}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -251,7 +251,7 @@ class TestRegistration(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -287,7 +287,7 @@ class TestUserInfo(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -350,7 +350,7 @@ class TestCheckSession(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -372,7 +372,7 @@ class TestCheckID(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -394,7 +394,7 @@ class TestEndSession(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -415,7 +415,7 @@ class TestWebFinger(object):
                          'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/',
                          'resource': 'joe@example.com'}
-        self.cli_info = ClientInfo(config=client_config)
+        self.cli_info = ServiceContext(config=client_config)
         self.cli_info.service = build_services(
             DEFAULT_SERVICES, factory, keyjar=None,
             client_authn_method=CLIENT_AUTHN_METHOD)
@@ -465,7 +465,7 @@ def test_authz_service_conf():
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'behaviour': {'response_types': ['code']}
     }
-    cli_info = ClientInfo(keyjar, config=client_config)
+    cli_info = ServiceContext(keyjar, config=client_config)
     req = srv.construct(cli_info)
     assert 'claims' in req
     assert set(req['claims'].keys()) == {'id_token'}

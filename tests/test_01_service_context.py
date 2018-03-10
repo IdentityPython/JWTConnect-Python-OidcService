@@ -3,7 +3,7 @@ import pytest
 
 from urllib.parse import urlsplit
 
-from oidcservice.client_info import ClientInfo
+from oidcservice.service_context import ServiceContext
 
 
 def test_client_info_init():
@@ -12,20 +12,20 @@ def test_client_info_init():
         'client_secret': 'client_secret', 'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
-    ci = ClientInfo(config=config)
+    ci = ServiceContext(config=config)
     for attr in config.keys():
         val = getattr(ci, attr)
         assert val == config[attr]
 
 
 def test_set_and_get_client_secret():
-    ci = ClientInfo()
+    ci = ServiceContext()
     ci.client_secret = 'supersecret'
     assert ci.client_secret == 'supersecret'
 
 
 def test_set_and_get_client_id():
-    ci = ClientInfo()
+    ci = ServiceContext()
     ci.client_id = 'myself'
     assert ci.client_id == 'myself'
     assert ci.state_db.client_id == 'myself'
@@ -37,7 +37,7 @@ def test_client_filename():
         'client_secret': 'client_secret', 'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
-    ci = ClientInfo(config=config)
+    ci = ServiceContext(config=config)
     fname = ci.filename_from_webname('https://example.com/rq12345')
     assert fname == 'rq12345'
 
@@ -50,7 +50,7 @@ class TestClientInfo(object):
             'client_secret': 'client_secret', 'base_url': 'https://example.com',
             'requests_dir': 'requests'
         }
-        self.ci = ClientInfo(config=config)
+        self.ci = ServiceContext(config=config)
 
     def test_registration_userinfo_sign_enc_algs(self):
         self.ci.registration_response = {
