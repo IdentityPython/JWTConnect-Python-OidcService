@@ -72,9 +72,9 @@ class Service(object):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, keyjar=None, client_authn_method=None,
+    def __init__(self, service_context, client_authn_method=None,
                  conf=None, **kwargs):
-        self.keyjar = keyjar
+        self.service_context = service_context
         self.client_authn_method = client_authn_method
         self.events = None
         self.endpoint = ''
@@ -93,13 +93,12 @@ class Service(object):
         self.pre_construct = []
         self.post_construct = []
 
-    def gather_request_args(self, service_context, **kwargs):
+    def gather_request_args(self, **kwargs):
         """
         Go through the attributes that the message class can contain and
         add values if they are missing and exists in the client info or
         when there are default values.
 
-        :param service_context: Service context
         :param kwargs: Initial set of attributes.
         :return: Possibly augmented set of attributes
         """
@@ -116,7 +115,7 @@ class Service(object):
                 continue
             else:
                 try:
-                    ar_args[prop] = getattr(service_context, prop)
+                    ar_args[prop] = getattr(self.service_context, prop)
                 except AttributeError:
                     try:
                         ar_args[prop] = self.conf['request_args'][prop]
@@ -137,12 +136,10 @@ class Service(object):
             _args.update(kwargs)
         return _args
 
-    def do_pre_construct(self, service_context, request_args, **kwargs):
+    def do_pre_construct(self, request_args, **kwargs):
         """
         Will run the pre_construct methods one by one in the order given.
 
-        :param service_context: Client Information as a
-            :py:class:`oidcservice.service_context.ServiceContext` instance.
         :param request_args: Request arguments
         :param kwargs: Extra key word arguments
         :return: A tuple of request_args and post_args. post_args are to be
@@ -152,17 +149,15 @@ class Service(object):
         _args = self.method_args('pre_construct', **kwargs)
         post_args = {}
         for meth in self.pre_construct:
-            request_args, _post_args = meth(service_context, request_args, **_args)
+            request_args, _post_args = meth(request_args, **_args)
             post_args.update(_post_args)
 
         return request_args, post_args
 
-    def do_post_construct(self, service_context, request_args, **kwargs):
+    def do_post_construct(self, request_args, **kwargs):
         """
         Will run the post_construct methods one at the time in order.
 
-        :param service_context: Client Information as a
-            :py:class:`oidcservice.service_context.ServiceContext` instance.
         :param request_args: Request arguments
         :param kwargs: Arguments used by the post_construct method
         :return: Possible modified set of request arguments.
@@ -170,29 +165,26 @@ class Service(object):
         _args = self.method_args('post_construct', **kwargs)
 
         for meth in self.post_construct:
-            request_args = meth(service_context, request_args, **_args)
+            request_args = meth(request_args, **_args)
 
         return request_args
 
-    def update_service_context(self, service_context, resp, state='', **kwargs):
+    def update_service_context(self, resp, state='', **kwargs):
         """
         A method run after the response has been parsed and verified.
 
         :param resp: The response as a :py:class:`oidcmsg.Message` instance
-        :param service_context: Service context as a
-            :py:class:`oidcservice.service_context.ServiceContext` instance.
         :param state: state value
         :param kwargs: Extra key word arguments
         """
         pass
 
-    def construct(self, service_context, request_args=None, **kwargs):
+    def construct(self, request_args=None, **kwargs):
         """
         Instantiate the request as a message class instance with
         attribute values gathered in a pre_construct method or in the
         gather_request_args method.
 
-        :param service_context: Information about the client
         :param request_args:
         :param kwargs: extra keyword arguments
         :return: message class instance
@@ -203,8 +195,7 @@ class Service(object):
         # run the pre_construct methods. Will return a possibly new
         # set of request arguments but also a set of arguments to
         # be used by the post_construct methods.
-        request_args, post_args = self.do_pre_construct(service_context,
-                                                        request_args,
+        request_args, post_args = self.do_pre_construct(request_args,
                                                         **kwargs)
 
         # If 'state' appears among the keyword argument and is not
@@ -216,14 +207,14 @@ class Service(object):
                 pass
 
         # logger.debug("request_args: %s" % sanitize(request_args))
-        _args = self.gather_request_args(service_context, **request_args)
+        _args = self.gather_request_args(**request_args)
 
         # logger.debug("kwargs: %s" % sanitize(kwargs))
         # initiate the request as in an instance of the self.msg_type
         # message type
         request = self.msg_type(**_args)
 
-        return self.do_post_construct(service_context, request, **post_args)
+        return self.do_post_construct(request, **post_args)
 
     def _endpoint(self, **kwargs):
         """
@@ -255,7 +246,7 @@ class Service(object):
     def get_endpoint(self, **kwargs):
         return self._endpoint(**kwargs)
 
-    def init_authentication_method(self, request, service_context, authn_method,
+    def init_authentication_method(self, request, authn_method,
                                    http_args=None, **kwargs):
         """
         Will run the proper client authentication method.
@@ -263,8 +254,6 @@ class Service(object):
         place. A method may modify the request.
 
         :param request: The request, a Message class instance
-        :param service_context: Service contextrmation, a
-            :py:class:`oidcservice.service_context.ServiceContext` instance
         :param authn_method: Client authentication method
         :param http_args: HTTP header arguments
         :param kwargs: Extra keyword arguments
@@ -276,18 +265,16 @@ class Service(object):
         if authn_method:
             logger.debug('Client authn method: {}'.format(authn_method))
             return self.client_authn_method[authn_method]().construct(
-                request, service_context, http_args=http_args, **kwargs)
+                request, self.service_context, http_args=http_args, **kwargs)
         else:
             return http_args
 
-    def construct_request(self, service_context, request_args=None, **kwargs):
+    def construct_request(self, request_args=None, **kwargs):
         """
         The method where everything is setup for sending the request.
         The request information is gathered and the where and how of sending the
         request is decided.
 
-        :param service_context: Service contextrmation as a
-            :py:class:`oidcservice.service_context.ServiceContext` instance
         :param request_args: Initial request arguments
         :param kwargs: Extra keyword arguments
         :return: A dictionary with the keys 'url' and possibly 'body', 'kwargs',
@@ -300,15 +287,15 @@ class Service(object):
         # _args = dict(
         #    [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
 
-        return self.construct(service_context, request_args, **kwargs)
+        return self.construct(request_args, **kwargs)
 
-    def get_authn_header(self, request, service_context, authn_method, **kwargs):
+    def get_authn_header(self, request, authn_method, **kwargs):
 
         headers = {}
         # If I should deal with client authentication
         if authn_method:
-            h_arg = self.init_authentication_method(
-                request, service_context, authn_method, **kwargs)
+            h_arg = self.init_authentication_method(request, authn_method,
+                                                    **kwargs)
             try:
                 headers = h_arg['headers']
             except KeyError:
@@ -316,10 +303,8 @@ class Service(object):
 
         return headers
 
-    def get_request_parameters(self, service_context, body_type="", method="",
-                                     authn_method='', request_args=None,
-                                     http_args=None,
-                                     **kwargs):
+    def get_request_parameters(self, body_type="", method="", authn_method='',
+                               request_args=None, http_args=None, **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -332,7 +317,6 @@ class Service(object):
         - serialize the request message into the necessary format (JSON,
             urlencoded, signed JWT)
 
-        :param service_context: Service contextrmation
         :param body_type: Which serialization to use for the HTTP body
         :param method: HTTP method used.
         :param authn_method: Client authentication method
@@ -349,7 +333,7 @@ class Service(object):
         if not body_type:
             body_type = self.body_type
 
-        request = self.construct_request(service_context, method=method,
+        request = self.construct_request(method=method,
                                          body_type=body_type,
                                          request_args=request_args,
                                          authn_method=authn_method, **kwargs)
@@ -358,16 +342,15 @@ class Service(object):
 
         # Find out where to send this request
         _args = kwargs.copy()
-        if service_context.issuer:
-            _args['iss'] = service_context.issuer
+        if self.service_context.issuer:
+            _args['iss'] = self.service_context.issuer
 
         if body_type == 'urlencoded':
             content_type = URL_ENCODED
         else:  # body_type == 'json'
             content_type = JSON_ENCODED
 
-        _headers = self.get_authn_header(request, service_context,
-                                                 authn_method, **kwargs)
+        _headers = self.get_authn_header(request, authn_method, **kwargs)
 
         endpoint_url = self.get_endpoint(**_args)
         _info['url'] = get_http_url(endpoint_url, request, method=method)
@@ -403,11 +386,10 @@ class Service(object):
                 info = fragment
         return info
 
-    def post_parse_response(self, service_context, response, **kwargs):
+    def post_parse_response(self, response, **kwargs):
         return response
 
-    def parse_response(self, info, service_context, sformat="", state="",
-                       **kwargs):
+    def parse_response(self, info, sformat="", state="", **kwargs):
         """
         This the start of a pipeline that will:
 
@@ -420,7 +402,6 @@ class Service(object):
 
         :param info: The response, can be either in a JSON or an urlencoded
             format
-        :param service_context: Information about client and server
         :param sformat: Which serialization that was used
         :param state: The state
         :param kwargs: Extra key word arguments
@@ -486,16 +467,14 @@ class Service(object):
             logger.debug('Error response: {}'.format(resp))
         else:
             # Need to add some information before running verify()
-            kwargs["client_id"] = service_context.client_id
-            kwargs['iss'] = service_context.issuer
+            kwargs["client_id"] = self.service_context.client_id
+            kwargs['iss'] = self.service_context.issuer
 
             # If no keys where provided in the method call use the instance's
             # keyjar as default
             if "key" not in kwargs and "keyjar" not in kwargs:
-                if self.keyjar:
-                    kwargs["keyjar"] = self.keyjar
-                else:
-                    kwargs['keyjar'] = service_context.keyjar
+                if self.service_context.keyjar:
+                    kwargs["keyjar"] = self.service_context.keyjar
 
             # add extra verify keyword arguments
             try:
@@ -524,7 +503,7 @@ class Service(object):
                 except KeyError:
                     pass
 
-            resp = self.post_parse_response(service_context, resp)
+            resp = self.post_parse_response(resp)
 
         if not resp:
             logger.error('Missing or faulty response')
@@ -560,16 +539,16 @@ class Service(object):
             return default
 
 
-def build_services(service_definitions, service_factory, keyjar,
+def build_services(service_definitions, service_factory, service_context,
                    client_authn_method):
     service = {}
     for service_name, service_configuration in service_definitions.items():
-        _srv = service_factory(service_name, keyjar=keyjar,
+        _srv = service_factory(service_name, service_context=service_context,
                                client_authn_method=client_authn_method,
                                conf=service_configuration)
         service[_srv.service_name] = _srv
 
     # For any unspecified service
-    service['any'] = Service(keyjar=keyjar,
+    service['any'] = Service(service_context=service_context,
                              client_authn_method=client_authn_method)
     return service

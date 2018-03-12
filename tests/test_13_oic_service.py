@@ -43,7 +43,7 @@ _dirname = os.path.dirname(os.path.abspath(__file__))
 
 
 def test_request_factory():
-    req = factory('Service', httplib=None, keyjar=None,
+    req = factory('Service', service_context=ServiceContext(None),
                   client_authn_method=None)
     assert isinstance(req, Service)
 
@@ -51,17 +51,17 @@ def test_request_factory():
 class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('Authorization',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.service_context = ServiceContext(keyjar, config=client_config)
+        service_context = ServiceContext(keyjar, config=client_config)
+        self.service = factory('Authorization',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'response_type': 'code',
                     'state': 'state'}
-        _req = self.service.construct(self.service_context,
-                                      request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
                                     'response_type', 'scope', 'state',
@@ -70,8 +70,7 @@ class TestAuthorization(object):
     def test_construct_token(self):
         req_args = {'foo': 'bar', 'response_type': 'token',
                     'state': 'state'}
-        _req = self.service.construct(self.service_context,
-                                      request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
                                     'response_type', 'scope', 'state'}
@@ -79,8 +78,7 @@ class TestAuthorization(object):
     def test_construct_token_nonce(self):
         req_args = {'foo': 'bar', 'response_type': 'token', 'nonce': 'nonce',
                     'state': 'state'}
-        _req = self.service.construct(self.service_context,
-                                      request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
                                     'response_type', 'scope', 'state', 'nonce'}
@@ -89,8 +87,7 @@ class TestAuthorization(object):
     def test_get_request_parameters(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args)
+        _info = self.service.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -100,8 +97,7 @@ class TestAuthorization(object):
     def test_request_init(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args)
+        _info = self.service.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -111,8 +107,7 @@ class TestAuthorization(object):
     def test_request_init_request_method(self):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args,
+        _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='value')
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
@@ -127,13 +122,12 @@ class TestAuthorization(object):
 
         assert os.path.isfile(os.path.join(_dirname, 'request123456.jwt'))
 
-        self.service_context.registration_response = {
+        self.service.service_context.registration_response = {
             'redirect_uris': ['https://example.com/cb'],
             'request_uris': ['https://example.com/request123456.jwt']
         }
-        self.service_context.base_url = 'https://example.com/'
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args,
+        self.service.service_context.base_url = 'https://example.com/'
+        _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='reference')
 
         assert set(_info.keys()) == {'url', 'method'}
@@ -142,18 +136,18 @@ class TestAuthorization(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('AccessToken',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
-        self.service_context = ServiceContext(keyjar, config=client_config)
-        self.service_context.state_db['state'] = {'code': 'access_code'}
+        service_context = ServiceContext(keyjar, config=client_config)
+        service_context.state_db['state'] = {'code': 'access_code'}
+        self.service = factory('AccessToken',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
 
-        _req = self.service.construct(self.service_context,
-                                      request_args=req_args,
+        _req = self.service.construct(request_args=req_args,
                                       state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
@@ -163,8 +157,7 @@ class TestAccessTokenRequest(object):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args,
+        _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state',
                                                     authn_method='client_secret_basic')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
@@ -181,8 +174,7 @@ class TestAccessTokenRequest(object):
                     'code': 'access_code'}
         self.service.endpoint = 'https://example.com/authorize'
 
-        _info = self.service.get_request_parameters(self.service_context,
-                                                    request_args=req_args,
+        _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state')
         assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
         assert _info['url'] == 'https://example.com/authorize'
@@ -194,19 +186,18 @@ class TestAccessTokenRequest(object):
             'redirect_uri': 'https://example.com/cli/authz_cb'}
 
     def test_id_token_nonce_match(self):
-        self.service_context.state_db.bind_nonce_to_state('nonce', 'state')
+        self.service.service_context.state_db.bind_nonce_to_state('nonce',
+                                                                  'state')
         resp = AccessTokenResponse(verified_id_token={'nonce': 'nonce'})
-        self.service_context.state_db.bind_nonce_to_state('nonce2', 'state2')
+        self.service.service_context.state_db.bind_nonce_to_state('nonce2',
+                                                                  'state2')
         with pytest.raises(ParameterError):
-            self.service.update_client_info(self.service_context, resp,
-                                            state='state2')
+            self.service.update_service_context(resp, state='state2')
 
 
 class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('ProviderInfoDiscovery',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
@@ -215,18 +206,18 @@ class TestProviderInfo(object):
                              'id_token_signed_response_alg': 'RS384',
                              'userinfo_signed_response_alg': 'RS384'
                          }}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('ProviderInfoDiscovery',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        _req = self.service.construct(self.service_context)
+        _req = self.service.construct()
         assert isinstance(_req, Message)
         assert len(_req) == 0
 
     def test_get_request_parameters(self):
-        _info = self.service.get_request_parameters(self.service_context)
+        _info = self.service.get_request_parameters()
         assert set(_info.keys()) == {'url', 'method'}
         assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -249,35 +240,33 @@ def test_response_types_to_grant_types():
 class TestRegistration(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('Registration',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('Registration',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        _req = self.service.construct(self.service_context)
+        _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 4
 
     def test_config_with_post_logout(self):
-        self.service_context.post_logout_redirect_uris = [
+        self.service.service_context.post_logout_redirect_uris = [
             'https://example.com/post_logout']
-        _req = self.service.construct(self.service_context)
+        _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5
         assert 'post_logout_redirect_uris' in _req
 
     def test_config_with_required_request_uri(self):
-        self.service_context.provider_info[
+        self.service.service_context.provider_info[
             'require_request_uri_registration'] = True
-        _req = self.service.construct(self.service_context)
+        _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5
         assert 'request_uris' in _req
@@ -286,23 +275,21 @@ class TestRegistration(object):
 class TestUserInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('UserInfo',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('UserInfo',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service_context.state_db['abcde'] = {
+        self.service.service_context.state_db['abcde'] = {
             'id_token': 'a.signed.jwt',
             'token': {'access_token': 'access_token'}}
-        _req = self.service.construct(self.service_context, state='abcde')
+        _req = self.service.construct(state='abcde')
         assert isinstance(_req, Message)
         assert len(_req) == 1
         assert 'access_token' in _req
@@ -311,7 +298,6 @@ class TestUserInfo(object):
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall')
         _resp = self.service.parse_response(resp.to_json(),
-                                            self.service_context,
                                             state='abcde')
         assert _resp
 
@@ -337,12 +323,11 @@ class TestUserInfo(object):
                                           'phone_number': 'src1'},
                             _claim_sources={'src1': {'JWT': _jwt}})
 
-        public_keys_keyjar(_keyjar, '', self.service_context.keyjar,
+        public_keys_keyjar(_keyjar, '', self.service.service_context.keyjar,
                            'https://example.org/op/')
 
-        _resp = self.service.parse_response(resp.to_json(),
-                                            self.service_context)
-        _resp = self.service.post_parse_response(self.service_context, _resp)
+        _resp = self.service.parse_response(resp.to_json())
+        _resp = self.service.post_parse_response(_resp)
         assert set(_resp.keys()) == {'sub', 'given_name', 'family_name',
                                      '_claim_names', '_claim_sources',
                                      'address', 'phone_number'}
@@ -351,21 +336,20 @@ class TestUserInfo(object):
 class TestCheckSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('CheckSession',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('CheckSession',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service_context.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
-        _req = self.service.construct(self.service_context, state='abcde')
+        self.service.service_context.state_db['abcde'] = {
+            'id_token': 'a.signed.jwt'}
+        _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckSessionRequest)
         assert len(_req) == 1
 
@@ -373,21 +357,20 @@ class TestCheckSession(object):
 class TestCheckID(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('CheckID',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('CheckID',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service_context.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
-        _req = self.service.construct(self.service_context, state='abcde')
+        self.service.service_context.state_db['abcde'] = {
+            'id_token': 'a.signed.jwt'}
+        _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckIDRequest)
         assert len(_req) == 1
 
@@ -395,71 +378,35 @@ class TestCheckID(object):
 class TestEndSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        self.service = factory('EndSession',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
         self._iss = 'https://example.com/as'
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
+        service_context = ServiceContext(config=client_config)
+        self.service = factory('EndSession',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service_context.state_db['abcde'] = {'id_token': 'a.signed.jwt'}
-        _req = self.service.construct(self.service_context, state='abcde')
+        self.service.service_context.state_db['abcde'] = {
+            'id_token': 'a.signed.jwt'}
+        _req = self.service.construct(state='abcde')
         assert isinstance(_req, EndSessionRequest)
         assert len(_req) == 1
 
 
-class TestWebFinger(object):
-    @pytest.fixture(autouse=True)
-    def create_request(self):
-        self.service = factory('WebFinger',
-                               client_authn_method=CLIENT_AUTHN_METHOD)
-        client_config = {'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/',
-                         'resource': 'joe@example.com'}
-        self.service_context = ServiceContext(config=client_config)
-        self.service_context.service = build_services(
-            DEFAULT_SERVICES, factory, keyjar=None,
-            client_authn_method=CLIENT_AUTHN_METHOD)
-
-    def test_get_request_parameters(self):
-        request_args = {'resource': 'acct:joe@example.com'}
-        _req = self.service.get_request_parameters(self.service_context,
-                                                   request_args=request_args)
-        assert set(_req.keys()) == {'method', 'url'}
-        assert _req['url'] == \
-               'https://example.com/.well-known/webfinger?resource=acct%3Ajoe' \
-               '%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect' \
-               '%2F1.0%2Fissuer'
-
-    def test_parse_response(self):
-        _info = {
-            "subject": "acct:joe@example.com",
-            "links":
-                [
-                    {
-                        "rel": "http://openid.net/specs/connect/1.0/issuer",
-                        "href": "https://server.example.com"
-                    }
-                ]
-        }
-        resp = self.service.parse_response(json.dumps(_info),
-                                           self.service_context)
-        assert resp.to_dict() == _info
-        self.service.update_client_info(client_info=self.service_context,
-                                        resp=resp)
-        assert self.service_context.issuer == _info['links'][0]['href']
-
-
 def test_authz_service_conf():
+    client_config = {
+        'client_id': 'client_id',
+        'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'behaviour': {'response_types': ['code']}
+    }
+
     srv = factory(
         'Authorization',
+        service_context=ServiceContext(keyjar, config=client_config),
         client_authn_method=CLIENT_AUTHN_METHOD,
         conf={
             'request_args': {
@@ -469,13 +416,7 @@ def test_authz_service_conf():
                             "auth_time": {"essential": True},
                             "acr": {"values": ["urn:mace:incommon:iap:silver"]}
                         }}}})
-    client_config = {
-        'client_id': 'client_id',
-        'client_secret': 'password',
-        'redirect_uris': ['https://example.com/cli/authz_cb'],
-        'behaviour': {'response_types': ['code']}
-    }
-    service_context = ServiceContext(keyjar, config=client_config)
-    req = srv.construct(service_context)
+
+    req = srv.construct()
     assert 'claims' in req
     assert set(req['claims'].keys()) == {'id_token'}

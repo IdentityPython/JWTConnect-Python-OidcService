@@ -3,7 +3,9 @@ import json
 from oidcmsg.oidc import Link, JRD
 from oidcservice.oidc import OIC_ISSUER
 
-from oidcservice.oidc.service import WebFinger, URINormalizer
+from oidcservice.oidc.service import URINormalizer
+from oidcservice.oidc.service import WebFinger
+from oidcservice.service_context import ServiceContext
 
 __author__ = 'Roland Hedberg'
 
@@ -197,21 +199,23 @@ def test_extra_member_response():
     assert _resp['dummy'] == 'foo'
 
 
+SERVICE_CONTEXT = ServiceContext(None)
+
 class TestWebFinger(object):
     def test_query_device(self):
-        wf = WebFinger()
+        wf = WebFinger(SERVICE_CONTEXT)
         request_args = {'resource': "device:p1.example.com"}
-        _info = wf.get_request_parameters({}, request_args=request_args)
+        _info = wf.get_request_parameters(request_args)
         assert _info[
                    'url'] == 'https://p1.example.com/.well-known/webfinger' \
                              '?resource=device%3Ap1.example.com&rel=http%3A' \
                              '%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
 
     def test_query_rel(self):
-        wf = WebFinger()
+        wf = WebFinger(SERVICE_CONTEXT)
         request_args = {'resource': "acct:bob@example.com"}
         _info = wf.get_request_parameters(
-            {}, request_args=request_args,
+            request_args,
             rel=["http://webfinger.net/rel/profile-page", "vcard"])
         assert _info['url'] == \
                "https://example.com/.well-known/webfinger?resource=acct%3Abob" \
@@ -219,9 +223,9 @@ class TestWebFinger(object):
                "-page&rel=vcard"
 
     def test_query_acct(self):
-        wf = WebFinger(OIC_ISSUER)
+        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER)
         request_args = {'resource': "acct:carol@example.com"}
-        _info = wf.get_request_parameters({}, request_args=request_args)
+        _info = wf.get_request_parameters(request_args=request_args)
 
         assert _info['url'] == \
                "https://example.com/.well-known/webfinger?resource" \

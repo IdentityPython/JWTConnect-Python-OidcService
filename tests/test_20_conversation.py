@@ -94,17 +94,7 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 
 def test_conversation():
-    service_spec = DEFAULT_SERVICES.copy()
-    service_spec['WebFinger'] = {}
-
-    service = build_services(service_spec, factory, keyjar=RP_KEYJAR,
-                             client_authn_method=CLIENT_AUTHN_METHOD)
-
-    assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
-                                   'registration', 'any', 'refresh_token',
-                                   'userinfo', 'provider_info'}
-
-    client_info = ServiceContext(
+    service_context = ServiceContext(
         RP_KEYJAR,
         {
             "client_prefs":
@@ -125,12 +115,23 @@ def test_conversation():
         }
     )
 
-    client_info.service = service
+    service_spec = DEFAULT_SERVICES.copy()
+    service_spec['WebFinger'] = {}
+
+    service = build_services(service_spec, factory,
+                             service_context=service_context,
+                             client_authn_method=CLIENT_AUTHN_METHOD)
+
+    assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
+                                   'registration', 'any', 'refresh_token',
+                                   'userinfo', 'provider_info'}
+
+    service_context.service = service
 
     # ======================== WebFinger ========================
 
     info = service['webfinger'].get_request_parameters(
-        client_info, request_args={'resource':'foobar@example.org'})
+        request_args={'resource': 'foobar@example.org'})
 
     assert info[
                'url'] == 'https://example.org/.well-known/webfinger?resource' \
@@ -143,8 +144,7 @@ def test_conversation():
                    "href": "https://example.org/op"}],
         "expires": "2018-02-04T11:08:41Z"})
 
-    response = service['webfinger'].parse_response(webfinger_response,
-                                                   client_info)
+    response = service['webfinger'].parse_response(webfinger_response)
 
     assert isinstance(response, JRD)
     assert set(response.keys()) == {'subject', 'links', 'expires'}
@@ -152,13 +152,12 @@ def test_conversation():
         {'rel': 'http://openid.net/specs/connect/1.0/issuer',
          'href': 'https://example.org/op'}]
 
-    service['webfinger'].update_client_info(client_info=client_info,
-                                            resp=response)
-    assert client_info.issuer == OP_BASEURL
+    service['webfinger'].update_service_context(resp=response)
+    assert service_context.issuer == OP_BASEURL
 
     # =================== Provider info discovery ====================
 
-    info = service['provider_info'].get_request_parameters(client_info)
+    info = service['provider_info'].get_request_parameters()
 
     assert info[
                'url'] == 'https://example.org/op/.well-known/openid' \
@@ -248,22 +247,21 @@ def test_conversation():
         "registration_endpoint": "{}/registration".format(OP_BASEURL),
         "end_session_endpoint": "{}/end_session".format(OP_BASEURL)})
 
-    resp = service['provider_info'].parse_response(provider_info_response,
-                                                   client_info)
+    resp = service['provider_info'].parse_response(provider_info_response)
 
     assert isinstance(resp, ProviderConfigurationResponse)
-    service['provider_info'].update_client_info(client_info, resp)
+    service['provider_info'].update_service_context(resp)
 
-    assert client_info.provider_info['issuer'] == OP_BASEURL
-    assert client_info.provider_info[
+    assert service_context.provider_info['issuer'] == OP_BASEURL
+    assert service_context.provider_info[
                'authorization_endpoint'] == \
            'https://example.org/op/authorization'
-    assert client_info.provider_info[
+    assert service_context.provider_info[
                'registration_endpoint'] == 'https://example.org/op/registration'
 
     # =================== Client registration ====================
 
-    info = service['registration'].get_request_parameters(client_info)
+    info = service['registration'].get_request_parameters()
 
     assert info['url'] == 'https://example.org/op/registration'
     assert info[
@@ -274,6 +272,7 @@ def test_conversation():
                           '"token_endpoint_auth_method": ' \
                           '"client_secret_basic", "redirect_uris": [' \
                           '"https://example.com/rp/authz_cb"], "grant_types": ' \
+                          '' \
                           '["authorization_code"]}'
     assert info['headers'] == {'Content-Type': 'application/json'}
 
@@ -294,14 +293,14 @@ def test_conversation():
         "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)]})
 
     response = service['registration'].parse_response(
-        op_client_registration_response,
-        client_info)
+        op_client_registration_response)
 
-    service['registration'].update_client_info(client_info, response)
-    assert client_info.client_id == 'zls2qhN1jO6A'
-    assert client_info.client_secret == 'c8434f28cf9375d9a7'
-    assert isinstance(client_info.registration_response, RegistrationResponse)
-    assert set(client_info.registration_response.keys()) == {
+    service['registration'].update_service_context(response)
+    assert service_context.client_id == 'zls2qhN1jO6A'
+    assert service_context.client_secret == 'c8434f28cf9375d9a7'
+    assert isinstance(service_context.registration_response,
+                      RegistrationResponse)
+    assert set(service_context.registration_response.keys()) == {
         'client_secret_expires_at', 'contacts', 'client_id',
         'token_endpoint_auth_method', 'redirect_uris', 'response_types',
         'client_id_issued_at', 'client_secret', 'application_type',
@@ -313,7 +312,7 @@ def test_conversation():
     NONCE = 'UvudLKz287YByZdsY3AJoPAlEXQkJ0dK'
 
     info = service['authorization'].get_request_parameters(
-        client_info, request_args={'state': STATE, 'nonce': NONCE})
+        request_args={'state': STATE, 'nonce': NONCE})
 
     p = urlparse(info['url'])
     _query = parse_qs(p.query)
@@ -332,20 +331,19 @@ def test_conversation():
 
     _authz_rep = AuthorizationResponse(**op_authz_resp)
 
-    _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded(),
-                                                    client_info)
-    service['authorization'].update_client_info(client_info, _resp)
-    assert client_info.state_db[
+    _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
+    service['authorization'].update_service_context(_resp)
+    assert service_context.state_db[
                'Oh3w3gKlvoM2ehFqlxI3HIK5'][
                'code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
 
     # =================== Access token ====================
 
     request_args = {'state': STATE,
-                    'redirect_uri': client_info.redirect_uris[0]}
+                    'redirect_uri': service_context.redirect_uris[0]}
 
-    info = service['accesstoken'].get_request_parameters(client_info,
-                                                          request_args=request_args)
+    info = service['accesstoken'].get_request_parameters(
+        request_args=request_args)
 
     assert info['url'] == 'https://example.org/op/token'
     assert info[
@@ -354,9 +352,9 @@ def test_conversation():
            '&redirect_uri=https%3A%2F%2Fexample.com%2Frp%2Fauthz_cb&code' \
            '=Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01&client_id=zls2qhN1jO6A'
     assert info['headers'] == {
-            'Authorization': 'Basic '
-                             'emxzMnFoTjFqTzZBOmM4NDM0ZjI4Y2Y5Mzc1ZDlhNw==',
-            'Content-Type': 'application/x-www-form-urlencoded'}
+        'Authorization': 'Basic '
+                         'emxzMnFoTjFqTzZBOmM4NDM0ZjI4Y2Y5Mzc1ZDlhNw==',
+        'Content-Type': 'application/x-www-form-urlencoded'}
 
     # create the IdToken
     _jwt = JWT(OP_KEYJAR, OP_BASEURL, lifetime=3600, sign=True,
@@ -372,17 +370,17 @@ def test_conversation():
         "token_type": "Bearer",
         "id_token": _jws}
 
-    client_info.issuer = OP_BASEURL
+    service_context.issuer = OP_BASEURL
     _resp = service['accesstoken'].parse_response(json.dumps(_resp),
-                                                  client_info, state=STATE)
+                                                  state=STATE)
 
     assert isinstance(_resp, AccessTokenResponse)
     assert set(_resp['verified_id_token'].keys()) == {
         'iss', 'kid', 'nonce', 'acr', 'auth_time', 'aud', 'iat', 'exp', 'sub'}
 
-    service['accesstoken'].update_client_info(client_info, _resp, state=STATE)
+    service['accesstoken'].update_service_context(_resp, state=STATE)
 
-    assert client_info.state_db[STATE]['token'] == {
+    assert service_context.state_db[STATE]['token'] == {
         'access_token': 'Z0FBQUFBQmFkdFF',
         'token_type': 'Bearer',
         'scope': ['openid']}
@@ -391,15 +389,14 @@ def test_conversation():
 
     request_args = {'state': STATE}
 
-    info = service['userinfo'].get_request_parameters(client_info, state=STATE)
+    info = service['userinfo'].get_request_parameters(state=STATE)
 
     assert info['url'] == 'https://example.org/op/userinfo'
     assert info['headers'] == {'Authorization': 'Bearer Z0FBQUFBQmFkdFF'}
 
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
-    _resp = service['userinfo'].parse_response(json.dumps(op_resp),
-                                               client_info, state=STATE)
+    _resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}

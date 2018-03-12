@@ -36,26 +36,26 @@ class Authorization(Service):
     service_name = 'authorization'
     response_body_type = 'urlencoded'
 
-    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
-        Service.__init__(self, keyjar=keyjar,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_service_context(self, service_context, resp, state='', **kwargs):
-        service_context.state_db.add_response(resp, state)
+    def update_service_context(self, resp, state='', **kwargs):
+        self.service_context.state_db.add_response(resp, state)
 
-    def gather_request_args(self, service_context, **kwargs):
-        ar_args = Service.gather_request_args(self, service_context, **kwargs)
+    def gather_request_args(self, **kwargs):
+        ar_args = Service.gather_request_args(self, **kwargs)
 
         if 'redirect_uri' not in ar_args:
             try:
-                ar_args['redirect_uri'] = service_context.redirect_uris[0]
+                ar_args['redirect_uri'] = self.service_context.redirect_uris[0]
             except (KeyError, AttributeError):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
 
-    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
+    def oauth_pre_construct(self, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -83,17 +83,18 @@ class AccessToken(Service):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
-        Service.__init__(self, keyjar=keyjar,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_service_context(self, service_context, resp, state='', **kwargs):
-        service_context.state_db.add_response(resp, state)
+    def update_service_context(self, resp, state='', **kwargs):
+        self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
+    def oauth_pre_construct(self, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = service_context.state_db.get_response_args(_state, self.msg_type)
+        req_args = self.service_context.state_db.get_response_args(
+            _state, self.msg_type)
 
         if request_args is None:
             request_args = req_args
@@ -116,17 +117,18 @@ class RefreshAccessToken(Service):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
-        Service.__init__(self, keyjar=keyjar,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_service_context(self, service_context, resp, state='', **kwargs):
-        service_context.state_db.add_response(resp, state)
+    def update_service_context(self, resp, state='', **kwargs):
+        self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
+    def oauth_pre_construct(self, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = service_context.state_db.get_response_args(_state, self.msg_type)
+        req_args = self.service_context.state_db.get_response_args(
+            _state, self.msg_type)
 
         if request_args is None:
             request_args = req_args
@@ -144,14 +146,13 @@ class ProviderInfoDiscovery(Service):
     service_name = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, keyjar=None, client_authn_method=None, conf=None):
-        Service.__init__(self, keyjar=keyjar,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
 
-    def request_info(self, service_context, method="GET", request_args=None,
-                     lax=False, **kwargs):
+    def request_info(self, method="GET", request_args=None, **kwargs):
 
-        issuer = service_context.issuer
+        issuer = self.service_context.issuer
 
         if issuer.endswith("/"):
             _issuer = issuer[:-1]
@@ -160,13 +161,13 @@ class ProviderInfoDiscovery(Service):
 
         return {'url': OIDCONF_PATTERN.format(_issuer)}
 
-    def update_service_context(self, service_context, resp, **kwargs):
+    def update_service_context(self, resp, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response
         :param service_context: Information collected/used by services
         """
-        issuer = service_context.issuer
+        issuer = self.service_context.issuer
 
         if "issuer" in resp:
             _pcr_issuer = resp["issuer"]
@@ -182,7 +183,7 @@ class ProviderInfoDiscovery(Service):
                     _issuer = issuer
 
             try:
-                service_context.allow['issuer_mismatch']
+                self.service_context.allow['issuer_mismatch']
             except KeyError:
                 if _issuer != _pcr_issuer:
                     raise OidcServiceError(
@@ -192,22 +193,22 @@ class ProviderInfoDiscovery(Service):
         else:  # No prior knowledge
             _pcr_issuer = issuer
 
-        service_context.issuer = _pcr_issuer
-        service_context.provider_info = resp
+        self.service_context.issuer = _pcr_issuer
+        self.service_context.provider_info = resp
 
         for key, val in resp.items():
             if key.endswith("_endpoint"):
-                for _srv in service_context.service.values():
+                for _srv in self.service_context.service.values():
                     if _srv.endpoint_name == key:
                         _srv.endpoint = val
 
         try:
-            kj = service_context.keyjar
+            kj = self.service_context.keyjar
         except KeyError:
             kj = KeyJar()
 
         kj.load_keys(resp, _pcr_issuer)
-        service_context.keyjar = kj
+        self.service_context.keyjar = kj
 
 
 def factory(req_name, **kwargs):

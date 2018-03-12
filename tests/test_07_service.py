@@ -31,27 +31,27 @@ class DummyService(Service):
 class TestDummyService(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
-        self.service = DummyService()
-        self.cli_info = ServiceContext(client_id='client_id',
-                                       issuer='https://www.example.org/as')
-        self.cli_info.state_db['state'] = {}
+        service_context = ServiceContext(client_id='client_id',
+                                         issuer='https://www.example.org/as')
+        self.service = DummyService(service_context)
+        self.service.service_context.state_db['state'] = {}
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
-        _req = self.service.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']
 
-    def test_construct_cli_info(self):
+    def test_construct_service_context(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
-        _req = self.service.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
     def test_get_request_parameters(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.cli_info, request_args=req_args)
+        _info = self.service.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -59,8 +59,7 @@ class TestDummyService(object):
     def test_request_init(self):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(self.cli_info,
-                                             request_args=req_args)
+        _info = self.service.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method'}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
@@ -70,12 +69,12 @@ class TestDummyService(object):
 class TestRequest(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
-        self.service = Service(httplib=None, keyjar=None,
+        service_context = ServiceContext(None)
+        self.service = Service(service_context, httplib=None, keyjar=None,
                                client_authn_method=None)
-        self.cli_info = ServiceContext(None)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
-        _req = self.service.construct(self.cli_info, request_args=req_args)
+        _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']

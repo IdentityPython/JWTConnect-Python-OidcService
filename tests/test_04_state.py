@@ -1,10 +1,13 @@
 import pytest
-from oidcservice.state import State, ExpiredToken
+
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.time_util import utc_time_sans_frac
+
+from oidcservice.state import ExpiredToken
+from oidcservice.state import State
 
 ATR = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                           token_type="example",
