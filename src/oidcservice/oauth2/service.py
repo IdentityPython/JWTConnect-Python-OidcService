@@ -55,7 +55,7 @@ class Authorization(Service):
 
         return ar_args
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
 
         if request_args is not None:
             try:  # change default
@@ -91,9 +91,9 @@ class AccessToken(Service):
     def update_service_context(self, resp, state='', **kwargs):
         self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = self.service_context.state_db.get_response_args(
+        req_args = service_context.state_db.get_response_args(
             _state, self.msg_type)
 
         if request_args is None:
@@ -125,10 +125,10 @@ class RefreshAccessToken(Service):
     def update_service_context(self, resp, state='', **kwargs):
         self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
+    def oauth_pre_construct(self, service_context,request_args=None, **kwargs):
         _state = get_state(request_args, kwargs)
-        req_args = self.service_context.state_db.get_response_args(
-            _state, self.msg_type)
+        req_args = service_context.state_db.get_response_args(_state,
+                                                              self.msg_type)
 
         if request_args is None:
             request_args = req_args

@@ -149,7 +149,8 @@ class Service(object):
         _args = self.method_args('pre_construct', **kwargs)
         post_args = {}
         for meth in self.pre_construct:
-            request_args, _post_args = meth(request_args, **_args)
+            request_args, _post_args = meth(self.service_context, request_args,
+                                            **_args)
             post_args.update(_post_args)
 
         return request_args, post_args
@@ -165,7 +166,7 @@ class Service(object):
         _args = self.method_args('post_construct', **kwargs)
 
         for meth in self.post_construct:
-            request_args = meth(request_args, **_args)
+            request_args = meth(self.service_context, request_args, **_args)
 
         return request_args
 
