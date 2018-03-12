@@ -1,13 +1,16 @@
 from cryptojwt import b64e
 from oidcservice import unreserved, CC_METHOD
 from oidcservice.exception import Unsupported
+from oidcservice.oauth2.service import get_state
 
 
-def add_code_challenge(service_context, state):
+def add_code_challenge(service_context, request_args, **kwargs):
     """
     PKCE RFC 7636 support
+    To be added as a post_construct method to an
+    :py:class:`oidcservice.oidc.service.Authorization` instance
 
-    :return:
+    :return: request arguments
     """
     try:
         cv_len = service_context.config['code_challenge']['length']
@@ -34,12 +37,30 @@ def add_code_challenge(service_context, state):
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
 
-    service_context.state_db.add_info(state, code_verifier=code_verifier,
-                                  code_challenge_method=_method)
+    service_context.state_db.add_info(request_args['state'],
+                                      code_verifier=code_verifier,
+                                      code_challenge_method=_method)
 
-    return {"code_challenge": code_challenge,
-            "code_challenge_method": _method}
+    request_args.update({"code_challenge": code_challenge,
+                         "code_challenge_method": _method})
+    return request_args
 
 
-def get_code_verifier(service_context, state):
-    return service_context.state_db[state]['code_verifier']
+def add_code_verifier(service_context, request_args, **kwargs):
+    """
+    PKCE RFC 7636 support
+    To be added as a post_construct method to an
+    :py:class:`oidcservice.oidc.service.AccessToken` instance
+
+    :param service_context:
+    :param request_args:
+    :return:
+    """
+    code_verifier = service_context.state_db[kwargs['state']]['code_verifier']
+    request_args.update({'code_verifier': code_verifier})
+    return request_args
+
+
+def put_state_in_post_args(service_context, request_args, **kwargs):
+    state = get_state(request_args, kwargs)
+    return request_args, {'state': state}
