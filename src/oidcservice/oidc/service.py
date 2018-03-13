@@ -405,20 +405,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
             conf=conf)
 
     def update_service_context(self, resp, **kwargs):
-        self.service_context.provider_info = resp
-
-        for endp, srvs in ENDPOINT2SERVICE.items():
-            try:
-                endpoint_url = resp['{}_endpoint'.format(endp)]
-            except KeyError:
-                continue
-
-            for srv in srvs:
-                try:
-                    self.service_context.service[srv].endpoint = endpoint_url
-                except KeyError:
-                    pass
-
+        self._update_service_context(resp, **kwargs)
         self.match_preferences(resp, self.service_context.issuer)
         if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
             _jwks = self.service_context.keyjar.export_jwks_as_json(

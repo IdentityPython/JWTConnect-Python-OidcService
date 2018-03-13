@@ -161,7 +161,7 @@ class ProviderInfoDiscovery(Service):
 
         return {'url': OIDCONF_PATTERN.format(_issuer)}
 
-    def update_service_context(self, resp, **kwargs):
+    def _update_service_context(self, resp, **kwargs):
         """
         Deal with Provider Config Response
         :param resp: The provider info response
@@ -209,6 +209,9 @@ class ProviderInfoDiscovery(Service):
 
         kj.load_keys(resp, _pcr_issuer)
         self.service_context.keyjar = kj
+
+    def update_service_context(self, resp, **kwargs):
+        return self._update_service_context(resp, **kwargs)
 
 
 def factory(req_name, **kwargs):
