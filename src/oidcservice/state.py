@@ -19,7 +19,7 @@ class StateJwt(JsonWebToken):
         "rfp": SINGLE_REQUIRED_STRING,
         'kid': SINGLE_OPTIONAL_STRING,
         'target_link_uri': SINGLE_OPTIONAL_STRING,
-        'as': SINGLE_OPTIONAL_STRING,
+        'iss': SINGLE_OPTIONAL_STRING,
         'at_hash': SINGLE_OPTIONAL_STRING,
         'c_hash': SINGLE_OPTIONAL_STRING
     })
@@ -74,7 +74,8 @@ class State(object):
         _now = utc_time_sans_frac()
 
         # gather the information I want to store
-        _state_info = {'client_id': self.client_id, 'as': receiver, 'iat': _now}
+        _state_info = {'client_id': self.client_id, 'iss': receiver,
+                       'iat': _now}
 
         # Add the request to the info
         if isinstance(request, Message):
@@ -279,7 +280,7 @@ class State(object):
 #         self.active = []
 #
 #     def create_state(self, receiver, request):
-#         _resp_args = {'as': receiver}
+#         _resp_args = {'iss': receiver}
 #         if isinstance(request, Message):
 #             _resp_args.update(request.to_dict())
 #         else:

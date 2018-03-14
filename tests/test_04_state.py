@@ -51,7 +51,7 @@ class TestState(object):
 
         _info = self.state_db[state]
         assert _info['client_id'] == 'client_id'
-        assert _info['as'] == 'https://example.org/op'
+        assert _info['iss'] == 'https://example.org/op'
         assert _info['redirect_uri'] == 'https://example.com/rp/cb'
         assert _info['response_type'] == 'code'
         assert 'iat' in _info

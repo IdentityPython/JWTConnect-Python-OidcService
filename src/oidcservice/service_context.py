@@ -4,7 +4,6 @@ import os
 from cryptojwt import as_bytes
 from cryptojwt.jwk import import_private_rsa_key_from_file
 from cryptojwt.jwk import RSAKey
-from oidcservice import DEF_SIGN_ALG
 from oidcservice.state import State
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.key_jar import build_keyjar
@@ -151,55 +150,6 @@ class ServiceContext(object):
             return _name[1:]
         else:
             return _name
-
-    def sign_enc_algs(self, typ):
-        """
-        Reformat the crypto algorithm information gathered from a
-        client registration response into something more palatable.
-
-        :param typ: 'id_token', 'userinfo' or 'request_object'
-        :return: Dictionary with 'sign', 'alg' or 'enc' as keys and the
-            corresponding algorithms as value
-        """
-        resp = {}
-        for key, val in ATTRMAP[typ].items():
-            try:
-                resp[key] = self.registration_response[val]
-            except (TypeError, KeyError):
-                if key == "sign":
-                    try:
-                        resp[key] = DEF_SIGN_ALG[typ]
-                    except KeyError:
-                        pass
-        return resp
-
-    def verify_alg_support(self, alg, usage, typ):
-        """
-        Verifies that the algorithm to be used are supported by the other side.
-        This will look at provider information either statically configured or
-        obtained through dynamic provider info discovery.
-
-        :param alg: The algorithm specification
-        :param usage: In which context the 'alg' will be used.
-            The following contexts are supported:
-            - userinfo
-            - id_token
-            - request_object
-            - token_endpoint_auth
-        :param typ: Type of algorithm
-            - signing_alg
-            - encryption_alg
-            - encryption_enc
-        :return: True or False
-        """
-
-        supported = self.provider_info[
-            "{}_{}_values_supported".format(usage, typ)]
-
-        if alg in supported:
-            return True
-        else:
-            return False
 
     def generate_request_uris(self, path):
         """

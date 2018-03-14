@@ -248,9 +248,7 @@ class BearerBody(ClientAuthnMethod):
                 try:
                     kwargs["state"]
                 except KeyError:
-                    if not service_context.state:
-                        raise AuthnFailure("Missing state specification")
-                    kwargs["state"] = service_context.state
+                    raise AuthnFailure("Missing state specification")
 
                 request["access_token"] = service_context.state_db.get_token_info(
                     **kwargs)['access_token']

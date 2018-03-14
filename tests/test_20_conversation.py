@@ -397,6 +397,7 @@ def test_conversation():
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
     _resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
+    service['userinfo'].update_service_context(_resp, state=STATE)
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}

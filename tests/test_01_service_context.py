@@ -3,7 +3,8 @@ import pytest
 
 from urllib.parse import urlsplit
 
-from oidcservice.service_context import ServiceContext
+from oidcservice import DEF_SIGN_ALG
+from oidcservice.service_context import ServiceContext, ATTRMAP
 
 
 def test_client_info_init():
@@ -19,9 +20,9 @@ def test_client_info_init():
 
 
 def test_set_and_get_client_secret():
-    ci = ServiceContext()
-    ci.client_secret = 'supersecret'
-    assert ci.client_secret == 'supersecret'
+    service_context = ServiceContext()
+    service_context.client_secret = 'supersecret'
+    assert service_context.client_secret == 'supersecret'
 
 
 def test_set_and_get_client_id():
@@ -42,6 +43,57 @@ def test_client_filename():
     assert fname == 'rq12345'
 
 
+def sign_enc_algs(service_context, typ):
+    """
+    Reformat the crypto algorithm information gathered from a
+    client registration response into something more palatable.
+
+    :param typ: 'id_token', 'userinfo' or 'request_object'
+    :return: Dictionary with 'sign', 'alg' or 'enc' as keys and the
+        corresponding algorithms as value
+    """
+    resp = {}
+    for key, val in ATTRMAP[typ].items():
+        try:
+            resp[key] = service_context.registration_response[val]
+        except (TypeError, KeyError):
+            if key == "sign":
+                try:
+                    resp[key] = DEF_SIGN_ALG[typ]
+                except KeyError:
+                    pass
+    return resp
+
+
+def verify_alg_support(service_context, alg, usage, typ):
+    """
+    Verifies that the algorithm to be used are supported by the other side.
+    This will look at provider information either statically configured or
+    obtained through dynamic provider info discovery.
+
+    :param alg: The algorithm specification
+    :param usage: In which context the 'alg' will be used.
+        The following contexts are supported:
+        - userinfo
+        - id_token
+        - request_object
+        - token_endpoint_auth
+    :param typ: Type of algorithm
+        - signing_alg
+        - encryption_alg
+        - encryption_enc
+    :return: True or False
+    """
+
+    supported = service_context.provider_info[
+        "{}_{}_values_supported".format(usage, typ)]
+
+    if alg in supported:
+        return True
+    else:
+        return False
+
+
 class TestClientInfo(object):
     @pytest.fixture(autouse=True)
     def create_client_info_instance(self):
@@ -50,10 +102,10 @@ class TestClientInfo(object):
             'client_secret': 'client_secret', 'base_url': 'https://example.com',
             'requests_dir': 'requests'
         }
-        self.ci = ServiceContext(config=config)
+        self.service_context = ServiceContext(config=config)
 
     def test_registration_userinfo_sign_enc_algs(self):
-        self.ci.registration_response = {
+        self.service_context.registration_response = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -63,11 +115,11 @@ class TestClientInfo(object):
             "userinfo_encrypted_response_enc": "A128CBC-HS256",
         }
 
-        res = self.ci.sign_enc_algs('userinfo')
+        res = sign_enc_algs(self.service_context, 'userinfo')
         assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
 
     def test_registration_request_object_sign_enc_algs(self):
-        self.ci.registration_response = {
+        self.service_context.registration_response = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -78,14 +130,14 @@ class TestClientInfo(object):
             "request_object_signing_alg": "RS384"
         }
 
-        res = self.ci.sign_enc_algs('userinfo')
+        res = sign_enc_algs(self.service_context, 'userinfo')
         # 'sign':'RS256' is an added default
         assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = self.ci.sign_enc_algs('request')
+        res = sign_enc_algs(self.service_context, 'request')
         assert res == {'sign': 'RS384'}
 
     def test_registration_id_token_sign_enc_algs(self):
-        self.ci.registration_response = {
+        self.service_context.registration_response = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -99,16 +151,16 @@ class TestClientInfo(object):
             'id_token_signed_response_alg': "ES384",
         }
 
-        res = self.ci.sign_enc_algs('userinfo')
+        res = sign_enc_algs(self.service_context, 'userinfo')
         # 'sign':'RS256' is an added default
         assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = self.ci.sign_enc_algs('request')
+        res = sign_enc_algs(self.service_context, 'request')
         assert res == {'sign': 'RS384'}
-        res = self.ci.sign_enc_algs('id_token')
+        res = sign_enc_algs(self.service_context, 'id_token')
         assert res == {'sign': 'ES384', 'alg': 'ECDH-ES', 'enc': 'A128GCM'}
 
     def test_verify_alg_support(self):
-        self.ci.provider_info = {
+        self.service_context.provider_info = {
             "version": "3.0",
             "issuer": "https://server.example.com",
             "authorization_endpoint":
@@ -161,20 +213,21 @@ class TestClientInfo(object):
                                      "fr-CA"]
         }
 
-        assert self.ci.verify_alg_support('RS256', 'id_token', 'signing_alg')
-        assert self.ci.verify_alg_support(
-            'RS512', 'id_token', 'signing_alg') is False
+        assert verify_alg_support(self.service_context, 'RS256', 'id_token',
+                                  'signing_alg')
+        assert verify_alg_support(self.service_context,
+                                  'RS512', 'id_token', 'signing_alg') is False
 
-        assert self.ci.verify_alg_support('RSA1_5', 'userinfo',
-                                          'encryption_alg')
+        assert verify_alg_support(self.service_context, 'RSA1_5', 'userinfo',
+                                  'encryption_alg')
 
         # token_endpoint_auth_signing_alg_values_supported
-        assert self.ci.verify_alg_support('ES256', 'token_endpoint_auth',
-                                          'signing_alg')
+        assert verify_alg_support(self.service_context, 'ES256',
+                                  'token_endpoint_auth', 'signing_alg')
 
     def test_verify_requests_uri(self):
-        self.ci.provider_info['issuer'] = 'https://example.com/'
-        url_list = self.ci.generate_request_uris('/leading')
+        self.service_context.provider_info['issuer'] = 'https://example.com/'
+        url_list = self.service_context.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         p = sp.path.split('/')
         assert p[0] == ''
@@ -182,8 +235,8 @@ class TestClientInfo(object):
         assert len(p) == 3
 
         # different for different OPs
-        self.ci.provider_info['issuer'] = 'https://op.example.org/'
-        url_list = self.ci.generate_request_uris('/leading')
+        self.service_context.provider_info['issuer'] = 'https://op.example.org/'
+        url_list = self.service_context.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         np = sp.path.split('/')
         assert np[0] == ''
@@ -195,13 +248,13 @@ class TestClientInfo(object):
     def test_import_keys(self):
         # Should only be two and that a symmetric key (client_secret) usable
         # for signing and encryption
-        assert len(self.ci.keyjar.get_issuer_keys('')) == 2
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
 
         file_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), 'salesforce.key'))
 
         keyspec = {'file': {'rsa': [file_path]}}
-        self.ci.import_keys(keyspec)
+        self.service_context.import_keys(keyspec)
 
         # Now there should be 3, the third a RSA key for signing
-        assert len(self.ci.keyjar.get_issuer_keys('')) == 3
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 3
