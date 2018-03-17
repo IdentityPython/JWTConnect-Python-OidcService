@@ -6,7 +6,7 @@ from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.exception import ParameterError
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.oidc.service import factory
+from oidcservice.oidc.service import factory, add_jwks_uri_or_jwks
 from oidcservice.oidc.service import response_types_to_grant_types
 from oidcservice.service import build_services
 from oidcservice.service import Service
@@ -465,3 +465,62 @@ def test_authz_service_conf():
     req = srv.construct()
     assert 'claims' in req
     assert set(req['claims'].keys()) == {'id_token'}
+
+
+def test_add_jwks_uri_or_jwks_0():
+    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                     'redirect_uris': ['https://example.com/cli/authz_cb'],
+                     'jwks_uri': 'https://example.com/jwks/jwks.json',
+                     'issuer': 'https://example.com/as',
+                     'client_preferences': {
+                         'id_token_signed_response_alg': 'RS384',
+                         'userinfo_signed_response_alg': 'RS384'
+                     }}
+    service_context = ServiceContext(config=client_config)
+    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
+
+
+def test_add_jwks_uri_or_jwks_1():
+    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                     'redirect_uris': ['https://example.com/cli/authz_cb'],
+                     'jwks_uri': 'https://example.com/jwks/jwks.json',
+                     'jwks': '{"keys":[]}',
+                     'issuer': 'https://example.com/as',
+                     'client_preferences': {
+                         'id_token_signed_response_alg': 'RS384',
+                         'userinfo_signed_response_alg': 'RS384'
+                     }}
+    service_context = ServiceContext(config=client_config)
+    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
+    assert set(req_args.keys()) == {'jwks_uri'}
+
+
+def test_add_jwks_uri_or_jwks_2():
+    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                     'redirect_uris': ['https://example.com/cli/authz_cb'],
+                     'issuer': 'https://example.com/as',
+                     'client_preferences': {
+                         'id_token_signed_response_alg': 'RS384',
+                         'userinfo_signed_response_alg': 'RS384'
+                     }}
+    service_context = ServiceContext(
+        config=client_config, jwks_uri='https://example.com/jwks/jwks.json')
+    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
+    assert set(req_args.keys()) == {'jwks_uri'}
+
+
+def test_add_jwks_uri_or_jwks_3():
+    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                     'redirect_uris': ['https://example.com/cli/authz_cb'],
+                     'issuer': 'https://example.com/as',
+                     'client_preferences': {
+                         'id_token_signed_response_alg': 'RS384',
+                         'userinfo_signed_response_alg': 'RS384'
+                     }}
+    service_context = ServiceContext(config=client_config, jwks='{"keys":[]}')
+    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    assert req_args['jwks'] == '{"keys":[]}'
+    assert set(req_args.keys()) == {'jwks'}

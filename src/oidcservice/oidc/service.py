@@ -577,6 +577,30 @@ def add_post_logout_redirect_uris(service_context, request_args=None, **kwargs):
     return request_args, {}
 
 
+def add_jwks_uri_or_jwks(service_context, request_args=None, **kwargs):
+    if 'jwks_uri' in request_args:
+        if 'jwks' in request_args:
+            del request_args['jwks']  # only one of jwks_uri and jwks allowed
+        return request_args, {}
+    elif 'jwks' in request_args:
+        return request_args, {}
+
+    for attr in ['jwks_uri', 'jwks']:
+        _val = getattr(service_context, attr, 0)
+        if _val:
+            request_args[attr] = _val
+            break
+        else:
+            try:
+                _val = service_context.config[attr]
+            except KeyError:
+                pass
+            else:
+                request_args[attr] = _val
+                break
+
+    return request_args, {}
+
 
 class Registration(Service):
     msg_type = oidc.RegistrationRequest
@@ -594,7 +618,8 @@ class Registration(Service):
                          client_authn_method=client_authn_method,
                          conf=conf)
         self.pre_construct = [self.add_client_behaviour,add_redirect_uris,
-                              add_request_uri, add_post_logout_redirect_uris]
+                              add_request_uri, add_post_logout_redirect_uris,
+                              add_jwks_uri_or_jwks]
         self.post_construct = [self.oidc_post_construct]
 
     def add_client_behaviour(self, service_context, request_args=None,

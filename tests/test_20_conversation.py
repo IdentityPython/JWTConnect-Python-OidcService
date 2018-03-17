@@ -108,10 +108,7 @@ def test_conversation():
                                                    'client_secret_post'],
                 },
             "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
-            'behaviour':
-                {
-                    "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
-                }
+            "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
         }
     )
 
@@ -265,13 +262,13 @@ def test_conversation():
 
     assert info['url'] == 'https://example.org/op/registration'
     _body = json.loads(info['body'])
-    assert _body== {"application_type": "web",
-                    "response_types": ["code"],
-                    "contacts": ["ops@example.org"],
-                    "jwks_uri": "https://example.com/rp/static/jwks.json",
-                    "redirect_uris": ["https://example.com/rp/authz_cb"],
-                    'token_endpoint_auth_method': 'client_secret_basic',
-                    "grant_types": ["authorization_code"]}
+    assert _body == {"application_type": "web",
+                     "response_types": ["code"],
+                     "contacts": ["ops@example.org"],
+                     "jwks_uri": "https://example.com/rp/static/jwks.json",
+                     "redirect_uris": ["https://example.com/rp/authz_cb"],
+                     'token_endpoint_auth_method': 'client_secret_basic',
+                     "grant_types": ["authorization_code"]}
     assert info['headers'] == {'Content-Type': 'application/json'}
 
     now = int(time.time())
