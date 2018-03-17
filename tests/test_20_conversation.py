@@ -97,7 +97,7 @@ def test_conversation():
     service_context = ServiceContext(
         RP_KEYJAR,
         {
-            "client_prefs":
+            "client_preferences":
                 {
                     "application_type": "web",
                     "application_name": "rphandler",
@@ -264,16 +264,14 @@ def test_conversation():
     info = service['registration'].get_request_parameters()
 
     assert info['url'] == 'https://example.org/op/registration'
-    assert info[
-               'body'] == '{"application_type": "web", "response_types": [' \
-                          '"code"], "contacts": ["ops@example.org"], ' \
-                          '"jwks_uri": ' \
-                          '"https://example.com/rp/static/jwks.json", ' \
-                          '"token_endpoint_auth_method": ' \
-                          '"client_secret_basic", "redirect_uris": [' \
-                          '"https://example.com/rp/authz_cb"], "grant_types": ' \
-                          '' \
-                          '["authorization_code"]}'
+    _body = json.loads(info['body'])
+    assert _body== {"application_type": "web",
+                    "response_types": ["code"],
+                    "contacts": ["ops@example.org"],
+                    "jwks_uri": "https://example.com/rp/static/jwks.json",
+                    "redirect_uris": ["https://example.com/rp/authz_cb"],
+                    'token_endpoint_auth_method': 'client_secret_basic',
+                    "grant_types": ["authorization_code"]}
     assert info['headers'] == {'Content-Type': 'application/json'}
 
     now = int(time.time())

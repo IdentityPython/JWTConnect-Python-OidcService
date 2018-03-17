@@ -15,6 +15,9 @@ def request_object_encryption(msg, service_context, **kwargs):
         except KeyError:
             return msg
 
+    if not encalg:
+        return msg
+
     try:
         encenc = kwargs["request_object_encryption_enc"]
     except KeyError:
@@ -23,6 +26,10 @@ def request_object_encryption(msg, service_context, **kwargs):
         except KeyError:
             raise MissingRequiredAttribute(
                 "No request_object_encryption_enc specified")
+
+    if not encenc:
+        raise MissingRequiredAttribute(
+            "No request_object_encryption_enc specified")
 
     _jwe = JWE(msg, alg=encalg, enc=encenc)
     _kty = jwe.alg2keytype(encalg)

@@ -454,7 +454,7 @@ CLIENT_AUTHN_METHOD = {
 TYPE_METHOD = [(JWT_BEARER, JWSAuthnMethod)]
 
 
-def valid_service_context(cinfo, when=0):
+def valid_service_context(service_context, when=0):
     """
     Check if the client_secret has expired
 
@@ -462,7 +462,7 @@ def valid_service_context(cinfo, when=0):
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """
-    eta = getattr(cinfo, 'registration_expires', 0)
+    eta = getattr(service_context, 'client_secret_expires_at', 0)
     now = when or utc_time_sans_frac()
     if eta != 0 and eta < now:
         return False

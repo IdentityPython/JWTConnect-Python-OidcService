@@ -9,7 +9,6 @@ from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import KeyJar
 
-
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
 
@@ -36,17 +35,13 @@ class ServiceContext(object):
     from dynamic provider info discovery or client registration.
     But information is also picked up during the conversation with a server.
     """
-    def __init__(self, keyjar=None, config=None, events=None, db=None,
-                 db_name='', strict_on_preferences=False, jwks_uri='',
-                 **kwargs):
+
+    def __init__(self, keyjar=None, config=None, db=None, db_name='', **kwargs):
         self.keyjar = keyjar or KeyJar()
         self.state_db = State('', db=db, db_name=db_name)
-        self.events = events
-        self.strict_on_preferences = strict_on_preferences
         self.provider_info = {}
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
-        self.jwks_uri = jwks_uri
 
         if config is None:
             config = {}
@@ -57,7 +52,7 @@ class ServiceContext(object):
         self.requests_dir = ''
         self.allow = {}
         self.behaviour = {}
-        self.client_prefs = {}
+        self.client_preferences = {}
         self._c_id = ''
         self._c_secret = ''
         self.issuer = ''
@@ -72,7 +67,8 @@ class ServiceContext(object):
             except:
                 setattr(self, attr, '')
 
-        for attr in ['allow', 'client_prefs', 'behaviour', 'provider_info']:
+        for attr in ['allow', 'client_preferences', 'behaviour',
+                     'provider_info']:
             try:
                 setattr(self, attr, config[attr])
             except:
@@ -87,6 +83,11 @@ class ServiceContext(object):
             self.redirect_uris = config['redirect_uris']
         except:
             self.redirect_uris = [None]
+
+        try:
+            self.callback = config['callback']
+        except KeyError:
+            self.callback = {}
 
         try:
             self.import_keys(config['keys'])

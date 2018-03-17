@@ -85,7 +85,7 @@ service = build_services(service_spec, factory, RP_KEYJAR,
 client_info = ServiceContext(
     RP_KEYJAR,
     {
-        "client_prefs":
+        "client_preferences":
             {
                 "application_type": "web",
                 "application_name": "rphandler",

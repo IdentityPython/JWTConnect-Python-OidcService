@@ -352,17 +352,17 @@ class TestValidClientInfo(object):
         _service_context = services['any'].service_context
         _now = 123456  # At some time
         # Expiration time missing or 0, client_secret never expires
-        # service_context.registration_expires
+        # service_context.client_secret_expires_at
         assert valid_service_context(_service_context, _now)
-        _service_context.registration_expires = 0
+        _service_context.client_secret_expires_at = 0
         assert valid_service_context(_service_context, _now)
         # Expired secret
-        _service_context.registration_expires = 1
+        _service_context.client_secret_expires_at = 1
         assert valid_service_context(_service_context, _now) is not True
 
-        _service_context.registration_expires = 123455
+        _service_context.client_secret_expires_at = 123455
         assert valid_service_context(_service_context, _now) is not True
 
         # Valid secret
-        _service_context.registration_expires = 123460
-        assert valid_service_context({'registration_expires': 123460}, _now)
+        _service_context.client_secret_expires_at = 123460
+        assert valid_service_context({'client_secret_expires_at': 123460}, _now)

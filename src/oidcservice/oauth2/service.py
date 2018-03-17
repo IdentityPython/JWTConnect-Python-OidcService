@@ -27,6 +27,39 @@ def get_state(request_args, kwargs):
     return _state
 
 
+def pick_redirect_uris(service_context, request_args=None, **kwargs):
+    if 'redirect_uri' in request_args:
+        pass
+    elif service_context.callback:
+        try:
+            _response_type = request_args['response_type']
+        except KeyError:
+            _response_type = service_context.behaviour['response_types'][0]
+            request_args['response_type'] = _response_type
+
+        try:
+            _response_mode = request_args['response_mode']
+        except KeyError:
+            _response_mode = ''
+
+        if _response_mode == 'form_post':
+            request_args['redirect_uri'] = service_context.callback[
+                'form_post']
+        elif _response_type == 'code':
+            request_args['redirect_uri'] = service_context.callback['code']
+        else:
+            request_args['redirect_uri'] = service_context.callback[
+                'implicit']
+    else:
+        request_args['redirect_uri'] = service_context.redirect_uris[0]
+    return request_args, {}
+
+
+def set_state(service_context, request_args=None, **kwargs):
+    request_args['state'] = get_state(request_args, kwargs)
+    return request_args, {}
+
+
 class Authorization(Service):
     msg_type = oauth2.AuthorizationRequest
     response_cls = oauth2.AuthorizationResponse
@@ -39,7 +72,7 @@ class Authorization(Service):
     def __init__(self, service_context, client_authn_method=None, conf=None):
         Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct.append(self.oauth_pre_construct)
+        self.pre_construct.extend([pick_redirect_uris, set_state])
 
     def update_service_context(self, resp, state='', **kwargs):
         self.service_context.state_db.add_response(resp, state)
@@ -54,21 +87,6 @@ class Authorization(Service):
                 raise MissingParameter('redirect_uri')
 
         return ar_args
-
-    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
-
-        if request_args is not None:
-            try:  # change default
-                new = request_args["redirect_uri"]
-                if new:
-                    self.redirect_uris = [new]
-            except KeyError:
-                pass
-        else:
-            request_args = {}
-
-        request_args['state'] = get_state(request_args, kwargs)
-        return request_args, {}
 
 
 class AccessToken(Service):

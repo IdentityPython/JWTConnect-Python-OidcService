@@ -11,7 +11,7 @@ from oidcservice.exception import ConfigurationError, WebFingerError, \
     MissingEndpoint
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import service
-from oidcservice.oauth2.service import get_state
+from oidcservice.oauth2.service import get_state, pick_redirect_uris
 from oidcservice.oidc import OIC_ISSUER, WF_URL
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
@@ -81,6 +81,16 @@ def store_id_token(service_context, resp, **kwargs):
         pass
 
 
+def set_state(service_context, request_args, **kwargs):
+    try:
+        service_context.state_db.create_state(
+            service_context.issuer, request_args, request_args['state'])
+    except KeyError:
+        request_args['state'] = service_context.state_db.create_state(
+            service_context.issuer, request_args)
+    return request_args, {}
+
+
 class Authorization(service.Authorization):
     msg_type = oidc.AuthorizationRequest
     response_cls = oidc.AuthorizationResponse
@@ -91,7 +101,8 @@ class Authorization(service.Authorization):
         service.Authorization.__init__(self, service_context,
                                        client_authn_method, conf=conf)
         self.default_request_args = {'scope': ['openid']}
-        self.pre_construct = [self.oidc_pre_construct]
+        self.pre_construct = [set_state, pick_redirect_uris,
+                              self.oidc_pre_construct]
         self.post_construct = [self.oidc_post_construct]
 
     def update_service_context(self, resp, state='', **kwargs):
@@ -136,21 +147,6 @@ class Authorization(service.Authorization):
                 post_args['request_param'] = "request"
             del kwargs["request_method"]
 
-        try:
-            response_mod = service_context.behaviour['response_mode']
-        except KeyError:
-            pass
-        else:
-            if response_mod == 'form_post':
-                request_args['response_mode'] = response_mod
-
-        try:
-            service_context.state_db.create_state(
-                service_context.issuer, request_args, request_args['state'])
-        except KeyError:
-            request_args['state'] = service_context.state_db.create_state(
-                service_context.issuer, request_args)
-
         return request_args, post_args
 
     def oidc_post_construct(self, service_context, req, **kwargs):
@@ -176,7 +172,7 @@ class Authorization(service.Authorization):
         else:
             del kwargs['request_method']
 
-            alg = None
+            alg = 'RS256'
             for arg in ["request_object_signing_alg", "algorithm"]:
                 try:  # Trumps everything
                     alg = kwargs[arg]
@@ -393,6 +389,15 @@ ENDPOINT2SERVICE = {
 }
 
 
+def add_redirect_uris(service_context, request_args, **kwargs):
+    if "redirect_uris" not in request_args:
+        if service_context.callback:
+            request_args['redirect_uris'] = service_context.callback.values()
+        else:
+            request_args['redirect_uris'] = service_context.redirect_uris
+    return request_args, {}
+
+
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oidc.Message
     response_cls = oidc.ProviderConfigurationResponse
@@ -448,7 +453,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
 
         for _pref, _prov in PREFERENCE2PROVIDER.items():
             try:
-                vals = self.service_context.client_prefs[_pref]
+                vals = self.service_context.client_preferences[_pref]
             except KeyError:
                 continue
 
@@ -492,7 +497,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                 raise ConfigurationError(
                     "OP couldn't match preference:%s" % _pref, pcr)
 
-        for key, val in self.service_context.client_prefs.items():
+        for key, val in self.service_context.client_preferences.items():
             if key in self.service_context.behaviour:
                 continue
 
@@ -539,6 +544,40 @@ def response_types_to_grant_types(response_types):
     return list(_res)
 
 
+def add_request_uri(service_context, request_args=None, **kwargs):
+    if service_context.requests_dir:
+        try:
+            if service_context.provider_info[
+                    'require_request_uri_registration'] is True:
+                request_args[
+                    'request_uris'] = service_context.generate_request_uris(
+                        service_context.requests_dir)
+        except KeyError:
+            pass
+    return request_args, {}
+
+
+def add_post_logout_redirect_uris(service_context, request_args=None, **kwargs):
+    """
+
+    :param service_context:
+    :param request_args:
+    :param kwargs: parameters to the registration request
+    :return:
+    """
+
+    if "post_logout_redirect_uris" not in request_args:
+        try:
+            request_args[
+                "post_logout_redirect_uris"] = \
+                    service_context.post_logout_redirect_uris
+        except AttributeError:
+            pass
+
+    return request_args, {}
+
+
+
 class Registration(Service):
     msg_type = oidc.RegistrationRequest
     response_cls = oidc.RegistrationResponse
@@ -554,16 +593,12 @@ class Registration(Service):
         Service.__init__(self, service_context,
                          client_authn_method=client_authn_method,
                          conf=conf)
-        self.pre_construct = [self.oidc_pre_construct]
+        self.pre_construct = [self.add_client_behaviour,add_redirect_uris,
+                              add_request_uri, add_post_logout_redirect_uris]
         self.post_construct = [self.oidc_post_construct]
 
-    def oidc_pre_construct(self, service_context, request_args=None, **kwargs):
-        """
-        Create a registration request
-
-        :param kwargs: parameters to the registration request
-        :return:
-        """
+    def add_client_behaviour(self, service_context, request_args=None,
+                               **kwargs):
         for prop in self.msg_type.c_param.keys():
             if prop in request_args:
                 continue
@@ -571,32 +606,6 @@ class Registration(Service):
                 request_args[prop] = service_context.behaviour[prop]
             except KeyError:
                 pass
-
-        if "post_logout_redirect_uris" not in request_args:
-            try:
-                request_args[
-                    "post_logout_redirect_uris"] = \
-                        service_context.post_logout_redirect_uris
-            except AttributeError:
-                pass
-
-        if "redirect_uris" not in request_args:
-            try:
-                request_args[
-                    "redirect_uris"] = service_context.redirect_uris
-            except AttributeError:
-                raise MissingRequiredAttribute("redirect_uris", request_args)
-
-        if service_context.requests_dir:
-            try:
-                if self.service_context.provider_info[
-                        'require_request_uri_registration'] is True:
-                    request_args[
-                        'request_uris'] = service_context.generate_request_uris(
-                            service_context.requests_dir)
-            except KeyError:
-                pass
-
         return request_args, {}
 
     def oidc_post_construct(self, service_context, request_args=None, **kwargs):
@@ -623,7 +632,7 @@ class Registration(Service):
             pass
         else:
             try:
-                self.service_context.registration_expires = resp[
+                self.service_context.client_secret_expires_at = resp[
                     "client_secret_expires_at"]
             except KeyError:
                 pass

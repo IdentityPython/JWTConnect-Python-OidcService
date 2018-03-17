@@ -133,6 +133,51 @@ class TestAuthorization(object):
         assert set(_info.keys()) == {'url', 'method'}
 
 
+class TestAuthorizationCallback(object):
+    @pytest.fixture(autouse=True)
+    def create_request(self):
+        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+                         'callback': {
+                             'code': 'https://example.com/cli/authz_cb',
+                             'implicit': 'https://example.com/cli/authz_im_cb',
+                             'form_post': 'https://example.com/cli/authz_fp_cb'
+                         }}
+        service_context = ServiceContext(keyjar, config=client_config)
+        self.service = factory('Authorization',
+                               service_context=service_context,
+                               client_authn_method=CLIENT_AUTHN_METHOD)
+
+    def test_construct_code(self):
+        req_args = {'foo': 'bar', 'response_type': 'code',
+                    'state': 'state'}
+        _req = self.service.construct(request_args=req_args)
+        assert isinstance(_req, AuthorizationRequest)
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
+                                    'response_type', 'scope', 'state',
+                                    'nonce'}
+        assert _req['redirect_uri'] == 'https://example.com/cli/authz_cb'
+
+    def test_construct_implicit(self):
+        req_args = {'foo': 'bar', 'response_type': 'id_token token',
+                    'state': 'state'}
+        _req = self.service.construct(request_args=req_args)
+        assert isinstance(_req, AuthorizationRequest)
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
+                                    'response_type', 'scope', 'state',
+                                    'nonce'}
+        assert _req['redirect_uri'] == 'https://example.com/cli/authz_im_cb'
+
+    def test_construct_form_post(self):
+        req_args = {'foo': 'bar', 'response_type': 'code id_token token',
+                    'state': 'state', 'response_mode': 'form_post'}
+        _req = self.service.construct(request_args=req_args)
+        assert isinstance(_req, AuthorizationRequest)
+        assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
+                                    'response_type', 'scope', 'state',
+                                    'nonce', 'response_mode'}
+        assert _req['redirect_uri'] == 'https://example.com/cli/authz_fp_cb'
+
+
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
@@ -202,7 +247,7 @@ class TestProviderInfo(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss,
-                         'client_prefs': {
+                         'client_preferences': {
                              'id_token_signed_response_alg': 'RS384',
                              'userinfo_signed_response_alg': 'RS384'
                          }}
