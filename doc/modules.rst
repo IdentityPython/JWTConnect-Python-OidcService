@@ -1,7 +1,7 @@
-oidccli
-=======
+oidcservice
+===========
 
 .. toctree::
    :maxdepth: 4
 
-   oidccli
+   oidcservice
