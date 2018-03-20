@@ -2,6 +2,7 @@
 ServiceContext
 ++++++++++++++
 
+============
 Introduction
 ============
 
@@ -11,6 +12,7 @@ from an OP/AS it will store all or parts of it in the ServiceContext. When it
 constructs requests it will use the ServiceContext to find values for parameters
 in the request.
 
+=============================
 Content of the ServiceContext
 =============================
 
@@ -19,7 +21,6 @@ One can group them into a couple of groups:
 
     + Information about the client
     + Information about the OP/AS
-    + Information about authentication/authorisation sessions
 
 Information about the client and the OP/AS can be gotten in two different ways.
 Either by static configuration or by dynamic discovery/registration.
@@ -186,8 +187,9 @@ id_token
     The received ID Token as a signed JWT
 
 
+========================
 Using the ServiceContext
-------------------------
+========================
 
 The objects that use the ServiceContext are the oidcservice.service.Service
 instances. These object read and write to the ServiceContext while a session is
@@ -199,10 +201,10 @@ a request and when after having parsed the response it wants to update the
 ServiceContext.
 
 WebFinger
-.........
+---------
 
 Constructing request
-^^^^^^^^^^^^^^^^^^^^
+....................
 
 If Webfinger is used then nothing but an identifier for a user is in place so
 the ServiceContext doesn’t contain any useful information.
@@ -214,7 +216,7 @@ If the WebFinger request got a positive response then the URL which is the OP
 issuer ID is now know and will be stored in ServiceContext.issuer .
 
 ProviderInfoDiscovery
-.....................
+---------------------
 
 There are 2 paths here, either the information is provided in the configuration
 setup or the information is expected to be fetch using OIDC dynamic provider
@@ -229,14 +231,14 @@ ServiceContext.provider_info.
 If discovery is done then the following happens:
 
 Constructing request
-^^^^^^^^^^^^^^^^^^^
+....................
 
 The URL that is the Issuer ID is picked from ServiceContext.issuer and the
 “.well-known/openid-configuration” path is added to the the URL. The resulting
 URL is then used for the discovery request
 
 Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+...........................
 
 The parsed response, if it is an oidcmsg.oidc.ProviderConfigurationResponse
 instance is added to ServiceContext.provider_info.
@@ -246,7 +248,7 @@ together with the provider info response are converted into a
 ServiceContext.behaviour value.
 
 Registration
-............
+------------
 
 As for ProviderInfoDiscovery there are 2 possible path. The first using static
 client registration in which case all the necessary information must be
@@ -257,7 +259,7 @@ with the information in the configuration.
 If dynamic client registration is to happen, then the following happens.
 
 Constructing request
-^^^^^^^^^^^^^^^^^^^^
+....................
 
 Apart from the information given in client_preferences some more information
 are gathered from the ServiceContext. From ServiceContext.provider_info we get:
@@ -274,7 +276,7 @@ what is configured a set of *redirect_uris* are added to the request
 Same goes for *post_logout_redirect_uris*
 
 Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...........................
 
 The parsed registration response if it was positive is stored in
 ServiceContext.registration_response.
@@ -288,39 +290,3 @@ response:
 
 Also if *token_endpoint_auth_method*
 
-Authorization
-.............
-
-Constructing request
-^^^^^^^^^^^^^^^^^^^^
-
-Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-AccessToken
-...........
-
-Constructing request
-^^^^^^^^^^^^^^^^^^^^
-
-Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-RefreshAccessToken
-..................
-
-Constructing request
-^^^^^^^^^^^^^^^^^^^^
-
-Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-UserInfo
-.......
-
-Constructing request
-^^^^^^^^^^^^^^^^^^^^
-
-Updating the ServiceContext
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-.
