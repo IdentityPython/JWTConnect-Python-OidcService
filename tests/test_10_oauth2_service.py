@@ -1,12 +1,16 @@
 import pytest
 
+from oidcservice import rndstr
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.oauth2.service import factory
 from oidcservice.service import Service
+from oidcservice.service import State
 
 from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import Message
 
 
@@ -17,8 +21,23 @@ class Response(object):
         self.headers = headers or {"content-type": "text/plain"}
 
 
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        try:
+            return self.db[item]
+        except KeyError:
+            return None
+
+
 def test_service_factory():
-    req = factory('Service', service_context=ServiceContext(None),
+    req = factory('Service', state_db=DB(),
+                  service_context=ServiceContext(None),
                   client_authn_method=None)
     assert isinstance(req, Service)
 
@@ -29,9 +48,8 @@ class TestAuthorization(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        service_context.state_db['state'] = {}
-
-        self.service = factory('Authorization', service_context=service_context)
+        self.service = factory('Authorization', state_db=DB(),
+                               service_context=service_context)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -39,6 +57,12 @@ class TestAuthorization(object):
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo',
                                     'redirect_uri', 'state'}
+        assert self.service.state_db.get('state')
+        _item = self.service.get_item(AuthorizationRequest, 'auth_request',
+                                      'state')
+        assert _item.to_dict() == {
+            'foo': 'bar', 'redirect_uri': 'https://example.com/cli/authz_cb',
+            'state': 'state', 'client_id': 'client_id'}
 
     def test_get_request_parameters(self):
         req_args = {'response_type': 'code'}
@@ -72,8 +96,16 @@ class TestAccessTokenRequest(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        service_context.state_db['state'] = {'code': 'access_code'}
-        self.service = factory('AccessToken',
+        db = DB()
+        auth_request = AuthorizationRequest(
+            redirect_uri='https://example.com/cli/authz_cb',
+            state='state'
+        )
+        auth_response = AuthorizationResponse(code='access_code')
+        _state = State(auth_response=auth_response.to_json(),
+                       auth_request=auth_request.to_json())
+        db.set('state', _state.to_json())
+        self.service = factory('AccessToken', state_db=db,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -83,7 +115,8 @@ class TestAccessTokenRequest(object):
         _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
-                                    'client_secret', 'code', 'state'}
+                                    'client_secret', 'code', 'state',
+                                    'redirect_uri'}
 
     def test_construct_2(self):
         # Note that state as a argument means it will not end up in the
@@ -94,7 +127,8 @@ class TestAccessTokenRequest(object):
                                       state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
-                                    'client_secret', 'code'}
+                                    'client_secret', 'code', 'state',
+                                    'redirect_uri'}
 
     def test_get_request_parameters(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -110,7 +144,7 @@ class TestAccessTokenRequest(object):
             self.service.get_urlinfo(_info['body']))
         assert msg.to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
-            'grant_type': 'authorization_code',
+            'grant_type': 'authorization_code', 'state': 'state',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
         assert 'client_secret' not in msg
 
@@ -126,7 +160,7 @@ class TestAccessTokenRequest(object):
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
         assert msg.to_dict() == {
-            'client_id': 'client_id',
+            'client_id': 'client_id', 'state': 'state',
             'code': 'access_code', 'grant_type': 'authorization_code',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
 
@@ -139,8 +173,7 @@ class TestProviderInfo(object):
                          'redirect_uris': ['https://example.com/cli/authz_cb'],
                          'issuer': self._iss}
         service_context = ServiceContext(config=client_config)
-
-        self.service = factory('ProviderInfoDiscovery',
+        self.service = factory('ProviderInfoDiscovery', state_db=DB(),
                                service_context=service_context)
         self.service.endpoint = '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -163,12 +196,14 @@ class TestRefreshAccessTokenRequest(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        service_context.state_db['abcdef'] = {'code': 'access_code'}
-        service_context.state_db.add_response(
-            {'access_token': 'bearer_token', 'refresh_token': 'refresh'},
-            'abcdef'
-        )
-        self.service = factory('RefreshAccessToken',
+        db = DB()
+        auth_response = AuthorizationResponse(code='access_code')
+        token_response = AccessTokenResponse(access_token='bearer_token',
+                                             refresh_token='refresh')
+        _state = State(auth_response=auth_response.to_json(),
+                       token_response=token_response.to_json())
+        db.set('abcdef', _state.to_json())
+        self.service = factory('RefreshAccessToken', state_db=db,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
         self.service.endpoint = 'https://example.com/token'
@@ -189,9 +224,17 @@ def test_access_token_srv_conf():
     client_config = {'client_id': 'client_id', 'client_secret': 'password',
                      'redirect_uris': ['https://example.com/cli/authz_cb']}
     service_context = ServiceContext(config=client_config)
-    service_context.state_db['state'] = {'code': 'access_code'}
 
-    service = factory('AccessToken',
+    db = DB()
+    auth_request = AuthorizationRequest(
+        redirect_uri='https://example.com/cli/authz_cb', state='state')
+    auth_response = AuthorizationResponse(code='access_code')
+
+    _state = State(auth_request=auth_request.to_json(),
+                   auth_response=auth_response.to_json())
+    db.set('state', _state.to_json())
+
+    service = factory('AccessToken', state_db=db,
                       service_context=service_context,
                       client_authn_method=CLIENT_AUTHN_METHOD,
                       conf={'default_authn_method': 'client_secret_post'})

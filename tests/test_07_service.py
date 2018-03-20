@@ -1,7 +1,7 @@
 import pytest
 
 from oidcservice.service_context import ServiceContext
-from oidcservice.service import Service
+from oidcservice.service import Service, State
 
 from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_INT
@@ -28,13 +28,25 @@ class DummyService(Service):
     msg_type = DummyMessage
 
 
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        return self.db[item]
+
+
 class TestDummyService(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
         service_context = ServiceContext(client_id='client_id',
                                          issuer='https://www.example.org/as')
-        self.service = DummyService(service_context)
-        self.service.service_context.state_db['state'] = {}
+        db = DB()
+        db.set('state', State(iss='Issuer').to_json())
+        self.service = DummyService(service_context, state_db=db)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -70,7 +82,7 @@ class TestRequest(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
         service_context = ServiceContext(None)
-        self.service = Service(service_context, httplib=None, keyjar=None,
+        self.service = Service(service_context, state_db=DB(),
                                client_authn_method=None)
 
     def test_construct(self):

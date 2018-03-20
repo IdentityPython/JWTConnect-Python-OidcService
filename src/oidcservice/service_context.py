@@ -4,7 +4,6 @@ import os
 from cryptojwt import as_bytes
 from cryptojwt.jwk import import_private_rsa_key_from_file
 from cryptojwt.jwk import RSAKey
-from oidcservice.state import State
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import KeyJar
@@ -36,9 +35,8 @@ class ServiceContext(object):
     But information is also picked up during the conversation with a server.
     """
 
-    def __init__(self, keyjar=None, config=None, db=None, db_name='', **kwargs):
+    def __init__(self, keyjar=None, config=None, **kwargs):
         self.keyjar = keyjar or KeyJar()
-        self.state_db = State('', db=db, db_name=db_name)
         self.provider_info = {}
         self.registration_response = {}
         self.kid = {"sig": {}, "enc": {}}
@@ -53,7 +51,7 @@ class ServiceContext(object):
         self.allow = {}
         self.behaviour = {}
         self.client_preferences = {}
-        self._c_id = ''
+        self.client_id = ''
         self._c_secret = ''
         self.issuer = ''
 
@@ -115,17 +113,6 @@ class ServiceContext(object):
     # since client secret is used as a symmetric key in some instances
     # some special handling is needed for the client_secret attribute
     client_secret = property(get_client_secret, set_client_secret)
-
-    def get_client_id(self):
-        return self._c_id
-
-    def set_client_id(self, client_id):
-        self._c_id = client_id
-        self.state_db.client_id = client_id
-
-    # I keep the client_id in two places so there is a need to make the
-    # adding of client_id to those 2 places to be atomic.
-    client_id = property(get_client_id, set_client_id)
 
     def __setitem__(self, key, value):
         setattr(self, key, value)

@@ -10,8 +10,22 @@ from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
 from oidcmsg.oauth2 import AuthorizationErrorResponse
 from oidcmsg.oauth2 import ErrorResponse
-from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import TokenErrorResponse
+from oidcmsg.message import Message
+from oidcmsg.message import SINGLE_OPTIONAL_JSON
+from oidcmsg.message import SINGLE_REQUIRED_STRING
+
+
+class State(Message):
+    c_param = {
+        'iss': SINGLE_REQUIRED_STRING,
+        'auth_request': SINGLE_OPTIONAL_JSON,
+        'auth_response': SINGLE_OPTIONAL_JSON,
+        'token_response': SINGLE_OPTIONAL_JSON,
+        'refresh_token_request': SINGLE_OPTIONAL_JSON,
+        'refresh_token_response': SINGLE_OPTIONAL_JSON,
+        'user_info': SINGLE_OPTIONAL_JSON
+    }
 
 __author__ = 'Roland Hedberg'
 
@@ -72,8 +86,9 @@ class Service(object):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, client_authn_method=None,
-                 conf=None, **kwargs):
+    def __init__(self, service_context, state_db,
+                 client_authn_method=None, conf=None, **kwargs):
+        self.state_db = state_db
         self.service_context = service_context
         self.client_authn_method = client_authn_method
         self.events = None
@@ -149,8 +164,7 @@ class Service(object):
         _args = self.method_args('pre_construct', **kwargs)
         post_args = {}
         for meth in self.pre_construct:
-            request_args, _post_args = meth(self.service_context, request_args,
-                                            **_args)
+            request_args, _post_args = meth(request_args, service=self, **_args)
             post_args.update(_post_args)
 
         return request_args, post_args
@@ -166,7 +180,7 @@ class Service(object):
         _args = self.method_args('post_construct', **kwargs)
 
         for meth in self.post_construct:
-            request_args = meth(self.service_context, request_args, **_args)
+            request_args = meth(request_args, service=self, **_args)
 
         return request_args
 
@@ -266,7 +280,7 @@ class Service(object):
         if authn_method:
             logger.debug('Client authn method: {}'.format(authn_method))
             return self.client_authn_method[authn_method]().construct(
-                request, self.service_context, http_args=http_args, **kwargs)
+                request, self, http_args=http_args, **kwargs)
         else:
             return http_args
 
@@ -504,7 +518,7 @@ class Service(object):
                 except KeyError:
                     pass
 
-            resp = self.post_parse_response(resp)
+            resp = self.post_parse_response(resp, state=state)
 
         if not resp:
             logger.error('Missing or faulty response')
@@ -534,22 +548,154 @@ class Service(object):
             return err
 
     def get_conf_attr(self, attr, default=None):
+        """
+        Get the value of a attribute in the configuration
+
+        :param attr: The attribute
+        :param default: If the attribute doesn't appear in the configuration
+            return this value
+        :return: The value of attribute in the configuration or the default
+            value
+        """
         if attr in self.conf:
             return self.conf[attr]
         else:
             return default
 
+    def store_item(self, item, item_type, key):
+        """
+        Store a service response.
+
+        :param item: The item as a :py:class:`oidcmsg.message.Message`
+            subclass instance or a JSON document.
+        :param item_type: The type of request or response
+        :param key: The key under which the information should be stored in
+            the state database
+        """
+        _data = self.state_db.get(key)
+        if _data:
+            _state = State().from_json(_data)
+        else:
+            _state = State()
+
+        try:
+            _state[item_type] = item.to_json()
+        except AttributeError:
+            _state[item_type] = item
+
+        self.state_db.set(key, _state.to_json())
+
+    def get_iss(self, key):
+        """
+
+        :param key: Key to the information in the state database
+        :return: The issuer ID
+        """
+        _state = self.state_db.get(key)
+        if not _state:
+            raise KeyError(key)
+        return _state.iss
+
+    def get_item(self, item_cls, item_type, key):
+        """
+        Get a piece of information (a request or a response) from the state
+        database.
+
+        :param item_cls: The :py:class:`oidcmsg.message.Message` subclass
+            that described the item
+        :param item_type: Which request/response that is wanted
+        :param key: The key to the information in the state database
+        :return: A :py:class:`oidcmsg.message.Message` instance
+        """
+        _data = self.state_db.get(key)
+        if not _data:
+            raise KeyError(key)
+        else:
+            _state = State().from_json(_data)
+        try:
+            return item_cls(**_state[item_type])
+        except TypeError:
+            return item_cls().from_json(_state[item_type])
+
+    def extend_request_args(self, args, item_cls, item_type, key,
+                            parameters):
+        """
+        Add a set of parameters and their value to a set of request arguments.
+
+        :param args: A dictionary
+        :param item_cls: The :py:class:`oidcmsg.message.Message` subclass
+            that describes the item
+        :param item_type: The type of item, this is one of the parameter
+            names in the :py:class:`oidcservice.service.State` class.
+        :param key: The key to the information in the database
+        :param parameters: A list of parameters who's values this method
+            will return.
+        :return: A dictionary with keys from the list of parameters and
+            values being the values of those parameters in the item.
+            If the parameter does not a appear in the item it will not appear
+            in the returned dictionary.
+        """
+        item = self.get_item(item_cls, item_type, key)
+        for parameter in parameters:
+            try:
+                args[parameter] = item[parameter]
+            except KeyError:
+                pass
+
+        return args
+
+    def multiple_extend_request_args(self, args, key, parameters, item_types):
+        """
+
+        :param args:
+        :param key:
+        :param parameters:
+        :param item_types:
+        :return:
+        """
+        _data = self.state_db.get(key)
+        if not _data:
+            raise KeyError(key)
+        else:
+            _state = State().from_json(_data)
+
+        for typ in item_types:
+            try:
+                _item = Message(**_state[typ])
+            except KeyError:
+                continue
+
+            for parameter in parameters:
+                try:
+                    args[parameter] = _item[parameter]
+                except KeyError:
+                    pass
+
+        return args
+
+    def store_nonce2state(self, nonce, state):
+        self.state_db.set('__{}__'.format(nonce), state)
+
+    def get_state_by_nonce(self, nonce):
+        _state = self.state_db.get('__{}__'.format(nonce))
+        if _state:
+            return _state
+        else:
+            raise KeyError('Unknown nonce: "{}"'.format(nonce))
+
 
 def build_services(service_definitions, service_factory, service_context,
-                   client_authn_method):
+                   state_db, client_authn_method):
     service = {}
     for service_name, service_configuration in service_definitions.items():
         _srv = service_factory(service_name, service_context=service_context,
+                               state_db=state_db,
                                client_authn_method=client_authn_method,
                                conf=service_configuration)
         service[_srv.service_name] = _srv
 
     # For any unspecified service
     service['any'] = Service(service_context=service_context,
+                             state_db=state_db,
                              client_authn_method=client_authn_method)
     return service

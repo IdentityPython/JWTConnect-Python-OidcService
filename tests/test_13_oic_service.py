@@ -8,13 +8,13 @@ from oidcservice.exception import ParameterError
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory, add_jwks_uri_or_jwks
 from oidcservice.oidc.service import response_types_to_grant_types
-from oidcservice.service import build_services
+from oidcservice.service import build_services, State
 from oidcservice.service import Service
 
 from oidcmsg.jwt import JWT
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import public_keys_keyjar
-from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationResponse
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import Message
@@ -38,13 +38,26 @@ KEYSPEC = [
 ]
 
 keyjar = build_keyjar(KEYSPEC)[1]
-
 _dirname = os.path.dirname(os.path.abspath(__file__))
+
+
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        try:
+            return self.db[item]
+        except KeyError:
+            return None
 
 
 def test_request_factory():
     req = factory('Service', service_context=ServiceContext(None),
-                  client_authn_method=None)
+                  state_db=DB(), client_authn_method=None)
     assert isinstance(req, Service)
 
 
@@ -54,7 +67,7 @@ class TestAuthorization(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(keyjar, config=client_config)
-        self.service = factory('Authorization',
+        self.service = factory('Authorization', state_db=DB(),
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -143,7 +156,7 @@ class TestAuthorizationCallback(object):
                              'form_post': 'https://example.com/cli/authz_fp_cb'
                          }}
         service_context = ServiceContext(keyjar, config=client_config)
-        self.service = factory('Authorization',
+        self.service = factory('Authorization', state_db=DB(),
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -184,8 +197,14 @@ class TestAccessTokenRequest(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(keyjar, config=client_config)
-        service_context.state_db['state'] = {'code': 'access_code'}
-        self.service = factory('AccessToken',
+        _db = DB()
+        auth_request = AuthorizationRequest(
+            redirect_uri='https://example.com/cli/authz_cb',
+            state='state', response_type='code').to_json()
+        auth_response = AuthorizationResponse(code='access_code').to_json()
+        _db.set('state', State(auth_response=auth_response,
+                               auth_request=auth_request).to_json())
+        self.service = factory('AccessToken', state_db=_db,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -196,7 +215,8 @@ class TestAccessTokenRequest(object):
                                       state='state')
         assert isinstance(_req, AccessTokenRequest)
         assert set(_req.keys()) == {'client_id', 'foo', 'grant_type',
-                                    'client_secret', 'code'}
+                                    'client_secret', 'code', 'state',
+                                    'redirect_uri'}
 
     def test_get_request_parameters(self):
         req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -211,7 +231,7 @@ class TestAccessTokenRequest(object):
             self.service.get_urlinfo(_info['body']))
         assert msg.to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
-            'grant_type': 'authorization_code',
+            'grant_type': 'authorization_code', 'state': 'state',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
 
     def test_request_init(self):
@@ -227,15 +247,13 @@ class TestAccessTokenRequest(object):
             self.service.get_urlinfo(_info['body']))
         assert msg.to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
-            'grant_type': 'authorization_code',
+            'grant_type': 'authorization_code', 'state': 'state',
             'redirect_uri': 'https://example.com/cli/authz_cb'}
 
     def test_id_token_nonce_match(self):
-        self.service.service_context.state_db.bind_nonce_to_state('nonce',
-                                                                  'state')
+        self.service.store_nonce2state('nonce', 'state')
         resp = AccessTokenResponse(verified_id_token={'nonce': 'nonce'})
-        self.service.service_context.state_db.bind_nonce_to_state('nonce2',
-                                                                  'state2')
+        self.service.store_nonce2state('nonce2', 'state2')
         with pytest.raises(ParameterError):
             self.service.update_service_context(resp, state='state2')
 
@@ -252,7 +270,7 @@ class TestProviderInfo(object):
                              'userinfo_signed_response_alg': 'RS384'
                          }}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('ProviderInfoDiscovery',
+        self.service = factory('ProviderInfoDiscovery', state_db=None,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -291,7 +309,7 @@ class TestRegistration(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('Registration',
+        self.service = factory('Registration', state_db=None,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -326,14 +344,18 @@ class TestUserInfo(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('UserInfo',
+        db = DB()
+        auth_response = AuthorizationResponse(code='access_code').to_json()
+        token_response = AccessTokenResponse(
+            access_token='access_token', id_token='a.signed.jwt',
+            verified_id_token={'sub': 'diana'}).to_json()
+        db.set('abcde', State(token_response=token_response,
+                              auth_response=auth_response).to_json())
+        self.service = factory('UserInfo', state_db=db,
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service.service_context.state_db['abcde'] = {
-            'id_token': 'a.signed.jwt',
-            'token': {'access_token': 'access_token'}}
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, Message)
         assert len(_req) == 1
@@ -371,8 +393,8 @@ class TestUserInfo(object):
         public_keys_keyjar(_keyjar, '', self.service.service_context.keyjar,
                            'https://example.org/op/')
 
-        _resp = self.service.parse_response(resp.to_json())
-        _resp = self.service.post_parse_response(_resp)
+        _resp = self.service.parse_response(resp.to_json(), state='abcde')
+        _resp = self.service.post_parse_response(_resp, state='abcde')
         assert set(_resp.keys()) == {'sub', 'given_name', 'family_name',
                                      '_claim_names', '_claim_sources',
                                      'address', 'phone_number'}
@@ -387,13 +409,14 @@ class TestCheckSession(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckSession',
+        self.service = factory('CheckSession', state_db=DB(),
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service.service_context.state_db['abcde'] = {
-            'id_token': 'a.signed.jwt'}
+        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                'token_response',
+                                'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckSessionRequest)
         assert len(_req) == 1
@@ -408,13 +431,13 @@ class TestCheckID(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckID',
+        self.service = factory('CheckID', state_db=DB(),
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service.service_context.state_db['abcde'] = {
-            'id_token': 'a.signed.jwt'}
+        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckIDRequest)
         assert len(_req) == 1
@@ -429,13 +452,13 @@ class TestEndSession(object):
                          'issuer': self._iss, 'requests_dir': 'requests',
                          'base_url': 'https://example.com/cli/'}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('EndSession',
+        self.service = factory('EndSession', state_db=DB(),
                                service_context=service_context,
                                client_authn_method=CLIENT_AUTHN_METHOD)
 
     def test_construct(self):
-        self.service.service_context.state_db['abcde'] = {
-            'id_token': 'a.signed.jwt'}
+        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, EndSessionRequest)
         assert len(_req) == 1
@@ -450,7 +473,7 @@ def test_authz_service_conf():
     }
 
     srv = factory(
-        'Authorization',
+        'Authorization', state_db=DB(),
         service_context=ServiceContext(keyjar, config=client_config),
         client_authn_method=CLIENT_AUTHN_METHOD,
         conf={
@@ -477,7 +500,10 @@ def test_add_jwks_uri_or_jwks_0():
                          'userinfo_signed_response_alg': 'RS384'
                      }}
     service_context = ServiceContext(config=client_config)
-    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    service = factory('Registration', state_db=None,
+                      service_context=service_context,
+                      client_authn_method=CLIENT_AUTHN_METHOD)
+    req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
 
 
@@ -492,7 +518,10 @@ def test_add_jwks_uri_or_jwks_1():
                          'userinfo_signed_response_alg': 'RS384'
                      }}
     service_context = ServiceContext(config=client_config)
-    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    service = factory('Registration', state_db=None,
+                      service_context=service_context,
+                      client_authn_method=CLIENT_AUTHN_METHOD)
+    req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
     assert set(req_args.keys()) == {'jwks_uri'}
 
@@ -507,7 +536,11 @@ def test_add_jwks_uri_or_jwks_2():
                      }}
     service_context = ServiceContext(
         config=client_config, jwks_uri='https://example.com/jwks/jwks.json')
-    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    service = factory('Registration', state_db=None,
+                      service_context=service_context,
+                      client_authn_method=CLIENT_AUTHN_METHOD)
+
+    req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
     assert set(req_args.keys()) == {'jwks_uri'}
 
@@ -521,6 +554,9 @@ def test_add_jwks_uri_or_jwks_3():
                          'userinfo_signed_response_alg': 'RS384'
                      }}
     service_context = ServiceContext(config=client_config, jwks='{"keys":[]}')
-    req_args, post_args = add_jwks_uri_or_jwks(service_context, {})
+    service = factory('Registration', state_db=None,
+                      service_context=service_context,
+                      client_authn_method=CLIENT_AUTHN_METHOD)
+    req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks'] == '{"keys":[]}'
     assert set(req_args.keys()) == {'jwks'}

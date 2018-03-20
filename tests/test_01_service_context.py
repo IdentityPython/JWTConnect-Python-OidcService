@@ -29,7 +29,6 @@ def test_set_and_get_client_id():
     ci = ServiceContext()
     ci.client_id = 'myself'
     assert ci.client_id == 'myself'
-    assert ci.state_db.client_id == 'myself'
 
 
 def test_client_filename():

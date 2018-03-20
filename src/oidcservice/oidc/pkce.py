@@ -1,19 +1,24 @@
 from cryptojwt import b64e
+from oidcmsg.message import Message
+
 from oidcservice import unreserved, CC_METHOD
 from oidcservice.exception import Unsupported
-from oidcservice.oauth2.service import get_state
+from oidcservice.oauth2.service import get_state_parameter
 
 
-def add_code_challenge(service_context, request_args, **kwargs):
+def add_code_challenge(request_args, service, **kwargs):
     """
     PKCE RFC 7636 support
     To be added as a post_construct method to an
     :py:class:`oidcservice.oidc.service.Authorization` instance
 
-    :return: request arguments
+    :param service: The service that uses this function
+    :param request_args: Set of request arguments
+    :param kwargs: Extra set of keyword arguments
+    :return: Updated set of request arguments
     """
     try:
-        cv_len = service_context.config['code_challenge']['length']
+        cv_len = service.service_context.config['code_challenge']['length']
     except KeyError:
         cv_len = 64  # Use default
 
@@ -22,7 +27,7 @@ def add_code_challenge(service_context, request_args, **kwargs):
     _cv = code_verifier.encode()
 
     try:
-        _method = service_context.config['code_challenge']['method']
+        _method = service.service_context.config['code_challenge']['method']
     except KeyError:
         _method = 'S256'
 
@@ -37,30 +42,29 @@ def add_code_challenge(service_context, request_args, **kwargs):
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
 
-    service_context.state_db.add_info(request_args['state'],
-                                      code_verifier=code_verifier,
-                                      code_challenge_method=_method)
+    _item = Message(code_verifier=code_verifier,code_challenge_method=_method)
+    service.store_item(_item, 'pkce', request_args['state'])
 
     request_args.update({"code_challenge": code_challenge,
                          "code_challenge_method": _method})
     return request_args
 
 
-def add_code_verifier(service_context, request_args, **kwargs):
+def add_code_verifier(request_args, service, **kwargs):
     """
     PKCE RFC 7636 support
     To be added as a post_construct method to an
     :py:class:`oidcservice.oidc.service.AccessToken` instance
 
-    :param service_context:
-    :param request_args:
-    :return:
+    :param service: The service that uses this function
+    :param request_args: Set of request arguments
+    :return: updated set of request arguments
     """
-    code_verifier = service_context.state_db[kwargs['state']]['code_verifier']
-    request_args.update({'code_verifier': code_verifier})
+    _item = service.get_item(Message, 'pkce', kwargs['state'])
+    request_args.update({'code_verifier': _item['code_verifier']})
     return request_args
 
 
-def put_state_in_post_args(service_context, request_args, **kwargs):
-    state = get_state(request_args, kwargs)
+def put_state_in_post_args(request_args, **kwargs):
+    state = get_state_parameter(request_args, kwargs)
     return request_args, {'state': state}

@@ -201,9 +201,10 @@ def test_extra_member_response():
 
 SERVICE_CONTEXT = ServiceContext(None)
 
+
 class TestWebFinger(object):
     def test_query_device(self):
-        wf = WebFinger(SERVICE_CONTEXT)
+        wf = WebFinger(SERVICE_CONTEXT, state_db=None)
         request_args = {'resource': "device:p1.example.com"}
         _info = wf.get_request_parameters(request_args)
         assert _info[
@@ -212,7 +213,7 @@ class TestWebFinger(object):
                              '%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
 
     def test_query_rel(self):
-        wf = WebFinger(SERVICE_CONTEXT)
+        wf = WebFinger(SERVICE_CONTEXT, state_db=None)
         request_args = {'resource': "acct:bob@example.com"}
         _info = wf.get_request_parameters(
             request_args,
@@ -223,7 +224,7 @@ class TestWebFinger(object):
                "-page&rel=vcard"
 
     def test_query_acct(self):
-        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER)
+        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
         request_args = {'resource': "acct:carol@example.com"}
         _info = wf.get_request_parameters(request_args=request_args)
 

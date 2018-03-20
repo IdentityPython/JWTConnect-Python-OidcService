@@ -15,7 +15,7 @@ __author__ = 'Roland Hedberg'
 logger = logging.getLogger(__name__)
 
 
-def get_state_parameter(request_args, kwargs):
+def get_state(request_args, kwargs):
     try:
         _state = kwargs['state']
     except KeyError:
@@ -27,15 +27,14 @@ def get_state_parameter(request_args, kwargs):
     return _state
 
 
-def pick_redirect_uris(request_args=None, service=None, **kwargs):
-    _context = service.service_context
+def pick_redirect_uris(service_context, request_args=None, **kwargs):
     if 'redirect_uri' in request_args:
         pass
-    elif _context.callback:
+    elif service_context.callback:
         try:
             _response_type = request_args['response_type']
         except KeyError:
-            _response_type = _context.behaviour['response_types'][0]
+            _response_type = service_context.behaviour['response_types'][0]
             request_args['response_type'] = _response_type
 
         try:
@@ -44,21 +43,21 @@ def pick_redirect_uris(request_args=None, service=None, **kwargs):
             _response_mode = ''
 
         if _response_mode == 'form_post':
-            request_args['redirect_uri'] = _context.callback[
+            request_args['redirect_uri'] = service_context.callback[
                 'form_post']
         elif _response_type == 'code':
-            request_args['redirect_uri'] = _context.callback['code']
+            request_args['redirect_uri'] = service_context.callback['code']
         else:
-            request_args['redirect_uri'] = _context.callback[
+            request_args['redirect_uri'] = service_context.callback[
                 'implicit']
     else:
-        request_args['redirect_uri'] = _context.redirect_uris[0]
+        request_args['redirect_uri'] = service_context.redirect_uris[0]
     return request_args, {}
 
 
-def set_state_parameter(request_args=None, **kwargs):
-    request_args['state'] = get_state_parameter(request_args, kwargs)
-    return request_args, {'state': request_args['state']}
+def set_state(service_context, request_args=None, **kwargs):
+    request_args['state'] = get_state(request_args, kwargs)
+    return request_args, {}
 
 
 class Authorization(Service):
@@ -70,20 +69,13 @@ class Authorization(Service):
     service_name = 'authorization'
     response_body_type = 'urlencoded'
 
-    def __init__(self, service_context, state_db,
-                 client_authn_method=None, conf=None):
-        Service.__init__(self, service_context, state_db=state_db,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
-        self.pre_construct.extend([pick_redirect_uris, set_state_parameter])
-        self.post_construct.append(self.store_auth_request)
+        self.pre_construct.extend([pick_redirect_uris, set_state])
 
     def update_service_context(self, resp, state='', **kwargs):
-        self.store_item(resp, 'auth_response', state)
-
-    def store_auth_request(self, request_args=None, **kwargs):
-        _key = get_state_parameter(request_args, kwargs)
-        self.store_item(request_args, 'auth_request', _key)
-        return request_args
+        self.service_context.state_db.add_response(resp, state)
 
     def gather_request_args(self, **kwargs):
         ar_args = Service.gather_request_args(self, **kwargs)
@@ -109,39 +101,26 @@ class AccessToken(Service):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_service_context(self, resp, key='', **kwargs):
-        self.store_item(resp, 'token_response', key)
+    def update_service_context(self, resp, state='', **kwargs):
+        self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
-        """
-
-        :param request_args: Initial set of request arguments
-        :param kwargs: Extra keyword arguments
-        :return: Request arguments
-        """
-        _state = get_state_parameter(request_args, kwargs)
-        parameters = list(self.msg_type.c_param.keys())
-
-        _args = self.extend_request_args({}, oauth2.AuthorizationRequest,
-                                         'auth_request', _state, parameters)
-
-        _args = self.extend_request_args(_args, oauth2.AuthorizationResponse,
-                                         'auth_response', _state, parameters)
-
-        if "grant_type" not in _args:
-            _args["grant_type"] = "authorization_code"
+    def oauth_pre_construct(self, service_context, request_args=None, **kwargs):
+        _state = get_state(request_args, kwargs)
+        req_args = service_context.state_db.get_response_args(
+            _state, self.msg_type)
 
         if request_args is None:
-            request_args = _args
+            request_args = req_args
         else:
-            _args.update(request_args)
-            request_args = _args
+            request_args.update(req_args)
+
+        if "grant_type" not in request_args:
+            request_args["grant_type"] = "authorization_code"
 
         return request_args, {}
 
@@ -156,29 +135,23 @@ class RefreshAccessToken(Service):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
-    def update_service_context(self, resp, key='', **kwargs):
-        self.store_item(resp, 'token_response', key)
+    def update_service_context(self, resp, state='', **kwargs):
+        self.service_context.state_db.add_response(resp, state)
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
-        _state = get_state_parameter(request_args, kwargs)
-        parameters = list(self.msg_type.c_param.keys())
-        _args = self.extend_request_args({}, oauth2.AuthorizationResponse,
-                                         'auth_response', _state, parameters)
-
-        _args = self.extend_request_args(_args, oauth2.AccessTokenResponse,
-                                         'token_response', _state, parameters)
+    def oauth_pre_construct(self, service_context,request_args=None, **kwargs):
+        _state = get_state(request_args, kwargs)
+        req_args = service_context.state_db.get_response_args(_state,
+                                                              self.msg_type)
 
         if request_args is None:
-            request_args = _args
+            request_args = req_args
         else:
-            _args.update(request_args)
-            request_args = _args
+            request_args.update(req_args)
 
         return request_args, {}
 
@@ -191,9 +164,8 @@ class ProviderInfoDiscovery(Service):
     service_name = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
+    def __init__(self, service_context, client_authn_method=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_method=client_authn_method, conf=conf)
 
     def request_info(self, method="GET", request_args=None, **kwargs):

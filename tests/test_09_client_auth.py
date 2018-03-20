@@ -21,11 +21,12 @@ from oidcservice.client_auth import PrivateKeyJWT
 from oidcservice.client_auth import valid_service_context
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc import service
-from oidcservice.service import build_services
+from oidcservice.oidc.service import factory
+from oidcservice.service import build_services, State
 from oidcservice.service_context import ServiceContext
 
 from oidcmsg.key_bundle import KeyBundle
-from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationRequest
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import CCAccessTokenRequest
@@ -46,16 +47,40 @@ def _eq(l1, l2):
 
 def get_service_context():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
-    _sdb = service_context.state_db
-    _sdb['ABCDE'] = {'code': 'access_code'}
     service_context.client_secret = "boarding pass"
     return service_context
 
 
+def get_service():
+    service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
+    service_context.client_secret = "boarding pass"
+    service = factory('AccessToken', state_db=DB(),
+                      service_context=service_context)
+    return service
+
+
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        return self.db[item]
+
+
 @pytest.fixture
 def services():
+    db = DB()
+    auth_request = AuthorizationRequest(redirect_uri="http://example.com",
+                                        state='ABCDE').to_json()
+    auth_response = AuthorizationResponse(access_token="token",
+                                        state='ABCDE').to_json()
+    db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
+                          auth_response=auth_response).to_json())
     return build_services(DEFAULT_SERVICES, service.factory,
-                          service_context=get_service_context(),
+                          get_service_context(), db,
                           client_authn_method=CLIENT_AUTHN_METHOD)
 
 
@@ -65,8 +90,7 @@ class TestClientSecretBasic(object):
             redirect_uri="http://example.com", state='ABCDE')
 
         csb = ClientSecretBasic()
-        http_args = csb.construct(request,
-                                  services['accesstoken'].service_context)
+        http_args = csb.construct(request, services['accesstoken'])
 
         assert http_args == {"headers": {"Authorization": "Basic {}".format(
             base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
@@ -95,7 +119,7 @@ class TestBearerHeader(object):
     def test_construct(self):
         request = ResourceRequest(access_token="Sesame")
         bh = BearerHeader()
-        http_args = bh.construct(request, service_context=get_service_context)
+        http_args = bh.construct(request, service=get_service())
 
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
@@ -103,7 +127,7 @@ class TestBearerHeader(object):
         request = ResourceRequest(access_token="Sesame")
         bh = BearerHeader()
         # Any HTTP args should just be passed on
-        http_args = bh.construct(request, service_context=get_service_context,
+        http_args = bh.construct(request, service_context=get_service(),
                                  http_args={"foo": "bar"})
 
         assert _eq(http_args.keys(), ["foo", "headers"])
@@ -113,7 +137,7 @@ class TestBearerHeader(object):
         request = ResourceRequest(access_token="Sesame")
 
         bh = BearerHeader()
-        http_args = bh.construct(request, service_context=get_service_context,
+        http_args = bh.construct(request, service_context=get_service(),
                                  http_args={"headers": {"x-foo": "bar"}})
 
         assert _eq(http_args.keys(), ["headers"])
@@ -124,20 +148,20 @@ class TestBearerHeader(object):
         bh = BearerHeader()
         request = ResourceRequest(access_token="Sesame")
 
-        http_args = bh.construct(request, service_context=get_service_context)
+        http_args = bh.construct(request, service_context=get_service())
 
         assert "access_token" not in request
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
 
     def test_construct_with_token(self, services):
         authz_service = services['authorization']
-        authz_service.service_context.state_db['AAAA'] = {}
+        authz_service.state_db.set('AAAA', State(iss='Issuer').to_json())
 
         # Add a state and bind a code to it
         resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
         response = services['authorization'].parse_response(
             resp1.to_urlencoded(), "urlencoded")
-        services['authorization'].update_service_context(response)
+        services['authorization'].update_service_context(response, state='AAAA')
 
         # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
@@ -146,13 +170,12 @@ class TestBearerHeader(object):
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
 
-        services['accesstoken'].update_service_context(response)
+        services['accesstoken'].update_service_context(response, state='AAAA')
 
         # and finally use the access token, bound to a state, to
         # construct the authorization header
         http_args = BearerHeader().construct(
-            ResourceRequest(), services['accesstoken'].service_context,
-            state="AAAA")
+            ResourceRequest(), services['accesstoken'], state="AAAA")
         assert http_args == {"headers": {"Authorization": "Bearer token1"}}
 
 
@@ -160,50 +183,47 @@ class TestBearerBody(object):
     def test_construct(self, services):
         _srv = services['accesstoken']
         request = ResourceRequest(access_token="Sesame")
-        http_args = BearerBody().construct(request,
-                                           service_context=_srv.service_context)
+        http_args = BearerBody().construct(request, service=_srv)
 
         assert request["access_token"] == "Sesame"
         assert http_args is None
 
     def test_construct_with_state(self, services):
         _srv = services['authorization']
-        _sdb = _srv.service_context.state_db
-        _sdb['FFFFF'] = {}
+        _srv.state_db.set('FFFFF', State(iss='Issuer').to_json())
+
         resp = AuthorizationResponse(code="code", state="FFFFF")
-        _sdb.add_response(resp)
+        _srv.store_item(resp, 'auth_response', 'FFFFF')
+
         atr = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                                   token_type="example",
                                   refresh_token="tGzv3JOkF0XG5Qx2TlKWIA",
                                   example_parameter="example_value",
                                   scope=["inner", "outer"])
-        _sdb.add_response(atr, state='FFFFF')
+        _srv.store_item(atr, 'token_response', 'FFFFF')
 
         request = ResourceRequest()
-        http_args = BearerBody().construct(
-            request, service_context=_srv.service_context, state="FFFFF")
+        http_args = BearerBody().construct(request, service=_srv, state="FFFFF")
         assert request["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
     def test_construct_with_request(self, services):
         authz_service = services['authorization']
-        authz_service.service_context.state_db['EEEE'] = {}
+        authz_service.state_db.set('EEEE', State(iss='Issuer').to_json())
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
         response = authz_service.parse_response(resp1.to_urlencoded(),
                                                 "urlencoded")
-        authz_service.update_service_context(response)
+        authz_service.update_service_context(response, state='EEEE')
 
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="EEEE")
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
-        services['accesstoken'].update_service_context(response)
+        services['accesstoken'].update_service_context(response, state='EEEE')
 
         request = ResourceRequest()
-        BearerBody().construct(request,
-                               service_context=authz_service.service_context,
-                               state="EEEE")
+        BearerBody().construct(request, service=authz_service, state="EEEE")
 
         assert "access_token" in request
         assert request["access_token"] == "token1"
@@ -215,8 +235,7 @@ class TestClientSecretPost(object):
         request = token_service.construct(redirect_uri="http://example.com",
                                           state='ABCDE')
         csp = ClientSecretPost()
-        http_args = csp.construct(request,
-                                  service_context=token_service.service_context)
+        http_args = csp.construct(request, service=token_service)
 
         assert request["client_id"] == "A"
         assert request["client_secret"] == "boarding pass"
@@ -224,8 +243,7 @@ class TestClientSecretPost(object):
 
         request = AccessTokenRequest(code="foo",
                                      redirect_uri="http://example.com")
-        http_args = csp.construct(request,
-                                  service_context=token_service.service_context,
+        http_args = csp.construct(request, service=token_service,
                                   client_secret="another")
         assert request["client_id"] == "A"
         assert request["client_secret"] == "another"
@@ -246,9 +264,7 @@ class TestPrivateKeyJWT(object):
 
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
-        http_args = pkj.construct(request,
-                                  service_context=_service.service_context,
-                                  algorithm="RS256",
+        http_args = pkj.construct(request, service=_service, algorithm="RS256",
                                   authn_endpoint='token')
         assert http_args == {}
         cas = request["client_assertion"]
@@ -287,7 +303,6 @@ class TestPrivateKeyJWT(object):
 class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, services):
         _service_context = services['any'].service_context
-
         _service_context.token_endpoint = "https://example.com/token"
         _service_context.provider_info = {
             'issuer': 'https://example.com/',
@@ -296,9 +311,8 @@ class TestClientSecretJWT_TE(object):
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, service_context=_service_context,
-                      algorithm="HS256",
-                      authn_endpoint='token')
+        csj.construct(request, service=services['accesstoken'],
+                      algorithm="HS256", authn_endpoint='token')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]
@@ -326,9 +340,8 @@ class TestClientSecretJWT_UI(object):
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, service_context=_service_context,
-                      algorithm="HS256",
-                      authn_endpoint='userinfo')
+        csj.construct(request, service=services['accesstoken'],
+                      algorithm="HS256", authn_endpoint='userinfo')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]

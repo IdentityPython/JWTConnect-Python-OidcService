@@ -90,6 +90,20 @@ SERVICE_PUBLIC_JWKS = RP_KEYJAR.export_jwks('')
 OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        try:
+            return self.db[item]
+        except KeyError:
+            return None
+
+
 # ---------------------------------------------------
 
 
@@ -115,7 +129,7 @@ def test_conversation():
     service_spec = DEFAULT_SERVICES.copy()
     service_spec['WebFinger'] = {}
 
-    service = build_services(service_spec, factory,
+    service = build_services(service_spec, factory, state_db=DB(),
                              service_context=service_context,
                              client_authn_method=CLIENT_AUTHN_METHOD)
 
@@ -327,10 +341,10 @@ def test_conversation():
     _authz_rep = AuthorizationResponse(**op_authz_resp)
 
     _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
-    service['authorization'].update_service_context(_resp)
-    assert service_context.state_db[
-               'Oh3w3gKlvoM2ehFqlxI3HIK5'][
-               'code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
+    service['authorization'].update_service_context(_resp, state=STATE)
+    _item = service['authorization'].get_item(AuthorizationResponse,
+                                              'auth_response', STATE)
+    assert _item['code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
 
     # =================== Access token ====================
 
@@ -341,11 +355,12 @@ def test_conversation():
         request_args=request_args)
 
     assert info['url'] == 'https://example.org/op/token'
-    assert info[
-               'body'] == \
-           'grant_type=authorization_code&state=Oh3w3gKlvoM2ehFqlxI3HIK5' \
-           '&redirect_uri=https%3A%2F%2Fexample.com%2Frp%2Fauthz_cb&code' \
-           '=Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01&client_id=zls2qhN1jO6A'
+    _qp = parse_qs(info['body'])
+    assert _qp == {'grant_type': ['authorization_code'],
+                   'redirect_uri': ['https://example.com/rp/authz_cb'],
+                   'client_id': ['zls2qhN1jO6A'],
+                   'state': ['Oh3w3gKlvoM2ehFqlxI3HIK5'],
+                   'code': ['Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01']}
     assert info['headers'] == {
         'Authorization': 'Basic '
                          'emxzMnFoTjFqTzZBOmM4NDM0ZjI4Y2Y5Mzc1ZDlhNw==',
@@ -375,10 +390,14 @@ def test_conversation():
 
     service['accesstoken'].update_service_context(_resp, state=STATE)
 
-    assert service_context.state_db[STATE]['token'] == {
-        'access_token': 'Z0FBQUFBQmFkdFF',
-        'token_type': 'Bearer',
-        'scope': ['openid']}
+    _item = service['authorization'].get_item(AccessTokenResponse,
+                                              'token_response', STATE)
+
+    assert set(_item.keys()) == {'state', 'scope', 'access_token',
+                                 'token_type', 'id_token', 'verified_id_token'}
+
+    assert _item['token_type'] == 'Bearer'
+    assert _item['access_token'] == 'Z0FBQUFBQmFkdFF'
 
     # =================== User info ====================
 
@@ -396,3 +415,7 @@ def test_conversation():
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
+
+    _item = service['authorization'].get_item(OpenIDSchema,
+                                              'user_info', STATE)
+    assert _item.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
