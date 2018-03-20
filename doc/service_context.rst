@@ -39,19 +39,19 @@ interacts with, those are:
 
 base_url
     + This is the part of URLs that the client presents to the outside that
-        doesn’t vary between the URLs.
+      doesn’t vary between the URLs.
 
 requests_dir
     + If the request_uri parameter is used then signed JWTs will be stored in this
-        directory.
+      directory.
 
 The second group of parameters then is OP/AS dependent
 
 allow
     + This is used to make the client allow divergence from the standards. The
-        only present use if for non-matching issuer values. According to the OIDC
-        standard the value of iss in an ID Token must be the same as the Issuer ID
-        of the OP. The value of allow is a dictionary
+      only present use if for non-matching issuer values. According to the OIDC
+      standard the value of iss in an ID Token must be the same as the Issuer ID
+      of the OP. The value of allow is a dictionary
     + example: allow={“issuer_missmatch”: True}
 
 keyjar
@@ -74,14 +74,14 @@ redirect_uris
 
 callback
     + Depending on the response_type and response_mode used you may want to
-        pick one specific redirect_uri out of a given set.
+      pick one specific redirect_uri out of a given set.
     + The keys presently understood by the system are the ones listed in the
-        example.
+      example.
     + Example::
 
-    {“code”: “https://example.com/authz_cb”,
-     “implicit”: “https://example.com/authz_im_cb”,
-     “form_post”: “https://example.com/authz_fp_cb” }
+        {“code”: “https://example.com/authz_cb”,
+         “implicit”: “https://example.com/authz_im_cb”,
+         “form_post”: “https://example.com/authz_fp_cb” }
 
 
 registration_response
@@ -97,44 +97,47 @@ registration_access_token
 
 behaviour
     + If OIDC dynamic client registration is not supported by the OP or if
-        dynamic registration is not used then this is where necessary
-        information about how the RP should behave against the OP must be stored.
+      dynamic registration is not used then this is where necessary
+      information about how the RP should behave against the OP must be stored.
     + If dynamic client registration is used then the result after matching the
-        registration response against the client_preferences are store here.
+      registration response against the client_preferences are store here.
     + Example::
 
-    {
-       "response_types": ["code"],
-       "scope": ["openid", "profile", "email"],
-       "token_endpoint_auth_method": ["client_secret_basic",
-                                      'client_secret_post']
-    }
+        {
+           "response_types": ["code"],
+           "scope": ["openid", "profile", "email"],
+           "token_endpoint_auth_method": ["client_secret_basic",
+                                          'client_secret_post']
+        }
 
 client_preferences
     + When dynamic client registration is used this is where it’s specified what
-        should be sent in the registration request. This information will be
-        added to before sending it to the OP, more about that below. The format
-        is the same as for behaviour.
-    + The possible content is described in http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+      should be sent in the registration request. This information will be
+      added to before sending it to the OP, more about that below. The format
+      is the same as for behaviour.
+    + The possible content is described in
+      http://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
     + Example::
 
-    {
-       "application_type": "web",
-       "application_name": "rphandler",
-       "contacts": ["ops@example.com"],
-       "response_types": ["code", "id_token", "id_token token", "code id_token",
-                              "code id_token token", "code token"],
-       "scope": ["openid", "profile", "email", "address", "phone"],
-       "token_endpoint_auth_method": ["client_secret_basic",
-             “Client_secret_post”],
-    }
+        {
+           "application_type": "web",
+           "application_name": "rphandler",
+           "contacts": ["ops@example.com"],
+           "response_types": ["code", "id_token", "id_token token", "code id_token",
+                                  "code id_token token", "code token"],
+           "scope": ["openid", "profile", "email", "address", "phone"],
+           "token_endpoint_auth_method": ["client_secret_basic",
+                 “Client_secret_post”],
+        }
 
-**NOTE:** defining behaviour and client_preferences in configuration is mutually
-exclusive. Either you do static client configuration in which case you define
-behaviour in configuration or you do dynamic client registration and then you
-must use client_preferences. If you do dynamic client registration then based on
-the client_preferences and the registration response behaviour will be
-dynamically built.
+**NOTE:**
+If you do static client configuration you **MUST** define
+behaviour in configuration.
+
+If you do dynamic client registration you **MAY** use *behaviour* and you
+should use *client_preferences*.
+The result of matching the client_preferences with registration response will
+be used to update *behaviour*.
 
 OP information
 --------------
@@ -180,8 +183,8 @@ token
     + Information about the access token received
     + Example::
 
-     {‘access_token’: ‘Z0FBQUFBQmFkdFF’, ‘token_type’: ‘Bearer’,
-      ‘scope’: [‘openid’]}
+         {‘access_token’: ‘Z0FBQUFBQmFkdFF’, ‘token_type’: ‘Bearer’,
+          ‘scope’: [‘openid’]}
 
 id_token
     The received ID Token as a signed JWT
