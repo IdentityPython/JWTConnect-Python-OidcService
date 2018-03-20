@@ -31,37 +31,6 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-"""
-
-method call structure for Services.
-This is for constructing requests:
-
-get_request_parameters
-    - construct_request
-        - construct 
-            - pre_construct (*)
-            - gather_request_args
-            - post_construct (*)
-    - get_http_url
-    - get_authn_header
-    - get_http_body
-
-and this for parsing the response.
-
-parse_response
-     - get_urlinfo 
-     - post_parse_response   
-or
-parse_error_mesg
-
-The methods marked with (*) are where service specific
-behaviour is implemented.
-
-And this for storing information from the response in the client.
-
-update_service_context
-"""
-
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
 RESPONSE2ERROR = {

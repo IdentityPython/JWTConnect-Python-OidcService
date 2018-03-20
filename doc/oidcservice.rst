@@ -44,14 +44,6 @@ oidcservice\.service module
     :undoc-members:
     :show-inheritance:
 
-oidcservice\.state module
--------------------------
-
-.. automodule:: oidcservice.state
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 oidcservice\.util module
 ------------------------
 
