@@ -79,9 +79,11 @@ callback
       example.
     + Example::
 
-        {“code”: “https://example.com/authz_cb”,
-         “implicit”: “https://example.com/authz_im_cb”,
-         “form_post”: “https://example.com/authz_fp_cb” }
+        {
+            “code”: “https://example.com/authz_cb”,
+            “implicit”: “https://example.com/authz_im_cb”,
+            “form_post”: “https://example.com/authz_fp_cb”
+        }
 
 
 registration_response
@@ -123,11 +125,12 @@ client_preferences
            "application_type": "web",
            "application_name": "rphandler",
            "contacts": ["ops@example.com"],
-           "response_types": ["code", "id_token", "id_token token", "code id_token",
-                                  "code id_token token", "code token"],
+           "response_types": ["code", "id_token", "id_token token",
+                              "code id_token", "code id_token token",
+                              "code token"],
            "scope": ["openid", "profile", "email", "address", "phone"],
            "token_endpoint_auth_method": ["client_secret_basic",
-                 “Client_secret_post”],
+                                          “Client_secret_post”],
         }
 
 **NOTE:**
