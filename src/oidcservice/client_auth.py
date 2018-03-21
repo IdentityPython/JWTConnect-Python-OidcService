@@ -181,7 +181,19 @@ class ClientSecretPost(ClientSecretBasic):
 
 
 def find_token(request, token_type, service, **kwargs):
-    # try to find the token in the request
+    """
+    The access token can be in a number of places.
+    There are priority rules as to which one to use, abide by those:
+        1 If it's among the request parameters use that
+        2 If among the extra keyword arguments
+        3 Acquired by a previous run service.
+
+    :param request:
+    :param token_type:
+    :param service:
+    :param kwargs:
+    :return:
+    """
     if request is not None:
         try:
             _token = request[token_type]
@@ -196,6 +208,8 @@ def find_token(request, token_type, service, **kwargs):
     try:
         return kwargs["access_token"]
     except KeyError:
+        # I should pick the latest acquired token, this should be the right
+        # order for that.
         _arg = service.multiple_extend_request_args(
             {}, kwargs['state'], ['access_token'],
             ['auth_response', 'token_response', 'refresh_token_response'])
@@ -290,7 +304,7 @@ def bearer_auth(request, authn):
 
 class JWSAuthnMethod(ClientAuthnMethod):
     """
-    Base class for client authentication methods that uses signed Json
+    Base class for client authentication methods that uses signed JSON
     Web Tokens.
     """
 

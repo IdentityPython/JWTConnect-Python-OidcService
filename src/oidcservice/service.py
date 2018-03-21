@@ -377,12 +377,13 @@ class Service(object):
         """
         This the start of a pipeline that will:
 
-        - Deserializes a response into it's response message class.
-            Or :py:class:`oidcmsg.oauth2.ErrorResponse` if it's an error message
-        - verifies the correctness of the response by running the
-            verify method belonging to the message class used.
-        - runs the do_post_parse_response method iff the response was not
-            an error response.
+            1 Deserializes a response into it's response message class.
+              Or :py:class:`oidcmsg.oauth2.ErrorResponse` if it's an error
+              message
+            2 verifies the correctness of the response by running the
+              verify method belonging to the message class used.
+            3 runs the do_post_parse_response method iff the response was not
+              an error response.
 
         :param info: The response, can be either in a JSON or an urlencoded
             format
@@ -556,6 +557,7 @@ class Service(object):
 
     def get_iss(self, key):
         """
+        Get the Issuer ID
 
         :param key: Key to the information in the state database
         :return: The issuer ID
@@ -571,7 +573,7 @@ class Service(object):
         database.
 
         :param item_cls: The :py:class:`oidcmsg.message.Message` subclass
-            that described the item
+            that described the item.
         :param item_type: Which request/response that is wanted
         :param key: The key to the information in the state database
         :return: A :py:class:`oidcmsg.message.Message` instance
@@ -615,12 +617,17 @@ class Service(object):
 
     def multiple_extend_request_args(self, args, key, parameters, item_types):
         """
+        Go through a set of items (by their type) and add the attribute-value
+        that match the list of parameters to the arguments
+        If the same parameter occurs in 2 different items then the value in
+        the later one will be the one used.
 
-        :param args:
-        :param key:
-        :param parameters:
-        :param item_types:
-        :return:
+        :param args: Initial set of arguments
+        :param key: Key to the State information in the state database
+        :param parameters: A list of parameters that we're looking for
+        :param item_types: A list of item_type specifying which items we
+            are interested in.
+        :return: A possibly augmented set of arguments.
         """
         _data = self.state_db.get(key)
         if not _data:
@@ -643,9 +650,24 @@ class Service(object):
         return args
 
     def store_nonce2state(self, nonce, state):
+        """
+        Store the connection between a nonce value and a state value.
+        This allows us later in the game to find the state if we have the nonce.
+
+        :param nonce: The nonce value
+        :param state: The state value
+        """
         self.state_db.set('__{}__'.format(nonce), state)
 
     def get_state_by_nonce(self, nonce):
+        """
+        Find the state value by providing the nonce value.
+        Will raise an exception if the nonce value is absent from the state
+        data base.
+
+        :param nonce: The nonce value
+        :return: The state value
+        """
         _state = self.state_db.get('__{}__'.format(nonce))
         if _state:
             return _state
@@ -655,6 +677,22 @@ class Service(object):
 
 def build_services(service_definitions, service_factory, service_context,
                    state_db, client_authn_method):
+    """
+    This function will build a number of :py:class:`oidcservice.service.Service`
+    instances based on the service definitions provided.
+
+    :param service_definitions: A dictionary of service definitions. The keys
+        are the names of the subclasses. The values are configurations.
+    :param service_factory: A factory that can initiate a service class
+    :param service_context: A reference to the service context, this is the same
+        for all service instances.
+    :param state_db: A reference to the state database. Shared by all the
+        services.
+    :param client_authn_method: A list of methods the services can use to
+        authenticate the client to a service.
+    :return: A dictionary, with service name as key and the service instance as
+        value.
+    """
     service = {}
     for service_name, service_configuration in service_definitions.items():
         _srv = service_factory(service_name, service_context=service_context,
