@@ -1,7 +1,8 @@
 import pytest
 
 from oidcservice.service_context import ServiceContext
-from oidcservice.service import Service, State
+from oidcservice.service import Service
+from oidcservice.state_interface import State
 
 from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_INT

@@ -1,10 +1,11 @@
 from oidcmsg.message import Message
 from oidcmsg.message import SINGLE_REQUIRED_STRING
 from oidcmsg.oidc import AuthorizationResponse
+from oidcservice.state_interface import State
 
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.oidc.service import factory
-from oidcservice.service import Service, State
+from oidcservice.service import Service
 from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.pkce import add_code_challenge
 from oidcservice.oidc.pkce import add_code_verifier

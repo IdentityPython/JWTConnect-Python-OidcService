@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from urllib.parse import urlparse
 
 from cryptojwt import jws
+from oidcservice.state_interface import State
 
 from oidcservice import rndstr, OIDCONF_PATTERN
 from oidcservice.exception import ConfigurationError
@@ -18,7 +19,7 @@ from oidcservice.oauth2.service import pick_redirect_uris
 from oidcservice.oidc import OIC_ISSUER, WF_URL
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
-from oidcservice.service import Service, State
+from oidcservice.service import Service
 
 from oidcmsg import oidc
 from oidcmsg.exception import MissingRequiredAttribute

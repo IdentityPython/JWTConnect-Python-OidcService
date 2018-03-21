@@ -22,8 +22,9 @@ from oidcservice.client_auth import valid_service_context
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc import service
 from oidcservice.oidc.service import factory
-from oidcservice.service import build_services, State
+from oidcservice.service import build_services
 from oidcservice.service_context import ServiceContext
+from oidcservice.state_interface import State
 
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationRequest

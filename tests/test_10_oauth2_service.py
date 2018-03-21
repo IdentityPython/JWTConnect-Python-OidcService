@@ -5,7 +5,7 @@ from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.oauth2.service import factory
 from oidcservice.service import Service
-from oidcservice.service import State
+from oidcservice.state_interface import State
 
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse

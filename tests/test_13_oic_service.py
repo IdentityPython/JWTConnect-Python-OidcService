@@ -5,18 +5,18 @@ import pytest
 from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.exception import ParameterError
-from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory, add_jwks_uri_or_jwks
 from oidcservice.oidc.service import response_types_to_grant_types
-from oidcservice.service import build_services, State
 from oidcservice.service import Service
+from oidcservice.state_interface import State
 
 from oidcmsg.jwt import JWT
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import public_keys_keyjar
-from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationResponse
+from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import Message
 from oidcmsg.oidc import CheckIDRequest
 from oidcmsg.oidc import CheckSessionRequest
