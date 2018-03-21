@@ -68,9 +68,9 @@ The overall call sequence looks like this:
     + get_request_parameters
         - construct_request
             - construct
-                - pre_construct (*)
+                - do_pre_construct (*)
                 - gather_request_args
-                - post_construct (*)
+                - do_post_construct (*)
         - get_http_url
         - get_authn_header
         - get_http_body
@@ -177,18 +177,23 @@ get_authn_header
 
 Implemented in :py:meth:`oidcservice.service.Service.get_authn_header`
 
-oidcservice supports 6 different client authentication/authorization methods
+oidcservice supports 6 different client authentication/authorization methods.
+
+2 from https://tools.ietf.org/html/rfc6750:
 
     - bearer_body
     - bearer_header
+
+and these described in
+http://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication:
+
     - client_secret_basic
     - client_secret_jwt
     - client_secret_post
     - private_key_jwt
 
-depending on which of these, if any, is supposed to be used different things
-has to happen. In the cases where something has to be added to the
-HTTP *Authorization* header
+Depending on which of these, if any, is supposed to be used, different things
+has to happen.
 
 get_http_url
 ------------
@@ -196,31 +201,14 @@ get_http_url
 Implemented in :py:meth:`oidcservice.service.Service.get_http_url`
 
 Depending on where the request are to be placed in the request (part of the
-URL or as a POST body) and the serialization used the request in it's proper
-form will be constructed and tagged with destination.
-
-uri_and_body will return a dictionary that a HTTP client library can use
-to send the request.
-
-endpoint
-++++++++
-Implemented in :py:meth:`oidcservice.service.Service.endpoint`
-
-Picks the endpoint (URL) to which the request will be sent.
-
-update_http_args
-----------------
-Implemented in :py:meth:`oidcservice.service.Service.update_http_args`
-
-Will add the HTTP header arguments that has been added while the request
-has been travelling through the pipe line to a possible starting set.
-
+URL or as a POST body) and which serialization is to be used, the request in
+it's proper format will be constructed and tagged with destination.
 
 ---------------------
 The response pipeline
 ---------------------
 
-Below follows a desciption of the methods of the response pipeline in the order
+Below follows a description of the response pipeline methods in the order
 they are called.
 
 The overall call sequence looks like this:
@@ -230,24 +218,8 @@ The overall call sequence looks like this:
         * `do_post_parse_response`_ (#)
     + `parse_error_mesg`_
 
-parse_request_response
-======================
-
-Deal with a self.httplib response. The response are expected to
-follow a special pattern, having the attributes:
-
-    - headers (list of tuples with headers attributes and their values)
-    - status_code (integer)
-    - text (The text version of the response)
-    - url (The calling URL)
-
-Depending on the status_code in the HTTP response different things will happen.
-If it's in in the 200 <= x < 300 range then based on the value of Content-Type
-in the HTTP headers an appropriate deserializer method will be chosen and then
-*parse_response* will be called.
-
 parse_response
---------------
+==============
 
 Will initiate a *response_cls* instance with the result of deserializing the
 result.
@@ -260,11 +232,11 @@ parameter values being of the correct data types) and if it was not an error
 response *do_post_parse_response* is called.
 
 get_urlinfo
-'''''''''''
-Picks out the query or fragment component from a URL
+-----------
+Picks out the query or fragment component from an URL
 
 do_post_parse_response
-''''''''''''''''''''''
+----------------------
 
 Runs the list of *post_parse_response* methods in the order they appear in the
 list.
@@ -285,8 +257,10 @@ The parameters being:
         A set of extra keyword arguments
 
 parse_error_mesg
-----------------
+================
 
 Parses an error message return with a 4XX error message. OAuth2 expects
 400 errors, OpenID Connect also uses a 402 error. But we accept the full
-range since serves seems to be able to use them all.
+range since serves seems to be able to use them all. Also there are OP/AS
+implementations that return error messages in a HTTP 200 response.
+
