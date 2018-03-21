@@ -52,6 +52,14 @@ oidcservice\.util module
     :undoc-members:
     :show-inheritance:
 
+oidcservice\.state_interface module
+-----------------------------------
+
+.. automodule:: oidcservice.state_interface
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 Module contents
 ---------------
 

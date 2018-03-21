@@ -184,9 +184,10 @@ def find_token(request, token_type, service, **kwargs):
     """
     The access token can be in a number of places.
     There are priority rules as to which one to use, abide by those:
-        1 If it's among the request parameters use that
-        2 If among the extra keyword arguments
-        3 Acquired by a previous run service.
+
+    1 If it's among the request parameters use that
+    2 If among the extra keyword arguments
+    3 Acquired by a previous run service.
 
     :param request:
     :param token_type:
