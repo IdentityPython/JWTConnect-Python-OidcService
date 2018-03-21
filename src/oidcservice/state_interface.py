@@ -21,6 +21,19 @@ class StateInterface(object):
     def __init__(self, state_db):
         self.state_db = state_db
 
+    def get_state(self, key):
+        """
+        Get the state connected to a given key.
+
+        :param key: Key into the state database
+        :return: A :py:class:´oidcservice.state_interface.State` instance
+        """
+        _data = self.state_db.get(key)
+        if not _data:
+            raise KeyError(key)
+        else:
+            return State().from_json(_data)
+
     def store_item(self, item, item_type, key):
         """
         Store a service response.
@@ -31,10 +44,9 @@ class StateInterface(object):
         :param key: The key under which the information should be stored in
             the state database
         """
-        _data = self.state_db.get(key)
-        if _data:
-            _state = State().from_json(_data)
-        else:
+        try:
+            _state = self.get_state(key)
+        except KeyError:
             _state = State()
 
         try:
@@ -67,11 +79,7 @@ class StateInterface(object):
         :param key: The key to the information in the state database
         :return: A :py:class:`oidcmsg.message.Message` instance
         """
-        _data = self.state_db.get(key)
-        if not _data:
-            raise KeyError(key)
-        else:
-            _state = State().from_json(_data)
+        _state = self.get_state(key)
         try:
             return item_cls(**_state[item_type])
         except TypeError:
@@ -118,11 +126,7 @@ class StateInterface(object):
             are interested in.
         :return: A possibly augmented set of arguments.
         """
-        _data = self.state_db.get(key)
-        if not _data:
-            raise KeyError(key)
-        else:
-            _state = State().from_json(_data)
+        _state = self.get_state(key)
 
         for typ in item_types:
             try:
