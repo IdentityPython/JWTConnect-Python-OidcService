@@ -111,5 +111,6 @@ class ConfigurationError(OidcServiceError):
 class WrongContentType(OidcServiceError):
     pass
 
+
 class WebFingerError(OidcServiceError):
     pass

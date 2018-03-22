@@ -23,7 +23,7 @@ from oidcservice.service import Service
 
 from oidcmsg import oidc
 from oidcmsg.exception import MissingRequiredAttribute
-from oidcmsg.oauth2 import ErrorResponse
+from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oauth2 import Message
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import make_openid_request
@@ -69,7 +69,7 @@ PROVIDER_DEFAULT = {
 class Authorization(service.Authorization):
     msg_type = oidc.AuthorizationRequest
     response_cls = oidc.AuthorizationResponse
-    error_msg = oidc.AuthorizationErrorResponse
+    error_msg = oidc.ResponseMessage
 
     def __init__(self, service_context, state_db, client_authn_method=None,
                  conf=None):
@@ -213,7 +213,7 @@ class Authorization(service.Authorization):
 class AccessToken(service.AccessToken):
     msg_type = oidc.AccessTokenRequest
     response_cls = oidc.AccessTokenResponse
-    error_msg = oidc.TokenErrorResponse
+    error_msg = oidc.ResponseMessage
 
     def __init__(self, service_context, state_db, client_authn_method=None,
                  conf=None):
@@ -239,7 +239,7 @@ class AccessToken(service.AccessToken):
 class RefreshAccessToken(service.RefreshAccessToken):
     msg_type = oidc.RefreshAccessTokenRequest
     response_cls = oidc.AccessTokenResponse
-    error_msg = oidc.TokenErrorResponse
+    error_msg = oidc.ResponseMessage
 
 
 class URINormalizer(object):
@@ -283,7 +283,7 @@ class WebFinger(Service):
     """
     msg_type = Message
     response_cls = JRD
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     synchronous = True
     service_name = 'webfinger'
     http_method = 'GET'
@@ -388,7 +388,7 @@ def add_redirect_uris(request_args, service=None, **kwargs):
 class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     msg_type = oidc.Message
     response_cls = oidc.ProviderConfigurationResponse
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
 
     def __init__(self, service_context, state_db, client_authn_method=None,
                  conf=None):
@@ -594,7 +594,7 @@ def add_jwks_uri_or_jwks(request_args=None, service=None, **kwargs):
 class Registration(Service):
     msg_type = oidc.RegistrationRequest
     response_cls = oidc.RegistrationResponse
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = 'registration_endpoint'
     synchronous = True
     service_name = 'registration'
@@ -671,7 +671,7 @@ def carry_state(request_args=None, **kwargs):
 class UserInfo(Service):
     msg_type = Message
     response_cls = oidc.OpenIDSchema
-    error_msg = oidc.UserInfoErrorResponse
+    error_msg = oidc.ResponseMessage
     endpoint_name = 'userinfo_endpoint'
     synchronous = True
     service_name = 'userinfo'
@@ -736,7 +736,7 @@ class UserInfo(Service):
 class CheckSession(Service):
     msg_type = oidc.CheckSessionRequest
     response_cls = Message
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = ''
     synchronous = True
     service_name = 'check_session'
@@ -757,7 +757,7 @@ class CheckSession(Service):
 class CheckID(Service):
     msg_type = oidc.CheckIDRequest
     response_cls = Message
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = ''
     synchronous = True
     service_name = 'check_id'
@@ -778,7 +778,7 @@ class CheckID(Service):
 class EndSession(Service):
     msg_type = oidc.EndSessionRequest
     response_cls = Message
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = 'end_session_endpoint'
     synchronous = True
     service_name = 'end_session'

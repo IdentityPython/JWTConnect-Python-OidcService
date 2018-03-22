@@ -9,9 +9,7 @@ from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
 from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
-from oidcmsg.oauth2 import AuthorizationErrorResponse
-from oidcmsg.oauth2 import ErrorResponse
-from oidcmsg.oauth2 import TokenErrorResponse
+from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.message import Message
 
 
@@ -21,11 +19,6 @@ logger = logging.getLogger(__name__)
 
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
-RESPONSE2ERROR = {
-    "AuthorizationResponse": [AuthorizationErrorResponse, TokenErrorResponse],
-    "AccessTokenResponse": [TokenErrorResponse]
-}
-
 SPECIAL_ARGS = ['authn_endpoint', 'algs']
 
 REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
@@ -34,7 +27,7 @@ REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 class Service(StateInterface):
     msg_type = Message
     response_cls = Message
-    error_msg = ErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = ''
     synchronous = True
     service_name = ''
@@ -406,37 +399,8 @@ class Service(StateInterface):
         if self.events:
             self.events.store('Protocol Response', resp)
 
-        # if it's an error message and I didn't expect it recast the
-        # response as a :py:class:`oidcmsg.oauth2.ErrorResponse
-        if "error" in resp and not isinstance(resp, ErrorResponse):
-            resp = None
-            # Gather error message classes that are expected if an
-            # error was returned.
-            try:
-                errmsgs = [self.error_msg]
-                if ErrorResponse not in errmsgs:
-                    # Allow unspecified error response
-                    errmsgs.append(ErrorResponse)
-            except KeyError:
-                errmsgs = [ErrorResponse]
-
-            # loop through the error message classes and pick the one
-            # that verifies OK.
-            try:
-                for errmsg in errmsgs:
-                    try:
-                        resp = errmsg().deserialize(info, sformat)
-                        resp.verify()
-                        break
-                    except Exception:
-                        resp = None
-            except KeyError:
-                pass
-
-            if not resp:
-                logger.debug('Could not map into an error message')
-                raise ValueError('No error message: {}'.format(info))
-
+        # is this an error message
+        if resp.is_error_message():
             logger.debug('Error response: {}'.format(resp))
         else:
             # Need to add some information before running verify()
@@ -484,26 +448,26 @@ class Service(StateInterface):
 
         return resp
 
-    def parse_error_mesg(self, response, body_type):
-        """
-        Parse an error message.
-
-        :param response: The response text
-        :param body_type: How the body is encoded
-        :return: A :py:class:`oidcmsg.message.Message` instance
-        """
-        if body_type == 'txt':
-            _body_type = 'urlencoded'
-        else:
-            _body_type = body_type
-
-        err = self.error_msg().deserialize(response, method=_body_type)
-        try:
-            err.verify()
-        except OidcServiceError:
-            raise
-        else:
-            return err
+    # def parse_error_mesg(self, response, body_type):
+    #     """
+    #     Parse an error message.
+    #
+    #     :param response: The response text
+    #     :param body_type: How the body is encoded
+    #     :return: A :py:class:`oidcmsg.message.Message` instance
+    #     """
+    #     if body_type == 'txt':
+    #         _body_type = 'urlencoded'
+    #     else:
+    #         _body_type = body_type
+    #
+    #     err = self.error_msg().deserialize(response, method=_body_type)
+    #     try:
+    #         err.verify()
+    #     except OidcServiceError:
+    #         raise
+    #     else:
+    #         return err
 
     def get_conf_attr(self, attr, default=None):
         """

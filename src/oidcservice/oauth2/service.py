@@ -5,6 +5,7 @@ import sys
 from oidcmsg import oauth2
 from oidcmsg.exception import MissingParameter
 from oidcmsg.key_jar import KeyJar
+from oidcmsg.oauth2 import ResponseMessage
 
 from oidcservice import OIDCONF_PATTERN
 from oidcservice.exception import OidcServiceError
@@ -64,7 +65,7 @@ def set_state_parameter(request_args=None, **kwargs):
 class Authorization(Service):
     msg_type = oauth2.AuthorizationRequest
     response_cls = oauth2.AuthorizationResponse
-    error_msg = oauth2.AuthorizationErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = 'authorization_endpoint'
     synchronous = False
     service_name = 'authorization'
@@ -100,7 +101,7 @@ class Authorization(Service):
 class AccessToken(Service):
     msg_type = oauth2.AccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
-    error_msg = oauth2.TokenErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = 'token_endpoint'
     synchronous = True
     service_name = 'accesstoken'
@@ -149,7 +150,7 @@ class AccessToken(Service):
 class RefreshAccessToken(Service):
     msg_type = oauth2.RefreshAccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
-    error_msg = oauth2.TokenErrorResponse
+    error_msg = ResponseMessage
     endpoint_name = 'token_endpoint'
     synchronous = True
     service_name = 'refresh_token'
@@ -186,7 +187,7 @@ class RefreshAccessToken(Service):
 class ProviderInfoDiscovery(Service):
     msg_type = oauth2.Message
     response_cls = oauth2.ASConfigurationResponse
-    error_msg = oauth2.ErrorResponse
+    error_msg = ResponseMessage
     synchronous = True
     service_name = 'provider_info'
     http_method = 'GET'
