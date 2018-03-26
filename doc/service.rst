@@ -138,10 +138,11 @@ they appear in the list.
 
 The call API that all the pre_construct methods must adhere to is::
 
-    meth(cli_info, request_args, **_args)
+    meth(request_args, service_context, **_args)
 
 
-cli_info is an instance of :py:class:`oidcservice.client_info.ClientInfo`
+service_context is an instance of
+:py:class:`oidcservice.service_context.ServiceContext`
 The methods MUST return a tuple with request arguments and arguments to be
 used by the post_construct methods.
 
@@ -154,7 +155,7 @@ Has a number of sources where it can get request arguments from.
 In priority order:
 
     1. Arguments to the method call
-    2. Information kept in the client information instance
+    2. Information kept in the service context instance
     3. Information in the client configuration targeted for this method.
     4. Standard protocol defaults.
 
