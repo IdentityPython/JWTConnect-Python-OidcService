@@ -5,6 +5,7 @@ import time
 
 from oidcmsg.jwt import JWT
 from oidcmsg.oidc import AuthorizationResponse
+from oidcservice.state_interface import State
 
 from oidcservice.service_context import ServiceContext
 
@@ -15,6 +16,20 @@ from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
 
 from oidcservice.service import build_services
+
+class DB(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        try:
+            return self.db[item]
+        except KeyError:
+            return None
+
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
@@ -77,12 +92,9 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 # ---------------------------------------------------
 
 service_spec = DEFAULT_SERVICES.copy()
-service_spec.append(('WebFinger', {}))
+service_spec.update({'WebFinger': {}})
 
-service = build_services(service_spec, factory, RP_KEYJAR,
-                         client_authn_method=CLIENT_AUTHN_METHOD)
-
-client_info = ServiceContext(
+service_context = ServiceContext(
     RP_KEYJAR,
     {
         "client_preferences":
@@ -103,12 +115,15 @@ client_info = ServiceContext(
     }
 )
 
-client_info.service = service
+service = build_services(service_spec, factory, state_db=DB(),
+                         service_context=service_context,
+                         client_authn_method=CLIENT_AUTHN_METHOD)
+
+service_context.service = service
 
 # ======================== WebFinger ========================
 
-info = service['webfinger'].do_request_init(client_info,
-                                            resource='foobar@example.org')
+info = service['webfinger'].get_request_parameters(resource='foobar@example.org')
 
 print(info)
 
@@ -119,15 +134,16 @@ webfinger_response = json.dumps({
     "expires": "2018-02-04T11:08:41Z",
     'requests_dir': 'static'})
 
-response = service['webfinger'].parse_response(webfinger_response, client_info)
+response = service['webfinger'].parse_response(webfinger_response)
 
 print(response)
 
-print('client_info.issuer: {}'.format(client_info.issuer))
+service['webfinger'].update_service_context(response)
+print('service_context.issuer: {}'.format(service_context.issuer))
 
 # =================== Provider info discovery ====================
 
-info = service['provider_info'].do_request_init(client_info)
+info = service['provider_info'].get_request_parameters()
 
 print('uri: {}'.format(info['url']))
 
@@ -215,26 +231,26 @@ provider_info_response = json.dumps({
     "registration_endpoint": "{}/registration".format(OP_BASEURL),
     "end_session_endpoint": "{}/end_session".format(OP_BASEURL)})
 
-resp = service['provider_info'].parse_response(provider_info_response,
-                                               client_info)
+resp = service['provider_info'].parse_response(provider_info_response)
 
 print(resp)
+service['provider_info'].update_service_context(resp)
 
-print("client_info.provider_info['issuer']: {}".format(
-    client_info.provider_info['issuer']))
+print("service_context.provider_info['issuer']: {}".format(
+    service_context.provider_info['issuer']))
 
-print("client_info.provider_info['authorization_endpoint']: {}".format(
-    client_info.provider_info['authorization_endpoint']))
+print("service_context.provider_info['authorization_endpoint']: {}".format(
+    service_context.provider_info['authorization_endpoint']))
 
 # =================== Client registration ====================
 
-info = service['registration'].do_request_init(client_info)
+info = service['registration'].get_request_parameters()
 
 print()
 print('--- client registration, request ----')
 print('uri: {}'.format(info['url']))
 print('body: {}'.format(info['body']))
-print('http_args: {}'.format(info['http_args']))
+print('headers: {}'.format(info['headers']))
 
 now = int(time.time())
 
@@ -251,21 +267,21 @@ op_client_registration_response = json.dumps({
     "token_endpoint_auth_method": "client_secret_basic",
     "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)]})
 
-response = service['registration'].parse_response(op_client_registration_response,
-                                                  client_info)
+response = service['registration'].parse_response(op_client_registration_response)
+service['registration'].update_service_context(response)
 
 print()
 print('--- client registration, response ----')
-print('client_info.client_id: {}'.format(client_info.client_id))
-print('client_info.client_secret: {}'.format(client_info.client_secret))
+print('service_context.client_id: {}'.format(service_context.client_id))
+print('service_context.client_secret: {}'.format(service_context.client_secret))
 
 # =================== Authorization ====================
 
 STATE = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
 NONCE = 'UvudLKz287YByZdsY3AJoPAlEXQkJ0dK'
 
-info = service['authorization'].do_request_init(
-    client_info, request_args={'state': STATE, 'nonce': NONCE})
+info = service['authorization'].get_request_parameters(
+    request_args={'state': STATE, 'nonce': NONCE})
 
 print()
 print('--- Authorization, request ----')
@@ -280,27 +296,28 @@ op_authz_resp = {
 
 _authz_rep = AuthorizationResponse(**op_authz_resp)
 print(_authz_rep.to_urlencoded())
-_resp = service['authorization'].parse_response(_authz_rep.to_urlencoded(),
-                                                   client_info)
-
+_resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
+service['authorization'].update_service_context(_resp, state=STATE)
 print()
 print('--- Authorization registration, response ----')
 print(_resp)
-print('code: {}'.format(
-    client_info.state_db['Oh3w3gKlvoM2ehFqlxI3HIK5']['code']))
+
+_json = service['authorization'].state_db.get(STATE)
+_state = State().from_json(_json)
+
+print('code: {}'.format(_state['auth_response']['code']))
 
 # =================== Access token ====================
 
 request_args = {'state': STATE,
-                'redirect_uri': client_info.redirect_uris[0]}
+                'redirect_uri': service_context.redirect_uris[0]}
 
-info = service['accesstoken'].do_request_init(client_info,
-                                              request_args=request_args)
+info = service['accesstoken'].get_request_parameters(request_args=request_args)
 print()
 print('--- Access token, request ----')
 print('uri: {}'.format(info['url']))
 print('body: {}'.format(info['body']))
-print('http_args: {}'.format(info['http_args']))
+print('headers: {}'.format(info['headers']))
 
 _jwt = JWT(OP_KEYJAR, OP_BASEURL, lifetime=3600, sign=True, sign_alg='RS256')
 payload = {'sub': '1b2fc9341a16ae4e30082965d537', 'acr': 'PASSWORD',
@@ -316,10 +333,9 @@ _resp = {
     "token_type": "Bearer",
     "id_token": _jws}
 
-client_info.issuer = OP_BASEURL
-_resp = service['accesstoken'].parse_response(json.dumps(_resp),
-                                              client_info, state=STATE)
-
+service_context.issuer = OP_BASEURL
+_resp = service['accesstoken'].parse_response(json.dumps(_resp), state=STATE)
+service['accesstoken'].update_service_context(_resp, state=STATE)
 print()
 print('--- Access token, response ----')
 print(_resp)
@@ -328,17 +344,16 @@ print(_resp)
 
 request_args = {'state': STATE}
 
-info = service['userinfo'].do_request_init(client_info, state=STATE)
+info = service['userinfo'].get_request_parameters(state=STATE)
 print()
 print('--- User info, request ----')
 print('uri: {}'.format(info['url']))
-print('http_args: {}'.format(info['http_args']))
+print('headers: {}'.format(info['headers']))
 
 op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
-_resp = service['userinfo'].parse_response(json.dumps(op_resp),
-                                           client_info, state=STATE)
-
+_resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
+service['userinfo'].update_service_context(_resp, state=STATE)
 print()
 print('--- User info, response ----')
 print(_resp)
