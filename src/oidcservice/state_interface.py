@@ -63,10 +63,10 @@ class StateInterface(object):
         :param key: Key to the information in the state database
         :return: The issuer ID
         """
-        _state = self.state_db.get(key)
+        _state = self.get_state(key)
         if not _state:
             raise KeyError(key)
-        return _state.iss
+        return _state['iss']
 
     def get_item(self, item_cls, item_type, key):
         """
