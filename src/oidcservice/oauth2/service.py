@@ -169,10 +169,8 @@ class RefreshAccessToken(Service):
     def oauth_pre_construct(self, request_args=None, **kwargs):
         _state = get_state_parameter(request_args, kwargs)
         parameters = list(self.msg_type.c_param.keys())
-        _args = self.extend_request_args({}, oauth2.AuthorizationResponse,
-                                         'auth_response', _state, parameters)
 
-        _args = self.extend_request_args(_args, oauth2.AccessTokenResponse,
+        _args = self.extend_request_args({}, oauth2.AccessTokenResponse,
                                          'token_response', _state, parameters)
 
         if request_args is None:
