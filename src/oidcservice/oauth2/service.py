@@ -173,6 +173,10 @@ class RefreshAccessToken(Service):
         _args = self.extend_request_args({}, oauth2.AccessTokenResponse,
                                          'token_response', _state, parameters)
 
+        _args = self.extend_request_args({}, oauth2.AccessTokenResponse,
+                                         'refresh_token_response', _state,
+                                         parameters)
+
         if request_args is None:
             request_args = _args
         else:
