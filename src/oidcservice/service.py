@@ -1,7 +1,6 @@
 import logging
 from urllib.parse import urlparse
 
-from oidcservice.exception import MissingEndpoint
 from oidcservice.exception import OidcServiceError
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
@@ -181,36 +180,6 @@ class Service(StateInterface):
 
         return self.do_post_construct(request, **post_args)
 
-    def _endpoint(self, **kwargs):
-        """
-        Find out which endpoint the request should be sent to
-
-        :param kwargs: A possibly empty set of keyword arguments
-        :return: The endpoint URL
-        """
-        try:
-            uri = kwargs['endpoint']
-            if uri:
-                del kwargs['endpoint']
-        except KeyError:
-            uri = ""
-
-        if not uri:
-            try:
-                uri = self.endpoint
-            except Exception:
-                raise MissingEndpoint("No '{}' endpoint specified".format(
-                    self.__class__.__name__))
-
-        if not uri:  # Only if self.endpoint has no value
-            raise MissingEndpoint("No '{}' endpoint specified".format(
-                self.__class__.__name__))
-
-        return uri
-
-    def get_endpoint(self, **kwargs):
-        return self._endpoint(**kwargs)
-
     def init_authentication_method(self, request, authn_method,
                                    http_args=None, **kwargs):
         """
@@ -253,6 +222,9 @@ class Service(StateInterface):
         #    [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
 
         return self.construct(request_args, **kwargs)
+
+    def get_endpoint(self):
+        return self.endpoint
 
     def get_authn_header(self, request, authn_method, **kwargs):
 
@@ -298,32 +270,35 @@ class Service(StateInterface):
         if not body_type:
             body_type = self.body_type
 
-        request = self.construct_request(method=method,
-                                         body_type=body_type,
-                                         request_args=request_args,
-                                         authn_method=authn_method, **kwargs)
+        request = self.construct_request(request_args=request_args, **kwargs)
 
         _info = {'method': method}
 
-        # Find out where to send this request
         _args = kwargs.copy()
         if self.service_context.issuer:
             _args['iss'] = self.service_context.issuer
 
-        if body_type == 'urlencoded':
-            content_type = URL_ENCODED
-        else:  # body_type == 'json'
-            content_type = JSON_ENCODED
+        # Client authentication by usage of the Authorization HTTP header
+        _headers = self.get_authn_header(request, authn_method, **_args)
 
-        _headers = self.get_authn_header(request, authn_method, **kwargs)
+        # Find out where to send this request
+        try:
+            endpoint_url = kwargs['endpoint']
+        except KeyError:
+            endpoint_url = self.get_endpoint()
 
-        endpoint_url = self.get_endpoint(**_args)
         _info['url'] = get_http_url(endpoint_url, request, method=method)
 
+        # If there is to be a body part
         if method in ['POST', 'PUT']:
+            # How should it be serialized
+            if body_type == 'urlencoded':
+                content_type = URL_ENCODED
+            else:  # body_type == 'json'
+                content_type = JSON_ENCODED
+
             _info['body'] = get_http_body(request, content_type)
             _headers.update({'Content-Type': content_type})
-            # Collect HTTP headers
 
         if _headers:
             _info['headers'] = _headers

@@ -405,19 +405,16 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
             logger.info(
                 'Preloaded keys for {}: {}'.format(resp['issuer'], _jwks))
 
-    def get_endpoint(self, **kwargs):
+    def get_endpoint(self):
         try:
-            return self._endpoint(**kwargs)
-        except MissingEndpoint:
-            try:
-                issuer = kwargs['iss']
-            except KeyError:
-                raise MissingEndpoint
-            else:
-                if issuer.endswith('/'):
-                    return OIDCONF_PATTERN.format(issuer[:-1])
-                else:
-                    return OIDCONF_PATTERN.format(issuer)
+            _iss = self.service_context.issuer
+        except AttributeError:
+            _iss = self.endpoint
+
+        if _iss.endswith('/'):
+            return OIDCONF_PATTERN.format(_iss[:-1])
+        else:
+            return OIDCONF_PATTERN.format(_iss)
 
     def match_preferences(self, pcr=None, issuer=None):
         """

@@ -249,4 +249,3 @@ def test_access_token_srv_conf():
     msg = AccessTokenRequest().from_urlencoded(service.get_urlinfo(
         _info['body']))
     assert 'client_secret' in msg
-    assert 'Authorization' not in _info['headers']
