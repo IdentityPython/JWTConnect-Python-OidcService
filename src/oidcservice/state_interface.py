@@ -103,12 +103,16 @@ class StateInterface(object):
             If the parameter does not a appear in the item it will not appear
             in the returned dictionary.
         """
-        item = self.get_item(item_cls, item_type, key)
-        for parameter in parameters:
-            try:
-                args[parameter] = item[parameter]
-            except KeyError:
-                pass
+        try:
+            item = self.get_item(item_cls, item_type, key)
+        except KeyError:
+            pass
+        else:
+            for parameter in parameters:
+                try:
+                    args[parameter] = item[parameter]
+                except KeyError:
+                    pass
 
         return args
 
