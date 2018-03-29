@@ -94,7 +94,7 @@ class StateInterface(object):
         :param item_cls: The :py:class:`oidcmsg.message.Message` subclass
             that describes the item
         :param item_type: The type of item, this is one of the parameter
-            names in the :py:class:`oidcservice.service.State` class.
+            names in the :py:class:`oidcservice.state_interface.State` class.
         :param key: The key to the information in the database
         :param parameters: A list of parameters who's values this method
             will return.
