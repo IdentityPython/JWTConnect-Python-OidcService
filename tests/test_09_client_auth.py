@@ -128,7 +128,7 @@ class TestBearerHeader(object):
         request = ResourceRequest(access_token="Sesame")
         bh = BearerHeader()
         # Any HTTP args should just be passed on
-        http_args = bh.construct(request, service_context=get_service(),
+        http_args = bh.construct(request, service=get_service(),
                                  http_args={"foo": "bar"})
 
         assert _eq(http_args.keys(), ["foo", "headers"])
@@ -138,7 +138,7 @@ class TestBearerHeader(object):
         request = ResourceRequest(access_token="Sesame")
 
         bh = BearerHeader()
-        http_args = bh.construct(request, service_context=get_service(),
+        http_args = bh.construct(request, service=get_service(),
                                  http_args={"headers": {"x-foo": "bar"}})
 
         assert _eq(http_args.keys(), ["headers"])
@@ -149,7 +149,7 @@ class TestBearerHeader(object):
         bh = BearerHeader()
         request = ResourceRequest(access_token="Sesame")
 
-        http_args = bh.construct(request, service_context=get_service())
+        http_args = bh.construct(request, service=get_service())
 
         assert "access_token" not in request
         assert http_args == {"headers": {"Authorization": "Bearer Sesame"}}
