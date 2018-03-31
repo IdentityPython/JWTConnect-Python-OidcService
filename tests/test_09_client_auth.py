@@ -246,6 +246,7 @@ class TestClientSecretPost(object):
                                   client_secret="another")
         assert request["client_id"] == "A"
         assert request["client_secret"] == "another"
+        assert http_args is None
 
 
 class TestPrivateKeyJWT(object):
