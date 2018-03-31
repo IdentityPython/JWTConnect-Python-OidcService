@@ -4,18 +4,14 @@ import json
 import time
 
 from oidcmsg.jwt import JWT
-from oidcmsg.oidc import AuthorizationResponse
-from oidcservice.state_interface import State
-
-from oidcservice.service_context import ServiceContext
-
-from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcmsg.key_jar import KeyJar
+from oidcmsg.oidc import AuthorizationResponse
 
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
-
 from oidcservice.service import build_services
+from oidcservice.service_context import ServiceContext
+from oidcservice.state_interface import State
 
 class DB(object):
     def __init__(self):
@@ -108,16 +104,12 @@ service_context = ServiceContext(
                                                'client_secret_post'],
             },
         "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
-        'behaviour':
-            {
-                "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
-            }
+        "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
     }
 )
 
 service = build_services(service_spec, factory, state_db=DB(),
-                         service_context=service_context,
-                         client_authn_method=CLIENT_AUTHN_METHOD)
+                         service_context=service_context)
 
 service_context.service = service
 

@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import urlparse
 
+from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import OidcServiceError
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
@@ -35,11 +36,16 @@ class Service(StateInterface):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db,
-                 client_authn_method=None, conf=None, **kwargs):
+    def __init__(self, service_context, state_db, conf=None,
+                 client_authn_factory=None, **kwargs):
         StateInterface.__init__(self, state_db)
+
+        if client_authn_factory is None:
+            self.client_authn_factory=ca_factory
+        else:
+            self.client_authn_factory=client_authn_factory
+
         self.service_context = service_context
-        self.client_authn_method = client_authn_method
         self.events = None
         self.endpoint = ''
         self.default_request_args = {}
@@ -198,7 +204,7 @@ class Service(StateInterface):
 
         if authn_method:
             logger.debug('Client authn method: {}'.format(authn_method))
-            return self.client_authn_method[authn_method]().construct(
+            return self.client_authn_factory(authn_method).construct(
                 request, self, http_args=http_args, **kwargs)
         else:
             return http_args
@@ -461,7 +467,7 @@ class Service(StateInterface):
 
 
 def build_services(service_definitions, service_factory, service_context,
-                   state_db, client_authn_method):
+                   state_db, client_authn_factory=None):
     """
     This function will build a number of :py:class:`oidcservice.service.Service`
     instances based on the service definitions provided.
@@ -473,7 +479,7 @@ def build_services(service_definitions, service_factory, service_context,
         for all service instances.
     :param state_db: A reference to the state database. Shared by all the
         services.
-    :param client_authn_method: A list of methods the services can use to
+    :param client_authn_factory: A list of methods the services can use to
         authenticate the client to a service.
     :return: A dictionary, with service name as key and the service instance as
         value.
@@ -482,12 +488,8 @@ def build_services(service_definitions, service_factory, service_context,
     for service_name, service_configuration in service_definitions.items():
         _srv = service_factory(service_name, service_context=service_context,
                                state_db=state_db,
-                               client_authn_method=client_authn_method,
+                               client_authn_factory=client_authn_factory,
                                conf=service_configuration)
         service[_srv.service_name] = _srv
 
-    # For any unspecified service
-    service['any'] = Service(service_context=service_context,
-                             state_db=state_db,
-                             client_authn_method=client_authn_method)
     return service

@@ -1,7 +1,5 @@
 import pytest
 
-from oidcservice import rndstr
-from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.oauth2.service import factory
 from oidcservice.service import Service
@@ -106,8 +104,7 @@ class TestAccessTokenRequest(object):
                        auth_request=auth_request.to_json())
         db.set('state', _state.to_json())
         self.service = factory('AccessToken', state_db=db,
-                               service_context=service_context,
-                               client_authn_method=CLIENT_AUTHN_METHOD)
+                               service_context=service_context)
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'state': 'state'}
@@ -204,8 +201,7 @@ class TestRefreshAccessTokenRequest(object):
                        token_response=token_response.to_json())
         db.set('abcdef', _state.to_json())
         self.service = factory('RefreshAccessToken', state_db=db,
-                               service_context=service_context,
-                               client_authn_method=CLIENT_AUTHN_METHOD)
+                               service_context=service_context)
         self.service.endpoint = 'https://example.com/token'
 
     def test_construct(self):
@@ -236,7 +232,6 @@ def test_access_token_srv_conf():
 
     service = factory('AccessToken', state_db=db,
                       service_context=service_context,
-                      client_authn_method=CLIENT_AUTHN_METHOD,
                       conf={'default_authn_method': 'client_secret_post'})
 
     req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',

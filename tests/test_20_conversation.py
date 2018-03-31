@@ -13,7 +13,6 @@ from oidcmsg.oidc import OpenIDSchema
 from oidcmsg.oidc import ProviderConfigurationResponse
 from oidcmsg.oidc import RegistrationResponse
 
-from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
@@ -130,12 +129,11 @@ def test_conversation():
     service_spec['WebFinger'] = {}
 
     service = build_services(service_spec, factory, state_db=DB(),
-                             service_context=service_context,
-                             client_authn_method=CLIENT_AUTHN_METHOD)
+                             service_context=service_context)
 
     assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
-                                   'registration', 'any', 'refresh_token',
-                                   'userinfo', 'provider_info'}
+                                   'registration', 'refresh_token', 'userinfo',
+                                   'provider_info'}
 
     service_context.service = service
 

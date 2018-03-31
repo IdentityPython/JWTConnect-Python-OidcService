@@ -33,11 +33,9 @@ For this example we need these services::
 
 and to initiate these we need to run::
 
-    from oidcservice.client_auth import CLIENT_AUTHN_METHOD
     from oidcservice.oic.service import factory
 
-    service = build_services(service_spec, factory, None, KEYJAR,
-                         client_authn_method=CLIENT_AUTHN_METHOD)
+    service = build_services(service_spec, factory, None)
 
 **KEYJAR** contains the RP's signing and encryting keys. It's an
 :py:class:`oicmsg.keyjar.KeyJar` instance

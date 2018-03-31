@@ -71,10 +71,10 @@ class Authorization(service.Authorization):
     response_cls = oidc.AuthorizationResponse
     error_msg = oidc.ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         service.Authorization.__init__(self, service_context, state_db,
-                                       client_authn_method, conf=conf)
+                                       client_authn_factory, conf=conf)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.set_state, pick_redirect_uris,
                               self.oidc_pre_construct]
@@ -215,10 +215,10 @@ class AccessToken(service.AccessToken):
     response_cls = oidc.AccessTokenResponse
     error_msg = oidc.ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         service.AccessToken.__init__(self, service_context, state_db,
-                                     client_authn_method=client_authn_method,
+                                     client_authn_factory=client_authn_factory,
                                      conf=conf)
 
     def update_service_context(self, resp, state='', **kwargs):
@@ -289,10 +289,10 @@ class WebFinger(Service):
     http_method = 'GET'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None, rel='', **kwargs):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf,
+                         client_authn_factory=client_authn_factory, conf=conf,
                          **kwargs)
 
         self.rel = rel or OIC_ISSUER
@@ -390,11 +390,11 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
     response_cls = oidc.ProviderConfigurationResponse
     error_msg = ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         service.ProviderInfoDiscovery.__init__(
             self, service_context, state_db,
-            client_authn_method=client_authn_method, conf=conf)
+            client_authn_factory=client_authn_factory, conf=conf)
 
     def update_service_context(self, resp, **kwargs):
         self._update_service_context(resp, **kwargs)
@@ -598,10 +598,10 @@ class Registration(Service):
     body_type = 'json'
     http_method = 'POST'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method,
+                         client_authn_factory=client_authn_factory,
                          conf=conf)
         self.pre_construct = [self.add_client_behaviour,add_redirect_uris,
                               add_request_uri, add_post_logout_redirect_uris,
@@ -675,10 +675,10 @@ class UserInfo(Service):
     default_authn_method = 'bearer_header'
     http_method = 'GET'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct = [self.oidc_pre_construct, carry_state]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -738,10 +738,10 @@ class CheckSession(Service):
     synchronous = True
     service_name = 'check_session'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -759,10 +759,10 @@ class CheckID(Service):
     synchronous = True
     service_name = 'check_id'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -780,10 +780,10 @@ class EndSession(Service):
     synchronous = True
     service_name = 'end_session'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):

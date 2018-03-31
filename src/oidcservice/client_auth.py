@@ -7,7 +7,7 @@ from oidcservice import rndstr
 from oidcservice import sanitize
 from oidcservice import DEF_SIGN_ALG
 from oidcservice import JWT_BEARER
-from oidcservice.exception import MissingRequiredAttribute
+
 from oidcmsg.message import VREQUIRED
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
@@ -55,7 +55,7 @@ def assertion_jwt(client_id, keys, audience, algorithm, lifetime=600):
 class ClientAuthnMethod(object):
     """
     Basic Client Authentication Method class.
-    Only has one method: 'construct'
+    Only has one public method: *construct*
     """
 
     def construct(self, **kwargs):
@@ -125,7 +125,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         # then we should add client_id to the request if it's not already
         # there
         if isinstance(request, AccessTokenRequest) and request[
-                'grant_type'] == 'authorization_code':
+            'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
                     request['client_id'] = service.service_context.client_id
@@ -330,7 +330,8 @@ class JWSAuthnMethod(ClientAuthnMethod):
         Pick signing key based on signing algorithm to be used
 
         :param algorithm: Signing algorithm
-        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
+        :param service_context: A
+            :py:class:`oidcservice.service_context.ServiceContext` instance
         :return: A key
         """
         return service_context.keyjar.get_signing_key(
@@ -342,7 +343,8 @@ class JWSAuthnMethod(ClientAuthnMethod):
 
         :param kid: Key ID
         :param algorithm: Signing algorithm
-        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
+        :param service_context: A
+            :py:class:`oidcservice.service_context.ServiceContext` instance
         :return: A matching key
         """
         _key = service_context.keyjar.get_key_by_kid(kid)
@@ -487,7 +489,8 @@ def valid_service_context(service_context, when=0):
     """
     Check if the client_secret has expired
 
-    :param cinfo: A :py:class:`oidcservice.service_context.ServiceContext` instance
+    :param service_context: A
+        :py:class:`oidcservice.service_context.ServiceContext` instance
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """
@@ -496,3 +499,12 @@ def valid_service_context(service_context, when=0):
     if eta != 0 and eta < now:
         return False
     return True
+
+
+def factory(auth_method):
+    try:
+        return CLIENT_AUTHN_METHOD[auth_method]()
+    except KeyError:
+        logger.error(
+            'Unknown client authentication method: {}'.format(auth_method))
+        raise ValueError(auth_method)

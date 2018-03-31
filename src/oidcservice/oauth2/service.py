@@ -72,9 +72,9 @@ class Authorization(Service):
     response_body_type = 'urlencoded'
 
     def __init__(self, service_context, state_db,
-                 client_authn_method=None, conf=None):
+                 client_authn_factory=None, conf=None):
         Service.__init__(self, service_context, state_db=state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct.extend([pick_redirect_uris, set_state_parameter])
         self.post_construct.append(self.store_auth_request)
 
@@ -110,10 +110,10 @@ class AccessToken(Service):
     body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
     def update_service_context(self, resp, key='', **kwargs):
@@ -157,10 +157,10 @@ class RefreshAccessToken(Service):
     default_authn_method = 'bearer_header'
     http_method = 'POST'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct.append(self.oauth_pre_construct)
 
     def update_service_context(self, resp, key='', **kwargs):
@@ -194,10 +194,10 @@ class ProviderInfoDiscovery(Service):
     service_name = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, service_context, state_db, client_authn_method=None,
+    def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
-                         client_authn_method=client_authn_method, conf=conf)
+                         client_authn_factory=client_authn_factory, conf=conf)
 
     def request_info(self, method="GET", request_args=None, **kwargs):
 

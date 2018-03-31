@@ -13,7 +13,6 @@ from oidcservice import JWT_BEARER
 from oidcservice.client_auth import assertion_jwt
 from oidcservice.client_auth import BearerBody
 from oidcservice.client_auth import BearerHeader
-from oidcservice.client_auth import CLIENT_AUTHN_METHOD
 from oidcservice.client_auth import ClientSecretBasic
 from oidcservice.client_auth import ClientSecretJWT
 from oidcservice.client_auth import ClientSecretPost
@@ -81,8 +80,7 @@ def services():
     db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
                           auth_response=auth_response).to_json())
     return build_services(DEFAULT_SERVICES, service.factory,
-                          get_service_context(), db,
-                          client_authn_method=CLIENT_AUTHN_METHOD)
+                          get_service_context(), db)
 
 
 class TestClientSecretBasic(object):
@@ -252,7 +250,7 @@ class TestClientSecretPost(object):
 
 class TestPrivateKeyJWT(object):
     def test_construct(self, services):
-        _service = services['any']
+        _service = services['accesstoken']
         _key = rsa_load(
             os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
@@ -284,7 +282,7 @@ class TestPrivateKeyJWT(object):
             _service.service_context.provider_info['token_endpoint']]
 
     def test_construct_client_assertion(self, services):
-        _service = services['any']
+        _service = services['accesstoken']
 
         _key = rsa_load(os.path.join(BASE_PATH, "data/keys/rsa.key"))
         kc_rsa = KeyBundle([{"key": _key, "kty": "RSA", "use": "ver"},
@@ -303,7 +301,7 @@ class TestPrivateKeyJWT(object):
 
 class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, services):
-        _service_context = services['any'].service_context
+        _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
         _service_context.provider_info = {
             'issuer': 'https://example.com/',
@@ -332,7 +330,7 @@ class TestClientSecretJWT_TE(object):
 
 class TestClientSecretJWT_UI(object):
     def test_client_secret_jwt(self, services):
-        _service_context = services['any'].service_context
+        _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
         _service_context.provider_info = {'issuer': 'https://example.com/',
                                          'token_endpoint':
@@ -363,7 +361,7 @@ class TestClientSecretJWT_UI(object):
 
 class TestValidClientInfo(object):
     def test_valid_service_context(self, services):
-        _service_context = services['any'].service_context
+        _service_context = services['accesstoken'].service_context
         _now = 123456  # At some time
         # Expiration time missing or 0, client_secret never expires
         # service_context.client_secret_expires_at
