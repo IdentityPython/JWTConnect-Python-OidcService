@@ -486,8 +486,4 @@ def build_services(service_definitions, service_factory, service_context,
                                conf=service_configuration)
         service[_srv.service_name] = _srv
 
-    # For any unspecified service
-    service['any'] = Service(service_context=service_context,
-                             state_db=state_db,
-                             client_authn_method=client_authn_method)
     return service

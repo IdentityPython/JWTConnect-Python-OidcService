@@ -134,7 +134,7 @@ def test_conversation():
                              client_authn_method=CLIENT_AUTHN_METHOD)
 
     assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
-                                   'registration', 'any', 'refresh_token',
+                                   'registration', 'refresh_token',
                                    'userinfo', 'provider_info'}
 
     service_context.service = service
