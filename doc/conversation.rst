@@ -476,3 +476,8 @@ Parsing, verifying and storing away the information is done the usual way::
     service['userinfo'].update_service_context(_resp, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
 And we are done !! :-)
+
+In the state_db we have the following information::
+
+    $ list(service['userinfo'].get_state(STATE).keys())
+    ['iss', 'auth_request', 'auth_response', 'token_response', 'user_info']

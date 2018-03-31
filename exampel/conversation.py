@@ -350,3 +350,5 @@ service['userinfo'].update_service_context(_resp, state=STATE)
 print()
 print('--- User info, response ----')
 print(_resp)
+
+print(service['userinfo'].get_state(STATE).keys())
