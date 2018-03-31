@@ -10,7 +10,6 @@ from oidcservice.state_interface import State
 
 from oidcservice import rndstr, OIDCONF_PATTERN
 from oidcservice.exception import ConfigurationError
-from oidcservice.exception import MissingEndpoint
 from oidcservice.exception import WebFingerError
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import service

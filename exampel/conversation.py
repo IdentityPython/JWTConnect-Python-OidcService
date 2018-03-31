@@ -13,6 +13,7 @@ from oidcservice.service import build_services
 from oidcservice.service_context import ServiceContext
 from oidcservice.state_interface import State
 
+
 class DB(object):
     def __init__(self):
         self.db = {}

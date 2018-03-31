@@ -19,54 +19,73 @@ Initial setup
 =============
 
 We need a couple of things initiated before we start.
-The first one is initiating the services that the RP is going to use.
-For this example we need these services::
 
-    service_spec = {
-        'WebFinger': {},
-        'ProviderInfoDiscovery': {},
-        'Registration': {},
-        'Authorization': {},
-        'AccessToken': {},
-        'UserInfo': {}
-    }
+state_db instance
+    For this example we have an in-memory data store::
 
-and to initiate these we need to run::
+        class DB(object):
+        def __init__(self):
+            self.db = {}
+
+        def set(self, key, value):
+            self.db[key] = value
+
+        def get(self, item):
+            try:
+                return self.db[item]
+            except KeyError:
+                return None
+
+service_context
+    Which is where information common to more then one service is kept.
+    A :py:class:`oidcservice.service_context.ServiceContext` instance::
+
+        BASEURL = "https://example.org/rp
+        service_context = ServiceContext(
+            KEYJAR,
+            {
+                "client_prefs":
+                    {
+                        "application_type": "web",
+                        "application_name": "rphandler",
+                        "contacts": ["ops@example.org"],
+                        "response_types": ["code"],
+                        "scope": ["openid", "profile", "email", "address", "phone"],
+                        "token_endpoint_auth_method": ["client_secret_basic",
+                                                       'client_secret_post'],
+                    },
+                "redirect_uris": ["{}/authz_cb".format(BASEURL)],
+                "jwks_uri": "{}/static/jwks.json".format(BASEURL)
+            }
+        )
+
+
+
+service specifications
+    A dictionary of service class names and service configurations::
+
+        service_spec = {
+            'WebFinger': {},
+            'ProviderInfoDiscovery': {},
+            'Registration': {},
+            'Authorization': {},
+            'AccessToken': {},
+            'UserInfo': {}
+        }
+
+To initiate the services we need to run::
 
     from oidcservice.oic.service import factory
 
-    service = build_services(service_spec, factory, None)
+    service = build_services(service_spec, factory, state_db=DB(),
+                             service_context=service_context)
 
-**KEYJAR** contains the RP's signing and encryting keys. It's an
-:py:class:`oicmsg.keyjar.KeyJar` instance
 
-**service** is a dictionary with services identifiers as keys and
-:py:class:`oidcservice.service.Service` instances as values.
+The resulting **service** is a dictionary with services identifiers as keys and
+:py:class:`oidcservice.service.Service` instances as values::
 
-Next the :py:class:`oidcservice.client_info.ClientInfo` instance::
-
-    BASEURL = "https://example.org/rp
-    client_info = ClientInfo(
-        KEYJAR,
-        {
-            "client_prefs":
-                {
-                    "application_type": "web",
-                    "application_name": "rphandler",
-                    "contacts": ["ops@example.org"],
-                    "response_types": ["code"],
-                    "scope": ["openid", "profile", "email", "address", "phone"],
-                    "token_endpoint_auth_method": ["client_secret_basic",
-                                                   'client_secret_post'],
-                },
-            "redirect_uris": ["{}/authz_cb".format(BASEURL)],
-            "jwks_uri": "{}/static/jwks.json".format(BASEURL)
-        }
-    )
-
-    client_info.service = service
-
-We will keep all the session information in the client_info instance
+    $ set(service.keys())
+    {'accesstoken', 'authorization', 'webfinger', 'registration', 'userinfo', 'provider_info'}
 
 That's all we have to do when it comes to setup so now on to the actual
 conversation.
@@ -79,13 +98,11 @@ OP. What we have to start with is an user identifier provided by the user.
 The identifier we got was: **foobar@example.com** .
 With this information we can do::
 
-    info = service['webfinger'].get_request_parameters(client_info,
-                                                resource='foobar@example.com')
-
+    info = service['webfinger'].get_request_parameters(service_context, resource='foobar@example.com')
 
 service['webfinger'] will return the WebFinger service instance and running
-the method get_request_parameters will return the information necessary to do a
-HTTP request. In this case the value of *info* will be::
+the method *get_request_parameters* will return the information necessary to do
+a HTTP request. In this case the value of *info* will be::
 
     {
         'url': 'https://example.com/.well-known/webfinger?resource=acct%3Afoobar%40example.com&rel=http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
@@ -105,17 +122,18 @@ Doing HTTP GET on this URL will return a JSON document that looks like this::
 To parse and use it I can run another method provide by the service instance::
 
     response = service['webfinger'].parse_response(webfinger_response,
-                                                   client_info)
-    service['webfinger'].update_client_info(client_info, response)
+                                                   service_context)
 
 It's assumed that *webfinger_response* contains the JSON document mentioned
-above.
+above. *parse_response* only parses the response.
+So apart from that method we also need to invoke *update_service_context*::
 
-*parse_response* doesn't just parse the response it also interprets it.
-So the real result is that the information in **client_info** has changed.
+    service['webfinger'].update_service_context(response)
+
+The result of this is that the information in **service_context** will change.
 We now has this::
 
-    client_info.issuer: "https://example.com"
+    service_context.issuer: "https://example.com"
 
 And that is all we need to fetch the provider info
 
@@ -124,18 +142,18 @@ Provider info discovery
 
 We use the same process as with webfinger but with another service instance::
 
-    info = service['provider_info'].get_request_parameters(client_info)
+    info = service['provider_info'].get_request_parameters()
 
 *info* will now contain::
 
     {'url': 'https://example.com/.well-known/openid-configuration'}
 
-And this is the first example of *magic* that you will see.
+And this is the first example of **magic** that you will see.
 
-*get_request_parameters knows how to get the OpenID Connect providers discovery URL
-from the client_info instance. Now, if you don't wanted to do webfinger because
-perhaps the other side did not provide that service. Then you would have to
-set *client_info.issuer* to the correct value.
+*get_request_parameters knows how to contruct the OpenID Connect providers discovery URL
+from information stored in the service_context instance. Now, if you don't wanted to do
+webfinger because for instance the other side did not provide that service.
+Then you would have to set *service_context.issuer* to the correct value.
 
 Doing HTTP GET on the provided URL should get us the provider info.
 It does and we get a JSON document that looks something like this::
@@ -225,11 +243,12 @@ It does and we get a JSON document that looks something like this::
     "end_session_endpoint": "https://example.com/end_session"}
 
 Quite a lot of information as you can see.
-We feed this information into *parse_response* and let it do its business::
+We feed this information into *parse_response* and *update_service_context* and
+let them do their business::
 
-    resp = service['provider_info'].parse_response(json_document, client_info)
+    resp = service['provider_info'].parse_response(json_document)
 
-    service['provider_info'].update_client_info(client_info, resp)
+    service['provider_info'].update_service_context(resp)
 
 *json_document* contains the JSON document from the HTTP response.
 *parse_response* will parse and verify the response. One such verification is
@@ -237,15 +256,15 @@ to check that the value provided as **issuer** is the same as the URL used
 to fetch the information without the '.well-known' part. In our case the
 exact value that the webfinger query produced.
 
-As with the *webfinger* service this service also adds things to **client_info**.
-So we now for instance have::
+As with the *webfinger* service *update_service_context* adds things to **service_context**.
+So we now have::
 
-    client_info.provider_info['issuer']: https://example.com
-    client_info.provider_info['authorization_endpoint']: https://example.com/authorization
+    service_context.provider_info['issuer']: https://example.com
+    service_context.provider_info['authorization_endpoint']: https://example.com/authorization
 
 
 As you can guess from the above the whole response from the OP was stored in
-the client_info instance. Such that it is easily accessible in the future.
+the service_context instance. Such that it is easily accessible in the future.
 
 Now we know what we need to know to register the RP with the OP.
 If the OP had not provided a 'registration_endpoint' it would not have
@@ -256,7 +275,7 @@ Client registration
 
 By now you should recognize the pattern::
 
-    info = service['registration'].get_request_parameters(client_info)
+    info = service['registration'].get_request_parameters()
 
 Now *info* contains 3 parts:
 
@@ -303,17 +322,19 @@ Again a JSON document. This is the OP's response to the RP's registration
 request.
 
 We stuff the response into *json_document* and feed it to
-*parse_response* which will parse, verify and interpret the response::
+*parse_response* which will parse, verify and interpret the response and then
+*update_service_context* which updates *service_context*::
 
     response = service['registration'].parse_response(json_document,
-                                                      client_info)
+                                                      service_context)
+    service['registration'].update_service_context(response)
 
-The response will be stored in client_info as usual. Most under the heading
+The information stored in *service_context* is most under the heading
 *registration_response* but some, more important, will be stored at a
 directly reachable place::
 
-    client_info.client_id: zls2qhN1jO6A
-    client_info.client_secret: c8434f28cf9375d9a7f3b50dcfdf6a20d6e702e310066874f794817f
+    service_context.client_id: zls2qhN1jO6A
+    service_context.client_secret: c8434f28cf9375d9a7f3b50dcfdf6a20d6e702e310066874f794817f
 
 By that we have finalized the dynamic discovery and registration now we can get
 down to doing the authentication/authorization bits.
@@ -326,7 +347,7 @@ more of what the oidcservice package can do.
 
 Like when I used the other services this one is no different::
 
-    info = service['authorization'].get_request_parameters(client_info)
+    info = service['authorization'].get_request_parameters(service_context)
 
 *info* will only contain one piece of data and that is a URL::
 
@@ -340,7 +361,7 @@ Where did all the information come from ?:
     - state and nonce are dynamically created by the service instance.
 
 When this *service* instance creates a request it will also create a *session*
-instance in client_info keyed on the state value.
+instance in *state_db* keyed on the state value.
 
 I do HTTP GET on the provided URL and will eventually get redirected back to
 the RP with the response in the query part of the redirect URL.
@@ -351,17 +372,22 @@ Below you have just the query component::
 I feed the *query_part* into the *parse_response* method of the authorization
 service instance and hope for the best::
 
-    _resp = service['authorization'].parse_response(query_part,
-                                                    client_info)
+    _resp = service['authorization'].parse_response(query_part)
+    service['authorization'].update_service_context(_resp)
 
 Now as mentioned above one thing that happened when the authorization request
 was constructed was that some information of that request got stored away with
-the *state* value as key. All in the client_info instance.
+the *state* value as key. All in the state_db instance.
 
 The response on the authorization query will be stored in the same place.
 To get the code I can now use::
 
-    client_info.state_db['Oh3w3gKlvoM2ehFqlxI3HIK5']['code']
+    from oidcmsg.oidc import AuthorizationResponse
+
+    authn_response = service_context.get_item(AuthorizationResponse,
+                                              'auth_response',
+                                              'Oh3w3gKlvoM2ehFqlxI3HIK5')
+    code = authn_response['code']
 
 State information will be use when we take the next step, which is to get
 an access token.
@@ -372,16 +398,14 @@ Access token
 When sending an access token request I have to use the correct *code* value.
 To accomplish that *get_request_parameters* need to get state as an argument::
 
-    _state = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
-    request_args = {
-        'state': _state,
-        'redirect_uri': client_info.state_db[_state]['redirect_uri']}
+    request_args = {'state': _state}
 
-    info = service['accesstoken'].get_request_parameters(client_info,
-                                                  request_args=request_args)
+    info = service['accesstoken'].get_request_parameters(service_context,
+                                                         request_args=request_args)
 
 The OIDC standard says that the *redirect_uri* used for the authorization request
-should be provided in the access token request so I need to add that too.
+should be provided in the access token request, therefor the service will add it
+if I don't.
 
 This time *info* has these parts::
 
@@ -406,11 +430,13 @@ The response has this JSON document in the body::
 
 We will deal with this in the now well know fashion::
 
-    _resp = service['accesstoken'].parse_response(
-        json_document, client_info, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
+    _resp = service['accesstoken'].parse_response(json_document, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
-Note that we need to provide the method with the *state* parameter so it will
-know where to find the correct information needed to verify the response.
+    service['accesstoken'].update_service_context(_resp, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
+
+Note that we need to provide the methods with the *state* parameter so they will
+know where to find the correct information needed to verify the response and
+later store the received information.
 
 Once the verification has been done one parameter will be added to the
 response before it is stored in the state database, namely::
@@ -435,7 +461,7 @@ User info
 Again we have to provide the *get_request_parameters* method with the correct state
 value::
 
-    info = service['userinfo'].get_request_parameters(client_info,
+    info = service['userinfo'].get_request_parameters(service_context,
                                                state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
 And the response is a JSON document::
@@ -446,8 +472,7 @@ Only the *sub* parameter because the asked for scope was 'openid'.
 
 Parsing, verifying and storing away the information is done the usual way::
 
-    _resp = service['userinfo'].parse_response(json_document,
-                                               client_info,
-                                               state='Oh3w3gKlvoM2ehFqlxI3HIK5')
+    _resp = service['userinfo'].parse_response(json_document,state='Oh3w3gKlvoM2ehFqlxI3HIK5')
+    service['userinfo'].update_service_context(_resp, state='Oh3w3gKlvoM2ehFqlxI3HIK5')
 
 And we are done !! :-)
