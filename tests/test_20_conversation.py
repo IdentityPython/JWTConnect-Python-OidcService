@@ -117,8 +117,7 @@ def test_conversation():
                     "contacts": ["ops@example.org"],
                     "response_types": ["code"],
                     "scope": ["openid", "profile", "email", "address", "phone"],
-                    "token_endpoint_auth_method": ["client_secret_basic",
-                                                   'client_secret_post'],
+                    "token_endpoint_auth_method": "client_secret_basic",
                 },
             "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
             "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)

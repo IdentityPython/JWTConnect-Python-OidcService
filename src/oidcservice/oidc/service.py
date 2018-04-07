@@ -64,6 +64,14 @@ PROVIDER_DEFAULT = {
     "id_token_signed_response_alg": "RS256",
 }
 
+IDT2REG = {'sigalg': 'id_token_signed_response_alg',
+           'encalg': 'id_token_encrypted_response_alg',
+           'encenc': 'id_token_encrypted_response_enc'}
+
+UI2REG = {'sigalg': 'userinfo_signed_response_alg',
+          'encalg': 'userinfo_encrypted_response_alg',
+          'encenc': 'userinfo_encrypted_response_enc'}
+
 
 class Authorization(service.Authorization):
     msg_type = oidc.AuthorizationRequest
@@ -208,6 +216,31 @@ class Authorization(service.Authorization):
         self.store_item(req, 'auth_request', req['state'])
         return req
 
+    def gather_verify_arguments(self):
+        """
+        Need to add some information before running verify()
+
+        :return: dictionary with arguments to the verify call
+        """
+        _ctx = self.service_context
+        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+                  'keyjar': _ctx.keyjar, 'verify': True,
+                  'skew': _ctx.clock_skew}
+
+        for attr, param in IDT2REG.items():
+            try:
+                kwargs[attr] = _ctx.registration_response[param]
+            except KeyError:
+                pass
+
+        try:
+            kwargs['allow_missing_kid'] = self.service_context.allow[
+                'missing_kid']
+        except KeyError:
+            pass
+
+        return kwargs
+
 
 class AccessToken(service.AccessToken):
     msg_type = oidc.AccessTokenRequest
@@ -219,6 +252,31 @@ class AccessToken(service.AccessToken):
         service.AccessToken.__init__(self, service_context, state_db,
                                      client_authn_factory=client_authn_factory,
                                      conf=conf)
+
+    def gather_verify_arguments(self):
+        """
+        Need to add some information before running verify()
+
+        :return: dictionary with arguments to the verify call
+        """
+        _ctx = self.service_context
+        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+                  'keyjar': _ctx.keyjar, 'verify': True,
+                  'skew': _ctx.clock_skew}
+
+        for attr, param in IDT2REG.items():
+            try:
+                kwargs[attr] = _ctx.registration_response[param]
+            except KeyError:
+                pass
+
+        try:
+            kwargs['allow_missing_kid'] = self.service_context.allow[
+                'missing_kid']
+        except KeyError:
+            pass
+
+        return kwargs
 
     def update_service_context(self, resp, state='', **kwargs):
         try:
@@ -532,9 +590,9 @@ def add_request_uri(request_args=None, service=None, **kwargs):
     if _context.requests_dir:
         try:
             if _context.provider_info[
-                    'require_request_uri_registration'] is True:
+                'require_request_uri_registration'] is True:
                 request_args['request_uris'] = _context.generate_request_uris(
-                        _context.requests_dir)
+                    _context.requests_dir)
         except KeyError:
             pass
 
@@ -594,7 +652,7 @@ class Registration(Service):
     endpoint_name = 'registration_endpoint'
     synchronous = True
     service_name = 'registration'
-    body_type = 'json'
+    request_body_type = 'json'
     http_method = 'POST'
 
     def __init__(self, service_context, state_db, client_authn_factory=None,
@@ -602,19 +660,25 @@ class Registration(Service):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory,
                          conf=conf)
-        self.pre_construct = [self.add_client_behaviour,add_redirect_uris,
-                              add_request_uri, add_post_logout_redirect_uris,
+        self.pre_construct = [self.add_client_behaviour_preference,
+                              add_redirect_uris, add_request_uri,
+                              add_post_logout_redirect_uris,
                               add_jwks_uri_or_jwks]
         self.post_construct = [self.oidc_post_construct]
 
-    def add_client_behaviour(self, request_args=None, **kwargs):
+    def add_client_behaviour_preference(self, request_args=None, **kwargs):
         for prop in self.msg_type.c_param.keys():
             if prop in request_args:
                 continue
+
             try:
-                request_args[prop] = self.service_context.behaviour[prop]
+                request_args[prop] = self.service_context.client_preferences[
+                    prop]
             except KeyError:
-                pass
+                try:
+                    request_args[prop] = self.service_context.behaviour[prop]
+                except KeyError:
+                    pass
         return request_args, {}
 
     def oidc_post_construct(self, request_args=None, **kwargs):
@@ -727,6 +791,31 @@ class UserInfo(Service):
 
         self.store_item(response, 'user_info', kwargs['state'])
         return response
+
+    def gather_verify_arguments(self):
+        """
+        Need to add some information before running verify()
+
+        :return: dictionary with arguments to the verify call
+        """
+        _ctx = self.service_context
+        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+                  'keyjar': _ctx.keyjar, 'verify': True,
+                  'skew': _ctx.clock_skew}
+
+        for attr, param in UI2REG.items():
+            try:
+                kwargs[attr] = _ctx.registration_response[param]
+            except KeyError:
+                pass
+
+        try:
+            kwargs['allow_missing_kid'] = self.service_context.allow[
+                'missing_kid']
+        except KeyError:
+            pass
+
+        return kwargs
 
 
 class CheckSession(Service):

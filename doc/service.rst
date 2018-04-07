@@ -47,7 +47,7 @@ The class has a number of attributes:
         Which HTTP method to use when sending the request.
         Default is **GET**
 
-    body_type
+    request_body_type
         The serialization method to be used for the request
         Default is *urlencoded*
 

@@ -29,11 +29,12 @@ class Service(StateInterface):
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = ''
-    synchronous = True
+    endpoint = ''
     service_name = ''
+    synchronous = True
     default_authn_method = ''
     http_method = 'GET'
-    body_type = 'urlencoded'
+    request_body_type = 'urlencoded'
     response_body_type = 'json'
 
     def __init__(self, service_context, state_db, conf=None,
@@ -52,8 +53,8 @@ class Service(StateInterface):
         if conf:
             self.conf = conf
             for param in ['msg_type', 'response_cls', 'error_msg',
-                          'default_authn_method', 'http_method', 'body_type',
-                          'response_body_type']:
+                          'default_authn_method', 'http_method',
+                          'request_body_type', 'response_body_type']:
                 if param in conf:
                     setattr(self, param, conf[param])
         else:
@@ -246,7 +247,7 @@ class Service(StateInterface):
 
         return headers
 
-    def get_request_parameters(self, body_type="", method="", authn_method='',
+    def get_request_parameters(self, request_body_type="", method="", authn_method='',
                                request_args=None, http_args=None, **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
@@ -260,7 +261,7 @@ class Service(StateInterface):
         - serialize the request message into the necessary format (JSON,
             urlencoded, signed JWT)
 
-        :param body_type: Which serialization to use for the HTTP body
+        :param request_body_type: Which serialization to use for the HTTP body
         :param method: HTTP method used.
         :param authn_method: Client authentication method
         :param request_args: Message arguments
@@ -273,8 +274,8 @@ class Service(StateInterface):
             method = self.http_method
         if not authn_method:
             authn_method = self.default_authn_method
-        if not body_type:
-            body_type = self.body_type
+        if not request_body_type:
+            request_body_type = self.request_body_type
 
         request = self.construct_request(request_args=request_args, **kwargs)
 
@@ -298,9 +299,9 @@ class Service(StateInterface):
         # If there is to be a body part
         if method in ['POST', 'PUT']:
             # How should it be serialized
-            if body_type == 'urlencoded':
+            if request_body_type == 'urlencoded':
                 content_type = URL_ENCODED
-            else:  # body_type == 'json'
+            else:  # request_body_type == 'json'
                 content_type = JSON_ENCODED
 
             _info['body'] = get_http_body(request, content_type)
@@ -334,6 +335,19 @@ class Service(StateInterface):
 
     def post_parse_response(self, response, **kwargs):
         return response
+
+    def gather_verify_arguments(self):
+        """
+        Need to add some information before running verify()
+
+        :return: dictionary with arguments to the verify call
+        """
+
+        kwargs = {'client_id': self.service_context.client_id,
+                  'iss': self.service_context.issuer,
+                  'keyjar': self.service_context.keyjar,
+                  'verify': True}
+        return kwargs
 
     def parse_response(self, info, sformat="", state="", **kwargs):
         """
@@ -384,26 +398,11 @@ class Service(StateInterface):
         if resp.is_error_message():
             logger.debug('Error response: {}'.format(resp))
         else:
-            # Need to add some information before running verify()
-            kwargs["client_id"] = self.service_context.client_id
-            kwargs['iss'] = self.service_context.issuer
-
-            # If no keys where provided in the method call use the instance's
-            # keyjar as default
-            if "key" not in kwargs and "keyjar" not in kwargs:
-                if self.service_context.keyjar:
-                    kwargs["keyjar"] = self.service_context.keyjar
-
-            # add extra verify keyword arguments
-            try:
-                kwargs.update(self.conf['verify'])
-            except KeyError:
-                pass
-
-            logger.debug("Verify response with {}".format(kwargs))
+            vargs = self.gather_verify_arguments()
+            logger.debug("Verify response with {}".format(vargs))
             try:
                 # verify the message
-                verf = resp.verify(**kwargs)
+                verf = resp.verify(**vargs)
             except Exception as err:
                 logger.error(
                     'Got exception while verifying response: {}'.format(err))
@@ -428,27 +427,6 @@ class Service(StateInterface):
             raise ResponseError("Missing or faulty response")
 
         return resp
-
-    # def parse_error_mesg(self, response, body_type):
-    #     """
-    #     Parse an error message.
-    #
-    #     :param response: The response text
-    #     :param body_type: How the body is encoded
-    #     :return: A :py:class:`oidcmsg.message.Message` instance
-    #     """
-    #     if body_type == 'txt':
-    #         _body_type = 'urlencoded'
-    #     else:
-    #         _body_type = body_type
-    #
-    #     err = self.error_msg().deserialize(response, method=_body_type)
-    #     try:
-    #         err.verify()
-    #     except OidcServiceError:
-    #         raise
-    #     else:
-    #         return err
 
     def get_conf_attr(self, attr, default=None):
         """

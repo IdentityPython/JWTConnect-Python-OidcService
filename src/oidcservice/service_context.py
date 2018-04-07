@@ -55,6 +55,11 @@ class ServiceContext(object):
         self._c_secret = ''
         self.issuer = ''
 
+        try:
+            self.clock_skew = config['clock_skew']
+        except KeyError:
+            self.clock_skew = 15
+
         for key, val in kwargs.items():
             setattr(self, key, val)
 

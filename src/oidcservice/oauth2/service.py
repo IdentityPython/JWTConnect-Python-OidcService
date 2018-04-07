@@ -107,7 +107,7 @@ class AccessToken(Service):
     service_name = 'accesstoken'
     default_authn_method = 'client_secret_basic'
     http_method = 'POST'
-    body_type = 'urlencoded'
+    request_body_type = 'urlencoded'
     response_body_type = 'json'
 
     def __init__(self, service_context, state_db, client_authn_factory=None,

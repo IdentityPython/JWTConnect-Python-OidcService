@@ -11,7 +11,7 @@ Each Service instance has 3 major methods:
 
   * get_request_parameters
   * parse_response
-  * update_service_contextrmation
+  * update_service_context
 
 ###get_request_parameters
 
