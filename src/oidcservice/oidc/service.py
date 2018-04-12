@@ -292,11 +292,23 @@ class AccessToken(service.AccessToken):
 
         self.store_item(resp, 'token_response', state)
 
+    def get_authn_method(self):
+        try:
+            return self.service_context.behaviour['token_endpoint_auth_method']
+        except KeyError:
+            return self.default_authn_method
+
 
 class RefreshAccessToken(service.RefreshAccessToken):
     msg_type = oidc.RefreshAccessTokenRequest
     response_cls = oidc.AccessTokenResponse
     error_msg = oidc.ResponseMessage
+
+    def get_authn_method(self):
+        try:
+            return self.service_context.behaviour['token_endpoint_auth_method']
+        except KeyError:
+            return self.default_authn_method
 
 
 class URINormalizer(object):

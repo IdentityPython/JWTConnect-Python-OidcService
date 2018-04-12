@@ -247,6 +247,9 @@ class Service(StateInterface):
 
         return headers
 
+    def get_authn_method(self):
+        return self.default_authn_method
+
     def get_request_parameters(self, request_body_type="", method="", authn_method='',
                                request_args=None, http_args=None, **kwargs):
         """
@@ -273,7 +276,7 @@ class Service(StateInterface):
         if not method:
             method = self.http_method
         if not authn_method:
-            authn_method = self.default_authn_method
+            authn_method = self.get_authn_method()
         if not request_body_type:
             request_body_type = self.request_body_type
 
@@ -286,7 +289,10 @@ class Service(StateInterface):
             _args['iss'] = self.service_context.issuer
 
         # Client authentication by usage of the Authorization HTTP header
-        _headers = self.get_authn_header(request, authn_method, **_args)
+        # or by modifying the request object
+        _headers = self.get_authn_header(request, authn_method,
+                                         authn_endpoint=self.endpoint_name,
+                                         **_args)
 
         # Find out where to send this request
         try:
@@ -386,8 +392,20 @@ class Service(StateInterface):
         try:
             resp = self.response_cls().deserialize(info, sformat, **kwargs)
         except Exception as err:
-            logger.error('Error while deserializing: {}'.format(err))
-            raise
+            resp = None
+            if sformat == 'json':
+                # Could be JWS or JWE but wrongly tagged
+                # Adding issuer is just a fail-safe. If one things was wrong
+                # then two can be.
+                try:
+                    resp = self.response_cls().deserialize(
+                        info, 'jwt', iss=self.service_context.issuer, **kwargs)
+                except Exception as err:
+                    pass
+
+            if resp is None:
+                logger.error('Error while deserializing: {}'.format(err))
+                raise
 
         msg = 'Initial response parsing => "{}"'
         logger.debug(msg.format(resp.to_dict()))
