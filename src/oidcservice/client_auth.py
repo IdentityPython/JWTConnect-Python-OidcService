@@ -384,9 +384,9 @@ class JWSAuthnMethod(ClientAuthnMethod):
             _context = service.service_context
             # audience for the signed JWT depends on which endpoint
             # we're talking to.
-            if kwargs['authn_endpoint'] in ['token', 'refresh']:
+            if kwargs['authn_endpoint'] in ['token_endpoint']:
                 try:
-                    algorithm = _context.registration_info[
+                    algorithm = _context.behaviour[
                         'token_endpoint_auth_signing_alg']
                 except (KeyError, AttributeError):
                     pass
