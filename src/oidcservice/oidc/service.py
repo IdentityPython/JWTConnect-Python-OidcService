@@ -102,6 +102,17 @@ class Authorization(service.Authorization):
         return request_args, {}
 
     def update_service_context(self, resp, state='', **kwargs):
+        try:
+            _idt = resp['verified_id_token']
+        except KeyError:
+            pass
+        else:
+            try:
+                if self.get_state_by_nonce(_idt['nonce']) != state:
+                    raise ParameterError('Someone has messed with "nonce"')
+            except KeyError:
+                raise ValueError('Invalid nonce value')
+
         self.store_item(resp.to_json(), 'auth_response', state)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -288,7 +299,7 @@ class AccessToken(service.AccessToken):
                 if self.get_state_by_nonce(_idt['nonce']) != state:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
-                raise ValueError('Unknown nonce value')
+                raise ValueError('Invalid nonce value')
 
         self.store_item(resp, 'token_response', state)
 
@@ -375,10 +386,16 @@ class WebFinger(Service):
             for link in links:
                 if link['rel'] == self.rel:
                     _href = link['href']
-                    if not self.get_conf_attr('allow_http_links'):
-                        if _href.startswith('http://'):
-                            raise ValueError(
-                                'http link not allowed ({})'.format(_href))
+                    try:
+                        _http_allowed = self.get_conf_attr(
+                            'allow', default={})['http_links']
+                    except KeyError:
+                        _http_allowed = False
+
+                    if _href.startswith('http://') and not _http_allowed:
+                        raise ValueError(
+                            'http link not allowed ({})'.format(_href))
+
                     self.service_context.issuer = link['href']
                     break
         return resp
@@ -800,6 +817,13 @@ class UserInfo(Service):
 
                     for key in claims:
                         response[key] = aggregated_claims[key]
+                elif 'endpoint' in spec:
+                    _info = {
+                        "headers": self.get_authn_header(
+                            {}, self.default_authn_method,
+                            authn_endpoint=self.endpoint_name),
+                        "url": spec["endpoint"]
+                    }
 
         self.store_item(response, 'user_info', kwargs['state'])
         return response
