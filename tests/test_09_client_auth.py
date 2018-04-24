@@ -265,7 +265,7 @@ class TestPrivateKeyJWT(object):
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
         http_args = pkj.construct(request, service=_service, algorithm="RS256",
-                                  authn_endpoint='token')
+                                  authn_endpoint='token_endpoint')
         assert http_args == {}
         cas = request["client_assertion"]
 
@@ -312,7 +312,7 @@ class TestClientSecretJWT_TE(object):
         request = AccessTokenRequest()
 
         csj.construct(request, service=services['accesstoken'],
-                      algorithm="HS256", authn_endpoint='token')
+                      algorithm="HS256", authn_endpoint='token_endpoint')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]
