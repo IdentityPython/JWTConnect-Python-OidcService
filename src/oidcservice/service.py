@@ -390,7 +390,8 @@ class Service(StateInterface):
 
         logger.debug('response_cls: {}'.format(self.response_cls.__name__))
         try:
-            resp = self.response_cls().deserialize(info, sformat, **kwargs)
+            resp = self.response_cls().deserialize(
+                info, sformat, iss=self.service_context.issuer, **kwargs)
         except Exception as err:
             resp = None
             if sformat == 'json':
