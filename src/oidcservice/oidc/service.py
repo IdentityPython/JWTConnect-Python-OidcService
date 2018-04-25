@@ -245,8 +245,7 @@ class Authorization(service.Authorization):
                 pass
 
         try:
-            kwargs['allow_missing_kid'] = self.service_context.allow[
-                'missing_kid']
+            kwargs['allow_missing_kid'] = _ctx.allow['missing_kid']
         except KeyError:
             pass
 
