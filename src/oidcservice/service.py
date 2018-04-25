@@ -47,8 +47,6 @@ class Service(StateInterface):
             self.client_authn_factory=client_authn_factory
 
         self.service_context = service_context
-        self.events = None
-        self.endpoint = ''
         self.default_request_args = {}
         if conf:
             self.conf = conf
@@ -385,9 +383,6 @@ class Service(StateInterface):
         if sformat == "urlencoded":
             info = self.get_urlinfo(info)
 
-        if self.events:
-            self.events.store('Response', info)
-
         logger.debug('response_cls: {}'.format(self.response_cls.__name__))
         try:
             resp = self.response_cls().deserialize(
@@ -410,8 +405,6 @@ class Service(StateInterface):
 
         msg = 'Initial response parsing => "{}"'
         logger.debug(msg.format(resp.to_dict()))
-        if self.events:
-            self.events.store('Protocol Response', resp)
 
         # is this an error message
         if resp.is_error_message():
