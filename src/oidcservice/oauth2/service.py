@@ -199,7 +199,9 @@ class ProviderInfoDiscovery(Service):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory, conf=conf)
 
-    def request_info(self, method="GET", request_args=None, **kwargs):
+    def get_request_parameters(self, request_body_type="", method="GET",
+                               authn_method='', request_args=None,
+                               http_args=None, **kwargs):
 
         issuer = self.service_context.issuer
 
@@ -208,7 +210,7 @@ class ProviderInfoDiscovery(Service):
         else:
             _issuer = issuer
 
-        return {'url': OIDCONF_PATTERN.format(_issuer)}
+        return {'url': OIDCONF_PATTERN.format(_issuer), 'method': method}
 
     def _update_service_context(self, resp, **kwargs):
         """
