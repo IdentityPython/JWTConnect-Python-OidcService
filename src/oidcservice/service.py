@@ -303,7 +303,7 @@ class Service(StateInterface):
         _info['url'] = get_http_url(endpoint_url, request, method=method)
 
         # If there is to be a body part
-        if method in ['POST', 'PUT']:
+        if method  == 'POST':
             # How should it be serialized
             if request_body_type == 'urlencoded':
                 content_type = URL_ENCODED
