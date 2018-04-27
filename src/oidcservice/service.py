@@ -413,16 +413,13 @@ class Service(StateInterface):
             vargs = self.gather_verify_arguments()
             logger.debug("Verify response with {}".format(vargs))
             try:
-                # verify the message
-                verf = resp.verify(**vargs)
+                # verify the message. If something is wrong an exception is
+                # thrown
+                resp.verify(**vargs)
             except Exception as err:
                 logger.error(
                     'Got exception while verifying response: {}'.format(err))
                 raise
-
-            if not verf:
-                logger.error('Verification of the response failed')
-                raise OidcServiceError("Verification of the response failed")
 
             # if it's an Authorization response and the scope claim was not
             # present in the response use the one I expected to be there.
