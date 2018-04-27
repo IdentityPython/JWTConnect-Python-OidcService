@@ -421,13 +421,13 @@ class Service(StateInterface):
                     'Got exception while verifying response: {}'.format(err))
                 raise
 
-            # if it's an Authorization response and the scope claim was not
-            # present in the response use the one I expected to be there.
-            if resp.type() == "AuthorizationResponse" and "scope" not in resp:
-                try:
-                    resp["scope"] = kwargs["scope"]
-                except KeyError:
-                    pass
+            # # if it's an Authorization response and the scope claim was not
+            # # present in the response use the one I expected to be there.
+            # if resp.type() == "AuthorizationResponse" and "scope" not in resp:
+            #     try:
+            #         resp["scope"] = kwargs["scope"]
+            #     except KeyError:
+            #         pass
 
             resp = self.post_parse_response(resp, state=state)
 

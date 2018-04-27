@@ -97,6 +97,31 @@ class Authorization(Service):
 
         return ar_args
 
+    def post_parse_response(self, response, **kwargs):
+        """
+        Add scope claim to responsefrom the request if not present in the
+        response
+
+        :param response: The response
+        :param kwargs: Extra Keyword arguments
+        :return: A possibly augmented response
+        """
+
+        if "scope" not in response:
+            try:
+                _key = kwargs['state']
+            except KeyError:
+                pass
+            else:
+                if _key:
+                    item = self.get_item(oauth2.AuthorizationRequest,
+                                         'auth_request', _key)
+                    try:
+                        response["scope"] = item["scope"]
+                    except KeyError:
+                        pass
+        return response
+
 
 class AccessToken(Service):
     msg_type = oauth2.AccessTokenRequest

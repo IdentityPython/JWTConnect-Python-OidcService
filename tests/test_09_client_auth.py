@@ -154,27 +154,31 @@ class TestBearerHeader(object):
 
     def test_construct_with_token(self, services):
         authz_service = services['authorization']
-        authz_service.state_db.set('AAAA', State(iss='Issuer').to_json())
+        _state = authz_service.create_state('Issuer')
+        req = AuthorizationRequest(state=_state, response_type='code',
+                                   redirect_uri='https://example.com',
+                                   scope=['openid'])
+        authz_service.store_item(req, 'auth_request', _state)
 
         # Add a state and bind a code to it
-        resp1 = AuthorizationResponse(code="auth_grant", state="AAAA")
+        resp1 = AuthorizationResponse(code="auth_grant", state=_state)
         response = services['authorization'].parse_response(
             resp1.to_urlencoded(), "urlencoded")
-        services['authorization'].update_service_context(response, state='AAAA')
+        services['authorization'].update_service_context(response, state=_state)
 
         # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
-                                    state="AAAA")
+                                    state=_state)
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
 
-        services['accesstoken'].update_service_context(response, state='AAAA')
+        services['accesstoken'].update_service_context(response, state=_state)
 
         # and finally use the access token, bound to a state, to
         # construct the authorization header
         http_args = BearerHeader().construct(
-            ResourceRequest(), services['accesstoken'], state="AAAA")
+            ResourceRequest(), services['accesstoken'], state=_state)
         assert http_args == {"headers": {"Authorization": "Bearer token1"}}
 
 

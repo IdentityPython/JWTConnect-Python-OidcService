@@ -174,5 +174,5 @@ class StateInterface(object):
     def create_state(self, iss):
         key = rndstr(32)
         _state = State(iss=iss)
-        self.state_db.set(key, _state)
+        self.state_db.set(key, _state.to_json())
         return key
