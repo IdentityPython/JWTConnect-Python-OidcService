@@ -2,7 +2,6 @@ import logging
 from urllib.parse import urlparse
 
 from oidcservice.client_auth import factory as ca_factory
-from oidcservice.exception import OidcServiceError
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
 from oidcservice.util import get_http_body
@@ -420,14 +419,6 @@ class Service(StateInterface):
                 logger.error(
                     'Got exception while verifying response: {}'.format(err))
                 raise
-
-            # # if it's an Authorization response and the scope claim was not
-            # # present in the response use the one I expected to be there.
-            # if resp.type() == "AuthorizationResponse" and "scope" not in resp:
-            #     try:
-            #         resp["scope"] = kwargs["scope"]
-            #     except KeyError:
-            #         pass
 
             resp = self.post_parse_response(resp, state=state)
 
