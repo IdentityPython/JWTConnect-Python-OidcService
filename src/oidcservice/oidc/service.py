@@ -8,14 +8,16 @@ from urllib.parse import urlparse
 from cryptojwt import jws
 from oidcservice.state_interface import State
 
-from oidcservice import rndstr, OIDCONF_PATTERN
+from oidcservice import OIDCONF_PATTERN
+from oidcservice import rndstr
 from oidcservice.exception import ConfigurationError
 from oidcservice.exception import WebFingerError
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import service
 from oidcservice.oauth2.service import get_state_parameter
 from oidcservice.oauth2.service import pick_redirect_uris
-from oidcservice.oidc import OIC_ISSUER, WF_URL
+from oidcservice.oidc import OIC_ISSUER
+from oidcservice.oidc import WF_URL
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
 from oidcservice.service import Service
@@ -324,14 +326,23 @@ class RefreshAccessToken(service.RefreshAccessToken):
 class URINormalizer(object):
     @staticmethod
     def has_scheme(inp):
+        """
+        Verify that the given string (URI) has a scheme specification
+
+        :param inp: The string to check
+        :return: True if there is a scheme specification otherwise False
+        """
         if "://" in inp:
             return True
         else:
+            # basically get everything before the first '/', '?' or '#'
             authority = inp.replace('/', '#').replace('?', '#').split("#")[0]
 
             if ':' in authority:
                 scheme_or_host, host_or_port = authority.split(':', 1)
-                # Assert it's not a port number
+                # Assert that the second part is not a port number
+                if not host_or_port:
+                    return False
                 if re.match('^\d+$', host_or_port):
                     return False
             else:
@@ -341,17 +352,24 @@ class URINormalizer(object):
     @staticmethod
     def acct_scheme_assumed(inp):
         if '@' in inp:
+            # get what's behind the last '@'. This should be a host/domain name
             host = inp.split('@')[-1]
+            # host/domain name not allowed to contain ':','/' or '?'
             return not (':' in host or '/' in host or '?' in host)
         else:
             return False
 
     def normalize(self, inp):
         if self.has_scheme(inp):
+            # If there is a scheme specification then just pass on
             pass
         elif self.acct_scheme_assumed(inp):
+            # No scheme specification but looks like an acct so add acct as
+            # scheme
             inp = "acct:%s" % inp
         else:
+            # No scheme specification and doesn't look like an acct assume
+            # it's a URL
             inp = "https://%s" % inp
         return inp.split("#")[0]  # strip fragment
 
@@ -423,6 +441,7 @@ class WebFinger(Service):
             host = host.replace('/', '#').replace('?', '#').split("#")[0]
         elif resource.startswith("device:"):
             host = resource.split(':')[1]
+            host = host.replace('/', '#').replace('?', '#').split("#")[0]
         else:
             raise WebFingerError("Unknown schema")
 

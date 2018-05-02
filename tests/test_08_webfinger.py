@@ -1,8 +1,8 @@
 import json
 
-from oidcmsg.oidc import Link, JRD
-from oidcservice.oidc import OIC_ISSUER
+from oidcmsg.oidc import JRD, Link
 
+from oidcservice.oidc import OIC_ISSUER, WF_URL
 from oidcservice.oidc.service import URINormalizer
 from oidcservice.oidc.service import WebFinger
 from oidcservice.service_context import ServiceContext
@@ -67,12 +67,52 @@ EXAMPLE = {
     "device:192.168.2.1/path?query#fragment": "device:192.168.2.1/path?query",
 }
 
+GRP_MTRL = {
+    "example.com": "example.com",
+    "example.com:8080": "example.com:8080",
+    "example.com/path": "example.com",
+    "example.com?query": "example.com",
+    "example.com#fragment": "example.com",
+    "example.com:8080/path?query#fragment": "example.com:8080",
+    "http://example.com": "example.com",
+    "http://example.com:8080": "example.com:8080",
+    "http://example.com/path": "example.com",
+    "http://example.com?query": "example.com",
+    "http://example.com#fragment": "example.com",
+    "http://example.com:8080/path?query#fragment": "example.com:8080",
+    "nov@example.com": "example.com",
+    "nov@example.com:8080": "example.com:8080",
+    "nov@example.com/path": "example.com",
+    "nov@example.com?query": "example.com",
+    "nov@example.com#fragment": "example.com",
+    "nov@example.com:8080/path?query#fragment": "example.com:8080",
+    "acct:nov@matake.jp": "matake.jp",
+    "acct:nov@example.com:8080": "example.com:8080",
+    "acct:nov@example.com/path": "example.com",
+    "acct:nov@example.com?query": "example.com",
+    "acct:nov@example.com#fragment": "example.com",
+    "acct:nov@example.com:8080/path?query#fragment": "example.com:8080",
+    "device:192.168.2.1": "192.168.2.1",
+    "device:192.168.2.1:8080": "192.168.2.1",
+    "device:192.168.2.1/path": "192.168.2.1",
+    "device:192.168.2.1?query": "192.168.2.1",
+    "device:192.168.2.1#fragment": "192.168.2.1",
+    "device:192.168.2.1/path?query#fragment": "192.168.2.1",
+}
+
 
 class TestURINormalizer(object):
     def test_normalize(self):
         for key, val in EXAMPLE.items():
             _val = URINormalizer().normalize(key)
             assert val == _val
+
+
+def test_get_request_parameters():
+    wf = WebFinger(None, None)
+    for key, res in GRP_MTRL.items():
+        _info = wf.get_request_parameters({'resource': key})
+        assert _info['url'].split('?')[0] == WF_URL % res
 
 
 def test_link1():
@@ -193,7 +233,8 @@ def test_extra_member_response():
                 "rel": "http://webfinger.net/rel/avatar",
                 "type": "image/jpeg",
                 "href": "http://www.example.com/~bob/bob.jpg"
-            }]}
+            }]
+    }
 
     _resp = JRD().from_json(json.dumps(ex))
     assert _resp['dummy'] == 'foo'
