@@ -1,5 +1,6 @@
 import base64
 import logging
+from urllib.parse import quote_plus
 
 from cryptojwt.jws import alg2keytype
 
@@ -74,6 +75,8 @@ class ClientSecretBasic(ClientAuthnMethod):
     The upshot of this is to construct an Authorization header that has the
     value 'Basic <token>' where <token> is username and password concatenated
     together with a ':' in between and then URL safe base64 encoded.
+
+    Note that both username and password
     """
 
     def construct(self, request, service=None, http_args=None, **kwargs):
@@ -110,7 +113,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         # The credential is username and password concatenated with a ':'
         # in between and then base 64 encoded becomes the authentication
         # token.
-        credentials = "{}:{}".format(user, passwd)
+        credentials = "{}:{}".format(quote_plus(user), quote_plus(passwd))
         authz = base64.urlsafe_b64encode(credentials.encode("utf-8")).decode(
             "utf-8")
         http_args["headers"]["Authorization"] = "Basic {}".format(authz)
@@ -118,7 +121,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         # If client_secret was part of the request message instance remove it
         try:
             del request["client_secret"]
-        except KeyError:
+        except (KeyError, TypeError):
             pass
 
         # If we're doing an access token request with an authorization code

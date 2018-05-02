@@ -1,5 +1,7 @@
 import base64
 import os
+from urllib.parse import quote_plus
+
 import pytest
 
 from cryptojwt import as_bytes
@@ -8,6 +10,7 @@ from cryptojwt.jwk import SYMKey
 from cryptojwt.jwk import rsa_load
 from cryptojwt.jws import JWS
 from cryptojwt.jwt import JWT
+from oidcmsg.message import Message
 
 from oidcservice import JWT_BEARER
 from oidcservice.client_auth import assertion_jwt
@@ -83,6 +86,18 @@ def services():
                           get_service_context(), db)
 
 
+def test_quote():
+    csb = ClientSecretBasic()
+    http_args = csb.construct(
+        Message(),
+        password='MKEM/A7Pkn7JuU0LAcxyHVKvwdczsugaPU0BieLb4CbQAgQj+ypcanFOCb0/FA5h' ,
+        user='796d8fae-a42f-4e4f-ab25-d6205b6d4fa2')
+
+    assert http_args['headers'][
+               'Authorization'] == 'Basic Nzk2ZDhmYWUtYTQyZi00ZTRmLWFiMjUtZDYyMDViNmQ0ZmEyOk1LRU0lMkZBN1BrbjdKdVUwTEFjeHlIVkt2d2RjenN1Z2FQVTBCaWVMYjRDYlFBZ1FqJTJCeXBjYW5GT0NiMCUyRkZBNWg='
+
+
+
 class TestClientSecretBasic(object):
     def test_construct(self, services):
         request = services['accesstoken'].construct(
@@ -91,8 +106,9 @@ class TestClientSecretBasic(object):
         csb = ClientSecretBasic()
         http_args = csb.construct(request, services['accesstoken'])
 
+        credentials = "{}:{}".format(quote_plus('A'), quote_plus('boarding pass'))
         assert http_args == {"headers": {"Authorization": "Basic {}".format(
-            base64.urlsafe_b64encode("A:boarding pass".encode("utf-8")).decode(
+            base64.urlsafe_b64encode(credentials.encode("utf-8")).decode(
                 "utf-8"))}}
 
     def test_does_not_remove_padding(self):
