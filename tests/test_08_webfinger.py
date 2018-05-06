@@ -10,42 +10,42 @@ from oidcservice.service_context import ServiceContext
 __author__ = 'Roland Hedberg'
 
 # examples provided by Nat Sakimura
-EXAMPLE = {
-    "example.com": "https://example.com",
-    "example.com:8080": "https://example.com:8080",
-    "example.com/path": "https://example.com/path",
-    "example.com?query": "https://example.com?query",
-    "example.com#fragment": "https://example.com",
-    "example.com:8080/path?query#fragment":
-        "https://example.com:8080/path?query",
-    "http://example.com": "http://example.com",
-    "http://example.com:8080": "http://example.com:8080",
-    "http://example.com/path": "http://example.com/path",
-    "http://example.com?query": "http://example.com?query",
-    "http://example.com#fragment": "http://example.com",
-    "http://example.com:8080/path?query#fragment":
-        "http://example.com:8080/path?query",
-    "nov@example.com": "acct:nov@example.com",
-    "nov@example.com:8080": "https://nov@example.com:8080",
-    "nov@example.com/path": "https://nov@example.com/path",
-    "nov@example.com?query": "https://nov@example.com?query",
-    "nov@example.com#fragment": "acct:nov@example.com",
-    "nov@example.com:8080/path?query#fragment":
-        "https://nov@example.com:8080/path?query",
-    "acct:nov@matake.jp": "acct:nov@matake.jp",
-    "acct:nov@example.com:8080": "acct:nov@example.com:8080",
-    "acct:nov@example.com/path": "acct:nov@example.com/path",
-    "acct:nov@example.com?query": "acct:nov@example.com?query",
-    "acct:nov@example.com#fragment": "acct:nov@example.com",
-    "acct:nov@example.com:8080/path?query#fragment":
-        "acct:nov@example.com:8080/path?query",
-    "nov@localhost": "acct:nov@localhost",
-    "nov@localhost:8080": "https://nov@localhost:8080",
-    "nov@localhost/path": "https://nov@localhost/path",
-    "nov@localhost?query": "https://nov@localhost?query",
-    "nov@localhost#fragment": "acct:nov@localhost",
-    "nov@localhost/path?query#fragment": "https://nov@localhost/path?query",
-    }
+# EXAMPLE = {
+#     "example.com": "https://example.com",
+#     "example.com:8080": "https://example.com:8080",
+#     "example.com/path": "https://example.com/path",
+#     "example.com?query": "https://example.com?query",
+#     "example.com#fragment": "https://example.com",
+#     "example.com:8080/path?query#fragment":
+#         "https://example.com:8080/path?query",
+#     "http://example.com": "http://example.com",
+#     "http://example.com:8080": "http://example.com:8080",
+#     "http://example.com/path": "http://example.com/path",
+#     "http://example.com?query": "http://example.com?query",
+#     "http://example.com#fragment": "http://example.com",
+#     "http://example.com:8080/path?query#fragment":
+#         "http://example.com:8080/path?query",
+#     "nov@example.com": "acct:nov@example.com",
+#     "nov@example.com:8080": "https://nov@example.com:8080",
+#     "nov@example.com/path": "https://nov@example.com/path",
+#     "nov@example.com?query": "https://nov@example.com?query",
+#     "nov@example.com#fragment": "acct:nov@example.com",
+#     "nov@example.com:8080/path?query#fragment":
+#         "https://nov@example.com:8080/path?query",
+#     "acct:nov@matake.jp": "acct:nov@matake.jp",
+#     "acct:nov@example.com:8080": "acct:nov@example.com:8080",
+#     "acct:nov@example.com/path": "acct:nov@example.com/path",
+#     "acct:nov@example.com?query": "acct:nov@example.com?query",
+#     "acct:nov@example.com#fragment": "acct:nov@example.com",
+#     "acct:nov@example.com:8080/path?query#fragment":
+#         "acct:nov@example.com:8080/path?query",
+#     "nov@localhost": "acct:nov@localhost",
+#     "nov@localhost:8080": "https://nov@localhost:8080",
+#     "nov@localhost/path": "https://nov@localhost/path",
+#     "nov@localhost?query": "https://nov@localhost?query",
+#     "nov@localhost#fragment": "acct:nov@localhost",
+#     "nov@localhost/path?query#fragment": "https://nov@localhost/path?query",
+#     }
 
 
 def test_query():
@@ -114,8 +114,28 @@ def test_query_2():
             "https%3A%2F%2Fnov%40example.com"),
         "nov@example.com:8080/path?query#fragment":(
             "nov@example.com:8080", rel,
-            "https%3A%2F%2Fnov%40example.com%3A8080%2Fpath%3Fquery")
-        }
+            "https%3A%2F%2Fnov%40example.com%3A8080%2Fpath%3Fquery"),
+        "acct:nov@example.com:8080": (
+            "example.com:8080", rel,
+            "acct%3Anov%40example.com%3A8080"
+        ),
+        "acct:nov@example.com/path": (
+            "example.com", rel,
+            "acct%3Anov%40example.com%2Fpath"
+        ),
+        "acct:nov@example.com?query":(
+            "example.com", rel,
+            "acct%3Anov%40example.com%3Fquery"
+        ),
+        "acct:nov@example.com#fragment": (
+            "example.com", rel,
+            "acct%3Anov%40example.com"
+        ),
+        "acct:nov@example.com:8080/path?query#fragment":(
+            "example.com:8080", rel,
+            "acct%3Anov%40example.com%3A8080%2Fpath%3Fquery"
+        )
+    }
 
     wf = WebFinger(None, None)
     for key, args in example_oidc.items():

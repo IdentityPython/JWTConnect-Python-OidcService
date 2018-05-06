@@ -443,11 +443,16 @@ class WebFinger(Service):
                         'No authority part in the resource specification')
                 elif _scheme == 'acct':
                     _path = part[PATH]
+                    for c in ['/', '?']:
+                        _path = _path.split(c)[0]
+
                     if '@' in _path:
                         authority = _path.split('@')[1]
                     else:
                         raise ValueError(
                             'No authority part in the resource specification')
+                    authority = authority.split('#')[0]
+                    resource = self.create_url(part, [FRAGMENT])
                 else:
                     authority = part[NETLOC]
                     resource = self.create_url(part, [FRAGMENT])
