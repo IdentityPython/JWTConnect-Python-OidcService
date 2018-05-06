@@ -9,5 +9,5 @@ DEFAULT_SERVICES = {
     'UserInfo': {}
 }
 
-WF_URL = "https://%s/.well-known/webfinger"
+WF_URL = "https://{}/.well-known/webfinger"
 OIC_ISSUER = "http://openid.net/specs/connect/1.0/issuer"

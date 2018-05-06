@@ -2,8 +2,9 @@ import inspect
 import logging
 import re
 import sys
-from urllib.parse import urlencode
 from urllib.parse import urlparse
+
+from uritools import urisplit, uricompose
 
 from cryptojwt import jws
 from oidcservice.state_interface import State
@@ -11,7 +12,6 @@ from oidcservice.state_interface import State
 from oidcservice import OIDCONF_PATTERN
 from oidcservice import rndstr
 from oidcservice.exception import ConfigurationError
-from oidcservice.exception import WebFingerError
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import service
 from oidcservice.oauth2.service import get_state_parameter
@@ -57,22 +57,26 @@ PREFERENCE2PROVIDER = {
         "token_endpoint_auth_signing_alg_values_supported",
     "response_types": "response_types_supported",
     'grant_types': 'grant_types_supported'
-}
+    }
 
 PROVIDER2PREFERENCE = dict([(v, k) for k, v in PREFERENCE2PROVIDER.items()])
 
 PROVIDER_DEFAULT = {
     "token_endpoint_auth_method": "client_secret_basic",
     "id_token_signed_response_alg": "RS256",
-}
+    }
 
-IDT2REG = {'sigalg': 'id_token_signed_response_alg',
-           'encalg': 'id_token_encrypted_response_alg',
-           'encenc': 'id_token_encrypted_response_enc'}
+IDT2REG = {
+    'sigalg': 'id_token_signed_response_alg',
+    'encalg': 'id_token_encrypted_response_alg',
+    'encenc': 'id_token_encrypted_response_enc'
+    }
 
-UI2REG = {'sigalg': 'userinfo_signed_response_alg',
-          'encalg': 'userinfo_encrypted_response_alg',
-          'encenc': 'userinfo_encrypted_response_enc'}
+UI2REG = {
+    'sigalg': 'userinfo_signed_response_alg',
+    'encalg': 'userinfo_encrypted_response_alg',
+    'encenc': 'userinfo_encrypted_response_enc'
+    }
 
 
 class Authorization(service.Authorization):
@@ -236,9 +240,11 @@ class Authorization(service.Authorization):
         :return: dictionary with arguments to the verify call
         """
         _ctx = self.service_context
-        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
-                  'keyjar': _ctx.keyjar, 'verify': True,
-                  'skew': _ctx.clock_skew}
+        kwargs = {
+            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'keyjar': _ctx.keyjar, 'verify': True,
+            'skew': _ctx.clock_skew
+            }
 
         for attr, param in IDT2REG.items():
             try:
@@ -272,9 +278,11 @@ class AccessToken(service.AccessToken):
         :return: dictionary with arguments to the verify call
         """
         _ctx = self.service_context
-        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
-                  'keyjar': _ctx.keyjar, 'verify': True,
-                  'skew': _ctx.clock_skew}
+        kwargs = {
+            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'keyjar': _ctx.keyjar, 'verify': True,
+            'skew': _ctx.clock_skew
+            }
 
         for attr, param in IDT2REG.items():
             try:
@@ -417,35 +425,71 @@ class WebFinger(Service):
                     break
         return resp
 
-    def query(self, resource, rel=None):
-        resource = URINormalizer().normalize(resource)
+    def normalize(self, resource):
+        return resource
 
-        info = [("resource", resource)]
+    def query(self, resource):
+        """
+        Given a resource identifier find the domain specifier and then
+        construct the webfinger request. Implements
+        http://openid.net/specs/openid-connect-discovery-1_0.html#NormalizationSteps
 
-        if rel is None:
-            if self.rel:
-                info.append(("rel", self.rel))
-        elif isinstance(rel, str):
-            info.append(("rel", rel))
+        :param resource:
+        """
+        if resource[0] in ['=', '@', '!']:  # Have no process for handling these
+            raise ValueError('Not allowed resource identifier')
+
+        try:
+            parts = urlparse(resource)
+        except Exception:
+            raise ValueError('Unparsable resource')
         else:
-            for val in rel:
-                info.append(("rel", val))
+            if not parts.scheme:
+                # if not parts.path and not parts.query and not parts.port and \
+                #         not parts.fragment:
+                #     authority = parts.host
+                #     resource = 'acct:{}'.format(parts.host)
+                if not parts.netloc and not parts.query and not parts.fragment:
+                    if '/' in parts.path:
+                        resource= "https://{}".format(resource)
+                        parts = urisplit(resource)
+                        authority = parts.netloc
+                    else:
+                        if '@' in parts.path:
+                            authority = parts.path.split('@')[1]
+                        else:
+                            authority = parts.path
+                        resource = 'acct:{}'.format(parts.path)
+                elif not parts.netloc and not parts.fragment:
+                    resource = "https://{}".format(resource)
+                    parts = urlparse(resource)
+                    authority = parts.netloc
+                else:
+                    resource = "https://{}?{}".format(parts.path, parts.query)
+                    parts = urlparse(resource)
+                    authority = parts.netloc
+            else:
+                if parts.scheme not in ['http', 'https', 'acct']:
+                    # assume it to be a hostname port combo,
+                    # eg. example.com:8080
+                    resource = 'https://{}'.format(resource)
+                    parts = urisplit(resource)
+                    authority = parts.authority
+                elif parts.scheme in ['http', 'https'] and not parts.authority:
+                    raise ValueError(
+                        'No authority part in the resource specification')
+                elif parts.scheme == 'acct':
+                    if '@' in parts.path:
+                        authority = parts.path.split('@')[1]
+                    else:
+                        raise ValueError(
+                            'No authority part in the resource specification')
+                else:
+                    authority = parts.authority
 
-        if resource.startswith("http"):
-            part = urlparse(resource)
-            host = part.hostname
-            if part.port is not None:
-                host += ":" + str(part.port)
-        elif resource.startswith("acct:"):
-            host = resource.split('@')[-1]
-            host = host.replace('/', '#').replace('?', '#').split("#")[0]
-        elif resource.startswith("device:"):
-            host = resource.split(':')[1]
-            host = host.replace('/', '#').replace('?', '#').split("#")[0]
-        else:
-            raise WebFingerError("Unknown schema")
-
-        return "%s?%s" % (WF_URL % host, urlencode(info))
+        location = WF_URL.format(authority)
+        return oidc.WebFingerRequest(
+            resource=resource, rel=OIC_ISSUER).request(location)
 
     def get_request_parameters(self, request_args=None, **kwargs):
 
@@ -463,11 +507,7 @@ class WebFinger(Service):
                 except KeyError:
                     raise MissingRequiredAttribute('resource')
 
-        if 'rel' in kwargs:
-            return {'url': self.query(_resource, rel=kwargs['rel']),
-                    'method': 'GET'}
-        else:
-            return {'url': self.query(_resource), 'method': 'GET'}
+        return {'url': self.query(_resource), 'method': 'GET'}
 
 
 ENDPOINT2SERVICE = {
@@ -476,7 +516,7 @@ ENDPOINT2SERVICE = {
     'userinfo': ['userinfo'],
     'registration': ['registration'],
     'end_sesssion': ['end_session']
-}
+    }
 
 
 def add_redirect_uris(request_args, service=None, **kwargs):
@@ -612,7 +652,7 @@ rt2gt = {
     'code id_token': ['authorization_code', 'implicit'],
     'code token': ['authorization_code', 'implicit'],
     'code id_token token': ['authorization_code', 'implicit']
-}
+    }
 
 
 def response_types_to_grant_types(response_types):
@@ -637,7 +677,7 @@ def add_request_uri(request_args=None, service=None, **kwargs):
     if _context.requests_dir:
         try:
             if _context.provider_info[
-                    'require_request_uri_registration'] is True:
+                'require_request_uri_registration'] is True:
                 request_args['request_uris'] = _context.generate_request_uris(
                     _context.requests_dir)
         except KeyError:
@@ -801,7 +841,7 @@ class UserInfo(Service):
             request_args = self.multiple_extend_request_args(
                 request_args, kwargs['state'], ['access_token'],
                 ['auth_response', 'token_response', 'refresh_token_response']
-            )
+                )
 
         return request_args, {}
 
@@ -809,7 +849,7 @@ class UserInfo(Service):
         _args = self.multiple_extend_request_args(
             {}, kwargs['state'], ['verified_id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
-        )
+            )
 
         try:
             _sub = _args['verified_id_token']['sub']
@@ -841,7 +881,7 @@ class UserInfo(Service):
                             {}, self.default_authn_method,
                             authn_endpoint=self.endpoint_name),
                         "url": spec["endpoint"]
-                    }
+                        }
 
         self.store_item(response, 'user_info', kwargs['state'])
         return response
@@ -853,9 +893,11 @@ class UserInfo(Service):
         :return: dictionary with arguments to the verify call
         """
         _ctx = self.service_context
-        kwargs = {'client_id': _ctx.client_id, 'iss': _ctx.issuer,
-                  'keyjar': _ctx.keyjar, 'verify': True,
-                  'skew': _ctx.clock_skew}
+        kwargs = {
+            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'keyjar': _ctx.keyjar, 'verify': True,
+            'skew': _ctx.clock_skew
+            }
 
         for attr, param in UI2REG.items():
             try:
