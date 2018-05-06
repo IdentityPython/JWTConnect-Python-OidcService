@@ -1,10 +1,8 @@
 import inspect
 import logging
-import re
 import sys
-from urllib.parse import urlparse
 
-from uritools import urisplit, uricompose
+from urllib.parse import urlsplit, urlunsplit
 
 from cryptojwt import jws
 from oidcservice.state_interface import State
@@ -331,55 +329,11 @@ class RefreshAccessToken(service.RefreshAccessToken):
             return self.default_authn_method
 
 
-class URINormalizer(object):
-    @staticmethod
-    def has_scheme(inp):
-        """
-        Verify that the given string (URI) has a scheme specification
-
-        :param inp: The string to check
-        :return: True if there is a scheme specification otherwise False
-        """
-        if "://" in inp:
-            return True
-        else:
-            # basically get everything before the first '/', '?' or '#'
-            authority = inp.replace('/', '#').replace('?', '#').split("#")[0]
-
-            if ':' in authority:
-                scheme_or_host, host_or_port = authority.split(':', 1)
-                # Assert that the second part is not a port number
-                if not host_or_port:
-                    return False
-                if re.match('^\d+$', host_or_port):
-                    return False
-            else:
-                return False
-        return True
-
-    @staticmethod
-    def acct_scheme_assumed(inp):
-        if '@' in inp:
-            # get what's behind the last '@'. This should be a host/domain name
-            host = inp.split('@')[-1]
-            # host/domain name not allowed to contain ':','/' or '?'
-            return not (':' in host or '/' in host or '?' in host)
-        else:
-            return False
-
-    def normalize(self, inp):
-        if self.has_scheme(inp):
-            # If there is a scheme specification then just pass on
-            pass
-        elif self.acct_scheme_assumed(inp):
-            # No scheme specification but looks like an acct so add acct as
-            # scheme
-            inp = "acct:%s" % inp
-        else:
-            # No scheme specification and doesn't look like an acct assume
-            # it's a URL
-            inp = "https://%s" % inp
-        return inp.split("#")[0]  # strip fragment
+SCHEME = 0
+NETLOC = 1
+PATH = 2
+QUERY = 3
+FRAGMENT = 4
 
 
 class WebFinger(Service):
@@ -425,8 +379,15 @@ class WebFinger(Service):
                     break
         return resp
 
-    def normalize(self, resource):
-        return resource
+    @staticmethod
+    def create_url(part, ignore):
+        res = []
+        for a in range(0, 5):
+            if a in ignore:
+                res.append('')
+            else:
+                res.append(part[a])
+        return urlunsplit(tuple(res))
 
     def query(self, resource):
         """
@@ -440,52 +401,56 @@ class WebFinger(Service):
             raise ValueError('Not allowed resource identifier')
 
         try:
-            parts = urlparse(resource)
+            part = urlsplit(resource)
         except Exception:
             raise ValueError('Unparsable resource')
         else:
-            if not parts.scheme:
-                # if not parts.path and not parts.query and not parts.port and \
-                #         not parts.fragment:
-                #     authority = parts.host
-                #     resource = 'acct:{}'.format(parts.host)
-                if not parts.netloc and not parts.query and not parts.fragment:
-                    if '/' in parts.path:
-                        resource= "https://{}".format(resource)
-                        parts = urisplit(resource)
-                        authority = parts.netloc
-                    else:
-                        if '@' in parts.path:
-                            authority = parts.path.split('@')[1]
+            if not part[SCHEME]:
+                if not part[NETLOC]:
+                    _path = part[PATH]
+                    if not part[QUERY] and not part[FRAGMENT]:
+                        if '/' in _path or ':' in _path:
+                            resource= "https://{}".format(resource)
+                            part = urlsplit(resource)
+                            authority = part[NETLOC]
                         else:
-                            authority = parts.path
-                        resource = 'acct:{}'.format(parts.path)
-                elif not parts.netloc and not parts.fragment:
-                    resource = "https://{}".format(resource)
-                    parts = urlparse(resource)
-                    authority = parts.netloc
+                            if '@' in _path:
+                                authority = _path.split('@')[1]
+                            else:
+                                authority = _path
+                            resource = 'acct:{}'.format(_path)
+                    elif part[QUERY]:
+                        resource = "https://{}?{}".format(_path, part[QUERY])
+                        parts = urlsplit(resource)
+                        authority = parts[NETLOC]
+                    else:
+                        resource = "https://{}".format(_path)
+                        part = urlsplit(resource)
+                        authority = part[NETLOC]
                 else:
-                    resource = "https://{}?{}".format(parts.path, parts.query)
-                    parts = urlparse(resource)
-                    authority = parts.netloc
+                    raise ValueError('Missing netloc')
             else:
-                if parts.scheme not in ['http', 'https', 'acct']:
+                _scheme = part[SCHEME]
+                if _scheme not in ['http', 'https', 'acct']:
                     # assume it to be a hostname port combo,
                     # eg. example.com:8080
                     resource = 'https://{}'.format(resource)
-                    parts = urisplit(resource)
-                    authority = parts.authority
-                elif parts.scheme in ['http', 'https'] and not parts.authority:
+                    part = urlsplit(resource)
+                    authority = part[NETLOC]
+                    resource = self.create_url(part,[FRAGMENT])
+                elif _scheme in ['http', 'https'] and not part[NETLOC]:
                     raise ValueError(
                         'No authority part in the resource specification')
-                elif parts.scheme == 'acct':
-                    if '@' in parts.path:
-                        authority = parts.path.split('@')[1]
+                elif _scheme == 'acct':
+                    _path = part[PATH]
+                    if '@' in _path:
+                        authority = _path.split('@')[1]
                     else:
                         raise ValueError(
                             'No authority part in the resource specification')
                 else:
-                    authority = parts.authority
+                    authority = part[NETLOC]
+                    resource = self.create_url(part, [FRAGMENT])
 
         location = WF_URL.format(authority)
         return oidc.WebFingerRequest(

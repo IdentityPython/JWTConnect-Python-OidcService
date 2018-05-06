@@ -47,6 +47,7 @@ EXAMPLE = {
     "nov@localhost/path?query#fragment": "https://nov@localhost/path?query",
     }
 
+
 def test_query():
     rel = 'http%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
     pattern = 'https://{}/.well-known/webfinger?rel={}&resource={}'
@@ -83,18 +84,44 @@ def test_query_2():
     pattern = 'https://{}/.well-known/webfinger?rel={}&resource={}'
     example_oidc = {
         # below are identifiers that are slightly off
-        "example.com?query": ('example.com', rel, 'acct%3Aexample.com'),
-        "example.com#fragment": ('example.com', rel, 'acct%3Aexample.com'),
+        "example.com?query": (
+            'example.com', rel, 'https%3A%2F%2Fexample.com%3Fquery'),
+        "example.com#fragment": (
+            'example.com', rel, 'https%3A%2F%2Fexample.com'),
         "example.com:8080/path?query#fragment":
             ('example.com:8080',
-             rel, 'https%3A%2F%2Fexample.com%3A8080%3Apath'),
-
+             rel, 'https%3A%2F%2Fexample.com%3A8080%2Fpath%3Fquery'),
+        "http://example.com/path": (
+            'example.com', rel, 'http%3A%2F%2Fexample.com%2Fpath'),
+        "http://example.com?query": (
+            'example.com', rel, 'http%3A%2F%2Fexample.com%3Fquery'),
+        "http://example.com#fragment": (
+            'example.com', rel, 'http%3A%2F%2Fexample.com'),
+        "http://example.com:8080/path?query#fragment": (
+            'example.com:8080', rel,
+            'http%3A%2F%2Fexample.com%3A8080%2Fpath%3Fquery'),
+        "nov@example.com:8080": (
+            "nov@example.com:8080", rel,
+            "https%3A%2F%2Fnov%40example.com%3A8080"),
+        "nov@example.com/path": (
+            "nov@example.com", rel,
+            "https%3A%2F%2Fnov%40example.com%2Fpath"),
+        "nov@example.com?query": (
+            "nov@example.com", rel,
+            "https%3A%2F%2Fnov%40example.com%3Fquery"),
+        "nov@example.com#fragment": (
+            "nov@example.com", rel,
+            "https%3A%2F%2Fnov%40example.com"),
+        "nov@example.com:8080/path?query#fragment":(
+            "nov@example.com:8080", rel,
+            "https%3A%2F%2Fnov%40example.com%3A8080%2Fpath%3Fquery")
         }
 
     wf = WebFinger(None, None)
     for key, args in example_oidc.items():
         _q = wf.query(key)
         assert _q == pattern.format(*args)
+
 
 def test_link1():
     link = Link(
