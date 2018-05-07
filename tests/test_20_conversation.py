@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 
 from oidcmsg.jwt import JWT
 from oidcmsg.key_jar import KeyJar
-from oidcmsg.oidc import AccessTokenResponse
+from oidcmsg.oidc import AccessTokenResponse, Link
 from oidcmsg.oidc import AuthorizationResponse
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import OpenIDSchema
@@ -142,9 +142,9 @@ def test_conversation():
         request_args={'resource': 'foobar@example.org'})
 
     assert info[
-               'url'] == 'https://example.org/.well-known/webfinger?resource' \
-                         '=acct%3Afoobar%40example.org&rel=http%3A%2F' \
-                         '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
+               'url'] == 'https://example.org/.well-known/webfinger?rel=http%3A%2F' \
+                         '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource' \
+                         '=acct%3Afoobar%40example.org'
 
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
@@ -157,8 +157,8 @@ def test_conversation():
     assert isinstance(response, JRD)
     assert set(response.keys()) == {'subject', 'links', 'expires'}
     assert response['links'] == [
-        {'rel': 'http://openid.net/specs/connect/1.0/issuer',
-         'href': 'https://example.org/op'}]
+        Link(rel= 'http://openid.net/specs/connect/1.0/issuer',
+             href= 'https://example.org/op')]
 
     service['webfinger'].update_service_context(resp=response)
     assert service_context.issuer == OP_BASEURL

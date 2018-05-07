@@ -119,7 +119,7 @@ class Authorization(service.Authorization):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['expires_at'] = time.time() + resp['expires_in']
+            resp['oidcrp:expires_at'] = time.time() + int(resp['expires_in'])
         self.store_item(resp.to_json(), 'auth_response', state)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -312,7 +312,7 @@ class AccessToken(service.AccessToken):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['expires_at'] = time.time() + resp['expires_in']
+            resp['oidcrp:expires_at'] = time.time() + int(resp['expires_in'])
 
         self.store_item(resp, 'token_response', state)
 
