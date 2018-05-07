@@ -383,7 +383,7 @@ def test_conversation():
                                                   state=STATE)
 
     assert isinstance(_resp, AccessTokenResponse)
-    assert set(_resp['verified_id_token'].keys()) == {
+    assert set(_resp['__verified_id_token'].keys()) == {
         'iss', 'kid', 'nonce', 'acr', 'auth_time', 'aud', 'iat', 'exp', 'sub'}
 
     service['accesstoken'].update_service_context(_resp, state=STATE)
@@ -392,8 +392,8 @@ def test_conversation():
                                               'token_response', STATE)
 
     assert set(_item.keys()) == {'state', 'scope', 'access_token',
-                                 'token_type', 'id_token', 'verified_id_token',
-                                 'expires_in', 'oidcrp:expires_at'}
+                                 'token_type', 'id_token', '__verified_id_token',
+                                 'expires_in', '__expires_at'}
 
     assert _item['token_type'] == 'Bearer'
     assert _item['access_token'] == 'Z0FBQUFBQmFkdFF'

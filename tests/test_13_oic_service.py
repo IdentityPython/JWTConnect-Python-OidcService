@@ -248,7 +248,7 @@ class TestAccessTokenRequest(object):
 
     def test_id_token_nonce_match(self):
         self.service.store_nonce2state('nonce', 'state')
-        resp = AccessTokenResponse(verified_id_token={'nonce': 'nonce'})
+        resp = AccessTokenResponse(__verified_id_token={'nonce': 'nonce'})
         self.service.store_nonce2state('nonce2', 'state2')
         with pytest.raises(ParameterError):
             self.service.update_service_context(resp, state='state2')
@@ -342,7 +342,7 @@ class TestUserInfo(object):
         auth_response = AuthorizationResponse(code='access_code').to_json()
         token_response = AccessTokenResponse(
             access_token='access_token', id_token='a.signed.jwt',
-            verified_id_token={'sub': 'diana'}).to_json()
+            __verified_id_token={'sub': 'diana'}).to_json()
         db.set('abcde', State(token_response=token_response,
                               auth_response=auth_response).to_json())
         self.service = factory('UserInfo', state_db=db,

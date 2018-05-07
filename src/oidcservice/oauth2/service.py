@@ -81,7 +81,7 @@ class Authorization(Service):
 
     def update_service_context(self, resp, state='', **kwargs):
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time_sans_frac() + int(resp['expires_in'])
+            resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp, 'auth_response', state)
 
     def store_auth_request(self, request_args=None, **kwargs):
@@ -146,7 +146,7 @@ class AccessToken(Service):
 
     def update_service_context(self, resp, key='', **kwargs):
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time_sans_frac() + int(resp['expires_in'])
+            resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, **kwargs):
@@ -195,7 +195,7 @@ class RefreshAccessToken(Service):
 
     def update_service_context(self, resp, key='', **kwargs):
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time_sans_frac() + int(resp['expires_in'])
+            resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, **kwargs):

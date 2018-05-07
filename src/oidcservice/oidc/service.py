@@ -106,7 +106,7 @@ class Authorization(service.Authorization):
 
     def update_service_context(self, resp, state='', **kwargs):
         try:
-            _idt = resp['verified_id_token']
+            _idt = resp['__verified_id_token']
         except KeyError:
             pass
         else:
@@ -117,7 +117,7 @@ class Authorization(service.Authorization):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time_sans_frac() + int(resp['expires_in'])
+            resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp.to_json(), 'auth_response', state)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -299,7 +299,7 @@ class AccessToken(service.AccessToken):
 
     def update_service_context(self, resp, state='', **kwargs):
         try:
-            _idt = resp['verified_id_token']
+            _idt = resp['__verified_id_token']
         except KeyError:
             pass
         else:
@@ -310,7 +310,7 @@ class AccessToken(service.AccessToken):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time_sans_frac() + int(
+            resp['__expires_at'] = time_sans_frac() + int(
                 resp['expires_in'])
 
         self.store_item(resp, 'token_response', state)
@@ -822,12 +822,12 @@ class UserInfo(Service):
 
     def post_parse_response(self, response, **kwargs):
         _args = self.multiple_extend_request_args(
-            {}, kwargs['state'], ['verified_id_token'],
+            {}, kwargs['state'], ['__verified_id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
         )
 
         try:
-            _sub = _args['verified_id_token']['sub']
+            _sub = _args['__verified_id_token']['sub']
         except KeyError:
             logger.warning("Can not verify value on sub")
         else:
