@@ -3,6 +3,8 @@ import pytest
 
 from urllib.parse import urlsplit
 
+from oidcmsg.key_jar import build_keyjar
+
 from oidcservice import DEF_SIGN_ALG
 from oidcservice.service_context import ServiceContext, ATTRMAP
 
@@ -244,7 +246,7 @@ class TestClientInfo(object):
 
         assert np[2] != p[2]
 
-    def test_import_keys(self):
+    def test_import_keys_file(self):
         # Should only be two and that a symmetric key (client_secret) usable
         # for signing and encryption
         assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
@@ -257,3 +259,21 @@ class TestClientInfo(object):
 
         # Now there should be 3, the third a RSA key for signing
         assert len(self.service_context.keyjar.get_issuer_keys('')) == 3
+
+    def test_import_keys_url(self, httpserver):
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
+
+        # One EC key for signing
+        key_def = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
+
+        keyjar = build_keyjar(key_def)[1]
+
+        httpserver.serve_content(keyjar.export_jwks_as_json())
+
+        keyspec = {'url': {'https://example.com': httpserver.url }}
+
+        self.service_context.import_keys(keyspec)
+
+        # Now there should be one belonging to https://example.com
+        assert len(self.service_context.keyjar.get_issuer_keys(
+            'https://example.com')) == 1
