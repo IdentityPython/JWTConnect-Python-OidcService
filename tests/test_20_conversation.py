@@ -375,6 +375,7 @@ def test_conversation():
         "scope": "openid",
         "access_token": "Z0FBQUFBQmFkdFF",
         "token_type": "Bearer",
+        'expires_in': 600,
         "id_token": _jws}
 
     service_context.issuer = OP_BASEURL
@@ -391,7 +392,8 @@ def test_conversation():
                                               'token_response', STATE)
 
     assert set(_item.keys()) == {'state', 'scope', 'access_token',
-                                 'token_type', 'id_token', 'verified_id_token'}
+                                 'token_type', 'id_token', 'verified_id_token',
+                                 'expires_in', 'oidcrp:expires_at'}
 
     assert _item['token_type'] == 'Bearer'
     assert _item['access_token'] == 'Z0FBQUFBQmFkdFF'

@@ -1,12 +1,16 @@
 import inspect
 import logging
 import sys
-import time
-
 from urllib.parse import urlsplit, urlunsplit
 
 from cryptojwt import jws
-from oidcservice.state_interface import State
+from oidcmsg import oidc
+from oidcmsg.exception import MissingRequiredAttribute
+from oidcmsg.oauth2 import Message
+from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oidc import JRD
+from oidcmsg.oidc import make_openid_request
+from oidcmsg.time_util import time_sans_frac
 
 from oidcservice import OIDCONF_PATTERN
 from oidcservice import rndstr
@@ -20,13 +24,7 @@ from oidcservice.oidc import WF_URL
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
 from oidcservice.service import Service
-
-from oidcmsg import oidc
-from oidcmsg.exception import MissingRequiredAttribute
-from oidcmsg.oauth2 import ResponseMessage
-from oidcmsg.oauth2 import Message
-from oidcmsg.oidc import JRD
-from oidcmsg.oidc import make_openid_request
+from oidcservice.state_interface import State
 
 __author__ = 'Roland Hedberg'
 
@@ -56,26 +54,26 @@ PREFERENCE2PROVIDER = {
         "token_endpoint_auth_signing_alg_values_supported",
     "response_types": "response_types_supported",
     'grant_types': 'grant_types_supported'
-    }
+}
 
 PROVIDER2PREFERENCE = dict([(v, k) for k, v in PREFERENCE2PROVIDER.items()])
 
 PROVIDER_DEFAULT = {
     "token_endpoint_auth_method": "client_secret_basic",
     "id_token_signed_response_alg": "RS256",
-    }
+}
 
 IDT2REG = {
     'sigalg': 'id_token_signed_response_alg',
     'encalg': 'id_token_encrypted_response_alg',
     'encenc': 'id_token_encrypted_response_enc'
-    }
+}
 
 UI2REG = {
     'sigalg': 'userinfo_signed_response_alg',
     'encalg': 'userinfo_encrypted_response_alg',
     'encenc': 'userinfo_encrypted_response_enc'
-    }
+}
 
 
 class Authorization(service.Authorization):
@@ -119,7 +117,7 @@ class Authorization(service.Authorization):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time.time() + int(resp['expires_in'])
+            resp['oidcrp:expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp.to_json(), 'auth_response', state)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -245,7 +243,7 @@ class Authorization(service.Authorization):
             'client_id': _ctx.client_id, 'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
-            }
+        }
 
         for attr, param in IDT2REG.items():
             try:
@@ -283,7 +281,7 @@ class AccessToken(service.AccessToken):
             'client_id': _ctx.client_id, 'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
-            }
+        }
 
         for attr, param in IDT2REG.items():
             try:
@@ -312,7 +310,8 @@ class AccessToken(service.AccessToken):
                 raise ValueError('Invalid nonce value')
 
         if 'expires_in' in resp:
-            resp['oidcrp:expires_at'] = time.time() + int(resp['expires_in'])
+            resp['oidcrp:expires_at'] = time_sans_frac() + int(
+                resp['expires_in'])
 
         self.store_item(resp, 'token_response', state)
 
@@ -416,7 +415,7 @@ class WebFinger(Service):
                     _path = part[PATH]
                     if not part[QUERY] and not part[FRAGMENT]:
                         if '/' in _path or ':' in _path:
-                            resource= "https://{}".format(resource)
+                            resource = "https://{}".format(resource)
                             part = urlsplit(resource)
                             authority = part[NETLOC]
                         else:
@@ -443,7 +442,7 @@ class WebFinger(Service):
                     resource = 'https://{}'.format(resource)
                     part = urlsplit(resource)
                     authority = part[NETLOC]
-                    resource = self.create_url(part,[FRAGMENT])
+                    resource = self.create_url(part, [FRAGMENT])
                 elif _scheme in ['http', 'https'] and not part[NETLOC]:
                     raise ValueError(
                         'No authority part in the resource specification')
@@ -492,7 +491,7 @@ ENDPOINT2SERVICE = {
     'userinfo': ['userinfo'],
     'registration': ['registration'],
     'end_sesssion': ['end_session']
-    }
+}
 
 
 def add_redirect_uris(request_args, service=None, **kwargs):
@@ -628,7 +627,7 @@ rt2gt = {
     'code id_token': ['authorization_code', 'implicit'],
     'code token': ['authorization_code', 'implicit'],
     'code id_token token': ['authorization_code', 'implicit']
-    }
+}
 
 
 def response_types_to_grant_types(response_types):
@@ -817,7 +816,7 @@ class UserInfo(Service):
             request_args = self.multiple_extend_request_args(
                 request_args, kwargs['state'], ['access_token'],
                 ['auth_response', 'token_response', 'refresh_token_response']
-                )
+            )
 
         return request_args, {}
 
@@ -825,7 +824,7 @@ class UserInfo(Service):
         _args = self.multiple_extend_request_args(
             {}, kwargs['state'], ['verified_id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
-            )
+        )
 
         try:
             _sub = _args['verified_id_token']['sub']
@@ -857,7 +856,7 @@ class UserInfo(Service):
                             {}, self.default_authn_method,
                             authn_endpoint=self.endpoint_name),
                         "url": spec["endpoint"]
-                        }
+                    }
 
         self.store_item(response, 'user_info', kwargs['state'])
         return response
@@ -873,7 +872,7 @@ class UserInfo(Service):
             'client_id': _ctx.client_id, 'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
-            }
+        }
 
         for attr, param in UI2REG.items():
             try:
