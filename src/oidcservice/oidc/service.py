@@ -1,6 +1,7 @@
 import inspect
 import logging
 import sys
+import time
 
 from urllib.parse import urlsplit, urlunsplit
 
@@ -117,6 +118,8 @@ class Authorization(service.Authorization):
             except KeyError:
                 raise ValueError('Invalid nonce value')
 
+        if 'expires_in' in resp:
+            resp['expires_at'] = time.time() + resp['expires_in']
         self.store_item(resp.to_json(), 'auth_response', state)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -307,6 +310,9 @@ class AccessToken(service.AccessToken):
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 raise ValueError('Invalid nonce value')
+
+        if 'expires_in' in resp:
+            resp['expires_at'] = time.time() + resp['expires_in']
 
         self.store_item(resp, 'token_response', state)
 

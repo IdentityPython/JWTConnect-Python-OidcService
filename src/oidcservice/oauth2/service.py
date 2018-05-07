@@ -1,6 +1,7 @@
 import inspect
 import logging
 import sys
+import time
 
 from oidcmsg import oauth2
 from oidcmsg.exception import MissingParameter
@@ -79,6 +80,8 @@ class Authorization(Service):
         self.post_construct.append(self.store_auth_request)
 
     def update_service_context(self, resp, state='', **kwargs):
+        if 'expires_in' in resp:
+            resp['expires_at'] = time.time() + resp['expires_in']
         self.store_item(resp, 'auth_response', state)
 
     def store_auth_request(self, request_args=None, **kwargs):
@@ -142,6 +145,8 @@ class AccessToken(Service):
         self.pre_construct.append(self.oauth_pre_construct)
 
     def update_service_context(self, resp, key='', **kwargs):
+        if 'expires_in' in resp:
+            resp['expires_at'] = time.time() + resp['expires_in']
         self.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, **kwargs):
@@ -189,6 +194,8 @@ class RefreshAccessToken(Service):
         self.pre_construct.append(self.oauth_pre_construct)
 
     def update_service_context(self, resp, key='', **kwargs):
+        if 'expires_in' in resp:
+            resp['expires_at'] = time.time() + resp['expires_in']
         self.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, **kwargs):
