@@ -495,10 +495,23 @@ ENDPOINT2SERVICE = {
 
 
 def add_redirect_uris(request_args, service=None, **kwargs):
+    """
+    Add redirect_uris to the request arguments.
+
+    :param request_args: Incomming request arguments
+    :param service: A link to the service
+    :param kwargs: Possible extra keyword arguments
+    :return: A possibly augmented set of request arguments.
+    """
     _context = service.service_context
     if "redirect_uris" not in request_args:
+        # Callbacks is a dictionary with callback type 'code', 'implicit',
+        # 'form_post' as keys.
         if _context.callback:
-            request_args['redirect_uris'] = _context.callback.values()
+            # Filter out local additions.
+            _uris = [v for v in _context.callback.values() if
+                     not v.startswith('__')]
+            request_args['redirect_uris'] = _uris
         else:
             request_args['redirect_uris'] = _context.redirect_uris
     return request_args, {}
@@ -734,11 +747,11 @@ class Registration(Service):
                 continue
 
             try:
-                request_args[prop] = self.service_context.client_preferences[
-                    prop]
+                request_args[prop] = self.service_context.behaviour[prop]
             except KeyError:
                 try:
-                    request_args[prop] = self.service_context.behaviour[prop]
+                    request_args[
+                        prop] = self.service_context.client_preferences[prop]
                 except KeyError:
                     pass
         return request_args, {}
