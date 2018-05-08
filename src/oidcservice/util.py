@@ -49,9 +49,9 @@ def get_http_body(req, content_type=URL_ENCODED):
     :param content_type: The format of the body part.
     :return: The correctly formatet service request.
     """
-    if content_type == URL_ENCODED:
+    if URL_ENCODED in content_type:
         return req.to_urlencoded()
-    elif content_type == JSON_ENCODED:
+    elif JSON_ENCODED in content_type:
         return req.to_json()
     else:
         raise UnSupported(
