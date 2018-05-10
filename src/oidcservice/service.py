@@ -8,6 +8,8 @@ from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
 from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
+
+from oidcmsg.oauth2 import is_error_message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.message import Message
 
@@ -409,7 +411,7 @@ class Service(StateInterface):
         logger.debug(msg.format(resp.to_dict()))
 
         # is this an error message
-        if resp.is_error_message():
+        if is_error_message(resp):
             logger.debug('Error response: {}'.format(resp))
         else:
             vargs = self.gather_verify_arguments()
