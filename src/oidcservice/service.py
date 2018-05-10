@@ -228,7 +228,10 @@ class Service(StateInterface):
         return self.construct(request_args, **kwargs)
 
     def get_endpoint(self):
-        return self.endpoint
+        if self.endpoint:
+            return self.endpoint
+        else:
+            return self.service_context.provider_info[self.endpoint_name]
 
     def get_authn_header(self, request, authn_method, **kwargs):
 
