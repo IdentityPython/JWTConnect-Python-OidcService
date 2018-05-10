@@ -507,13 +507,15 @@ def add_redirect_uris(request_args, service=None, **kwargs):
     if "redirect_uris" not in request_args:
         # Callbacks is a dictionary with callback type 'code', 'implicit',
         # 'form_post' as keys.
-        if _context.callback:
-            # Filter out local additions.
-            _uris = [v for v in _context.callback.values() if
-                     not v.startswith('__')]
-            request_args['redirect_uris'] = _uris
-        else:
+        try:
+            _cbs = _context.callbacks
+        except AttributeError:
             request_args['redirect_uris'] = _context.redirect_uris
+        else:
+            # Filter out local additions.
+            _uris = [v for k,v in _cbs.items() if not k.startswith('__')]
+            request_args['redirect_uris'] = _uris
+
     return request_args, {}
 
 
