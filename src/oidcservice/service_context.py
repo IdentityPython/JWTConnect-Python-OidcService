@@ -85,7 +85,7 @@ class ServiceContext(object):
         try:
             self.redirect_uris = config['redirect_uris']
         except:
-            self.redirect_uris = [None]
+            self.redirect_uris = []
 
         try:
             self.callback = config['callback']
