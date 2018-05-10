@@ -166,9 +166,22 @@ class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss}
+
+        client_config = {
+            'client_id': 'client_id',
+            'client_secret': 'password',
+            "client_preferences":
+                {
+                    "application_type": "web",
+                    "application_name": "rphandler",
+                    "contacts": ["ops@example.org"],
+                    "response_types": ["code"],
+                    "scope": ["openid", "profile", "email", "address", "phone"],
+                    "token_endpoint_auth_method": "client_secret_basic",
+                },
+                'redirect_uris': ['https://example.com/cli/authz_cb'],
+                'issuer': self._iss
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('ProviderInfoDiscovery', state_db=DB(),
                                service_context=service_context)
