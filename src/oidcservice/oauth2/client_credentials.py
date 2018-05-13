@@ -43,6 +43,7 @@ class RefreshAccessToken(Service):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory, conf=conf)
         self.pre_construct.append(self.cc_pre_construct)
+        self.post_construct.append(self.cc_post_construct)
 
     def cc_pre_construct(self, request_args=None, **kwargs):
         parameters = ['refresh_token']
@@ -60,6 +61,15 @@ class RefreshAccessToken(Service):
             request_args = _args
 
         return request_args, {}
+
+    def cc_post_construct(self, request_args, **kwargs):
+        for attr in ['client_id', 'client_secret']:
+            try:
+                del request_args[attr]
+            except KeyError:
+                pass
+
+        return request_args
 
     def update_service_context(self, resp, key='cc', **kwargs):
         if 'expires_in' in resp:
