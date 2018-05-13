@@ -1,11 +1,7 @@
-import inspect
-import sys
-
 from oidcmsg import oauth2
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.time_util import time_sans_frac
 
-from oidcservice.oauth2.service import factory as oauth2_factory
 from oidcservice.service import Service
 
 
