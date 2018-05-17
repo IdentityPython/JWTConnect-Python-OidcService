@@ -8,6 +8,8 @@ from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
 from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
+
+from oidcmsg.oauth2 import is_error_message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.message import Message
 
@@ -228,7 +230,10 @@ class Service(StateInterface):
         return self.construct(request_args, **kwargs)
 
     def get_endpoint(self):
-        return self.endpoint
+        if self.endpoint:
+            return self.endpoint
+        else:
+            return self.service_context.provider_info[self.endpoint_name]
 
     def get_authn_header(self, request, authn_method, **kwargs):
 
@@ -406,7 +411,7 @@ class Service(StateInterface):
         logger.debug(msg.format(resp.to_dict()))
 
         # is this an error message
-        if resp.is_error_message():
+        if is_error_message(resp):
             logger.debug('Error response: {}'.format(resp))
         else:
             vargs = self.gather_verify_arguments()

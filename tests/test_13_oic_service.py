@@ -1,5 +1,6 @@
 import json
 import os
+
 import pytest
 from cryptojwt import jws
 
@@ -235,19 +236,23 @@ class TestAuthorization(object):
 class TestAuthorizationCallback(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'callback': {
-                             'code': 'https://example.com/cli/authz_cb',
-                             'implicit': 'https://example.com/cli/authz_im_cb',
-                             'form_post': 'https://example.com/cli/authz_fp_cb'
-                         }}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'callback': {
+                'code': 'https://example.com/cli/authz_cb',
+                'implicit': 'https://example.com/cli/authz_im_cb',
+                'form_post': 'https://example.com/cli/authz_fp_cb'
+            }
+        }
         service_context = ServiceContext(keyjar, config=client_config)
         self.service = factory('Authorization', state_db=DB(),
                                service_context=service_context)
 
     def test_construct_code(self):
-        req_args = {'foo': 'bar', 'response_type': 'code',
-                    'state': 'state'}
+        req_args = {
+            'foo': 'bar', 'response_type': 'code',
+            'state': 'state'
+        }
         _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
@@ -256,8 +261,10 @@ class TestAuthorizationCallback(object):
         assert _req['redirect_uri'] == 'https://example.com/cli/authz_cb'
 
     def test_construct_implicit(self):
-        req_args = {'foo': 'bar', 'response_type': 'id_token token',
-                    'state': 'state'}
+        req_args = {
+            'foo': 'bar', 'response_type': 'id_token token',
+            'state': 'state'
+        }
         _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
@@ -266,8 +273,10 @@ class TestAuthorizationCallback(object):
         assert _req['redirect_uri'] == 'https://example.com/cli/authz_im_cb'
 
     def test_construct_form_post(self):
-        req_args = {'foo': 'bar', 'response_type': 'code id_token token',
-                    'state': 'state', 'response_mode': 'form_post'}
+        req_args = {
+            'foo': 'bar', 'response_type': 'code id_token token',
+            'state': 'state', 'response_mode': 'form_post'
+        }
         _req = self.service.construct(request_args=req_args)
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'redirect_uri', 'foo', 'client_id',
@@ -279,8 +288,10 @@ class TestAuthorizationCallback(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb']}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb']
+        }
         service_context = ServiceContext(keyjar, config=client_config)
         _db = DB()
         auth_request = AuthorizationRequest(
@@ -303,8 +314,10 @@ class TestAccessTokenRequest(object):
                                     'redirect_uri'}
 
     def test_get_request_parameters(self):
-        req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
-                    'code': 'access_code'}
+        req_args = {
+            'redirect_uri': 'https://example.com/cli/authz_cb',
+            'code': 'access_code'
+        }
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state',
@@ -316,11 +329,14 @@ class TestAccessTokenRequest(object):
         assert msg.to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code', 'state': 'state',
-            'redirect_uri': 'https://example.com/cli/authz_cb'}
+            'redirect_uri': 'https://example.com/cli/authz_cb'
+        }
 
     def test_request_init(self):
-        req_args = {'redirect_uri': 'https://example.com/cli/authz_cb',
-                    'code': 'access_code'}
+        req_args = {
+            'redirect_uri': 'https://example.com/cli/authz_cb',
+            'code': 'access_code'
+        }
         self.service.endpoint = 'https://example.com/authorize'
 
         _info = self.service.get_request_parameters(request_args=req_args,
@@ -332,7 +348,8 @@ class TestAccessTokenRequest(object):
         assert msg.to_dict() == {
             'client_id': 'client_id', 'code': 'access_code',
             'grant_type': 'authorization_code', 'state': 'state',
-            'redirect_uri': 'https://example.com/cli/authz_cb'}
+            'redirect_uri': 'https://example.com/cli/authz_cb'
+        }
 
     def test_id_token_nonce_match(self):
         self.service.store_nonce2state('nonce', 'state')
@@ -346,13 +363,21 @@ class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss,
-                         'client_preferences': {
-                             'id_token_signed_response_alg': 'RS384',
-                             'userinfo_signed_response_alg': 'RS384'
-                         }}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss,
+            'client_preferences':
+                {
+                    "application_type": "web",
+                    "application_name": "rphandler",
+                    "contacts": ["ops@example.org"],
+                    "response_types": ["code"],
+                    "scope": ["openid", "profile", "email",
+                              "address", "phone"],
+                    "token_endpoint_auth_method": "client_secret_basic",
+                }
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('ProviderInfoDiscovery', state_db=None,
                                service_context=service_context)
@@ -367,6 +392,108 @@ class TestProviderInfo(object):
         assert set(_info.keys()) == {'url', 'method'}
         assert _info['url'] == '{}/.well-known/openid-configuration'.format(
             self._iss)
+
+    def test_post_parse(self):
+        OP_BASEURL = "https://example.com/as"
+
+        provider_info_response = {
+            "version": "3.0",
+            "token_endpoint_auth_methods_supported": [
+                "client_secret_post", "client_secret_basic",
+                "client_secret_jwt", "private_key_jwt"],
+            "claims_parameter_supported": True,
+            "request_parameter_supported": True,
+            "request_uri_parameter_supported": True,
+            "require_request_uri_registration": True,
+            "grant_types_supported": ["authorization_code",
+                                      "implicit",
+                                      "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                                      "refresh_token"],
+            "response_types_supported": ["code", "id_token",
+                                         "id_token token",
+                                         "code id_token",
+                                         "code token",
+                                         "code id_token token"],
+            "response_modes_supported": ["query", "fragment",
+                                         "form_post"],
+            "subject_types_supported": ["public", "pairwise"],
+            "claim_types_supported": ["normal", "aggregated",
+                                      "distributed"],
+            "claims_supported": ["birthdate", "address",
+                                 "nickname", "picture", "website",
+                                 "email", "gender", "sub",
+                                 "phone_number_verified",
+                                 "given_name", "profile",
+                                 "phone_number", "updated_at",
+                                 "middle_name", "name", "locale",
+                                 "email_verified",
+                                 "preferred_username", "zoneinfo",
+                                 "family_name"],
+            "scopes_supported": ["openid", "profile", "email",
+                                 "address", "phone",
+                                 "offline_access", "openid"],
+            "userinfo_signing_alg_values_supported": [
+                "RS256", "RS384", "RS512",
+                "ES256", "ES384", "ES512",
+                "HS256", "HS384", "HS512",
+                "PS256", "PS384", "PS512", "none"],
+            "id_token_signing_alg_values_supported": [
+                "RS256", "RS384", "RS512",
+                "ES256", "ES384", "ES512",
+                "HS256", "HS384", "HS512",
+                "PS256", "PS384", "PS512", "none"],
+            "request_object_signing_alg_values_supported": [
+                "RS256", "RS384", "RS512", "ES256", "ES384",
+                "ES512", "HS256", "HS384", "HS512", "PS256",
+                "PS384", "PS512", "none"],
+            "token_endpoint_auth_signing_alg_values_supported": [
+                "RS256", "RS384", "RS512", "ES256", "ES384",
+                "ES512", "HS256", "HS384", "HS512", "PS256",
+                "PS384", "PS512"],
+            "userinfo_encryption_alg_values_supported": [
+                "RSA1_5", "RSA-OAEP", "RSA-OAEP-256",
+                "A128KW", "A192KW", "A256KW",
+                "ECDH-ES", "ECDH-ES+A128KW", "ECDH-ES+A192KW",
+                "ECDH-ES+A256KW"],
+            "id_token_encryption_alg_values_supported": [
+                "RSA1_5", "RSA-OAEP", "RSA-OAEP-256",
+                "A128KW", "A192KW", "A256KW",
+                "ECDH-ES", "ECDH-ES+A128KW", "ECDH-ES+A192KW",
+                "ECDH-ES+A256KW"],
+            "request_object_encryption_alg_values_supported": [
+                "RSA1_5", "RSA-OAEP", "RSA-OAEP-256", "A128KW",
+                "A192KW", "A256KW", "ECDH-ES", "ECDH-ES+A128KW",
+                "ECDH-ES+A192KW", "ECDH-ES+A256KW"],
+            "userinfo_encryption_enc_values_supported": [
+                "A128CBC-HS256", "A192CBC-HS384", "A256CBC-HS512",
+                "A128GCM", "A192GCM", "A256GCM"],
+            "id_token_encryption_enc_values_supported": [
+                "A128CBC-HS256", "A192CBC-HS384", "A256CBC-HS512",
+                "A128GCM", "A192GCM", "A256GCM"],
+            "request_object_encryption_enc_values_supported": [
+                "A128CBC-HS256", "A192CBC-HS384", "A256CBC-HS512",
+                "A128GCM", "A192GCM", "A256GCM"],
+            "acr_values_supported": ["PASSWORD"],
+            "issuer": OP_BASEURL,
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
+                OP_BASEURL),
+            "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
+            "token_endpoint": "{}/token".format(OP_BASEURL),
+            "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
+            "registration_endpoint": "{}/registration".format(OP_BASEURL),
+            "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
+        }
+        assert self.service.service_context.behaviour == {}
+        resp = self.service.post_parse_response(provider_info_response)
+        self.service.update_service_context(resp)
+        assert self.service.service_context.behaviour == {
+            'token_endpoint_auth_method': 'client_secret_basic',
+            'response_types': ['code'],
+            'application_type': 'web',
+            'application_name': 'rphandler',
+            'contacts': ['ops@example.org'],
+            'scope': ['openid', 'profile', 'email', 'address', 'phone']
+        }
 
 
 def test_response_types_to_grant_types():
@@ -387,10 +514,12 @@ class TestRegistration(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss, 'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/'}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss, 'requests_dir': 'requests',
+            'base_url': 'https://example.com/cli/'
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('Registration', state_db=None,
                                service_context=service_context)
@@ -421,10 +550,12 @@ class TestUserInfo(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss, 'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/'}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss, 'requests_dir': 'requests',
+            'base_url': 'https://example.com/cli/'
+        }
         service_context = ServiceContext(config=client_config)
         db = DB()
         auth_response = AuthorizationResponse(code='access_code').to_json()
@@ -456,7 +587,8 @@ class TestUserInfo(object):
                 "locality": "Los Angeles",
                 "region": "CA",
                 "postal_code": "90210",
-                "country": "US"},
+                "country": "US"
+            },
             "phone_number": "+1 (555) 123-4567"
         }
 
@@ -467,8 +599,10 @@ class TestUserInfo(object):
 
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall',
-                            _claim_names={'address': 'src1',
-                                          'phone_number': 'src1'},
+                            _claim_names={
+                                'address': 'src1',
+                                'phone_number': 'src1'
+                            },
                             _claim_sources={'src1': {'JWT': _jwt}})
 
         public_keys_keyjar(_keyjar, '', self.service.service_context.keyjar,
@@ -485,10 +619,12 @@ class TestCheckSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss, 'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/'}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss, 'requests_dir': 'requests',
+            'base_url': 'https://example.com/cli/'
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('CheckSession', state_db=DB(),
                                service_context=service_context)
@@ -506,10 +642,12 @@ class TestCheckID(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss, 'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/'}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss, 'requests_dir': 'requests',
+            'base_url': 'https://example.com/cli/'
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('CheckID', state_db=DB(),
                                service_context=service_context)
@@ -526,10 +664,12 @@ class TestEndSession(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         self._iss = 'https://example.com/as'
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                         'redirect_uris': ['https://example.com/cli/authz_cb'],
-                         'issuer': self._iss, 'requests_dir': 'requests',
-                         'base_url': 'https://example.com/cli/'}
+        client_config = {
+            'client_id': 'client_id', 'client_secret': 'password',
+            'redirect_uris': ['https://example.com/cli/authz_cb'],
+            'issuer': self._iss, 'requests_dir': 'requests',
+            'base_url': 'https://example.com/cli/'
+        }
         service_context = ServiceContext(config=client_config)
         self.service = factory('EndSession', state_db=DB(),
                                service_context=service_context)
@@ -560,7 +700,10 @@ def test_authz_service_conf():
                         {
                             "auth_time": {"essential": True},
                             "acr": {"values": ["urn:mace:incommon:iap:silver"]}
-                        }}}})
+                        }
+                }
+            }
+        })
 
     req = srv.construct()
     assert 'claims' in req
@@ -568,14 +711,16 @@ def test_authz_service_conf():
 
 
 def test_add_jwks_uri_or_jwks_0():
-    client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                     'redirect_uris': ['https://example.com/cli/authz_cb'],
-                     'jwks_uri': 'https://example.com/jwks/jwks.json',
-                     'issuer': 'https://example.com/as',
-                     'client_preferences': {
-                         'id_token_signed_response_alg': 'RS384',
-                         'userinfo_signed_response_alg': 'RS384'
-                     }}
+    client_config = {
+        'client_id': 'client_id', 'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'jwks_uri': 'https://example.com/jwks/jwks.json',
+        'issuer': 'https://example.com/as',
+        'client_preferences': {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384'
+        }
+    }
     service_context = ServiceContext(config=client_config)
     service = factory('Registration', state_db=None,
                       service_context=service_context)
@@ -584,15 +729,17 @@ def test_add_jwks_uri_or_jwks_0():
 
 
 def test_add_jwks_uri_or_jwks_1():
-    client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                     'redirect_uris': ['https://example.com/cli/authz_cb'],
-                     'jwks_uri': 'https://example.com/jwks/jwks.json',
-                     'jwks': '{"keys":[]}',
-                     'issuer': 'https://example.com/as',
-                     'client_preferences': {
-                         'id_token_signed_response_alg': 'RS384',
-                         'userinfo_signed_response_alg': 'RS384'
-                     }}
+    client_config = {
+        'client_id': 'client_id', 'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'jwks_uri': 'https://example.com/jwks/jwks.json',
+        'jwks': '{"keys":[]}',
+        'issuer': 'https://example.com/as',
+        'client_preferences': {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384'
+        }
+    }
     service_context = ServiceContext(config=client_config)
     service = factory('Registration', state_db=None,
                       service_context=service_context)
@@ -602,13 +749,15 @@ def test_add_jwks_uri_or_jwks_1():
 
 
 def test_add_jwks_uri_or_jwks_2():
-    client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                     'redirect_uris': ['https://example.com/cli/authz_cb'],
-                     'issuer': 'https://example.com/as',
-                     'client_preferences': {
-                         'id_token_signed_response_alg': 'RS384',
-                         'userinfo_signed_response_alg': 'RS384'
-                     }}
+    client_config = {
+        'client_id': 'client_id', 'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'issuer': 'https://example.com/as',
+        'client_preferences': {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384'
+        }
+    }
     service_context = ServiceContext(
         config=client_config, jwks_uri='https://example.com/jwks/jwks.json')
     service = factory('Registration', state_db=None,
@@ -620,13 +769,15 @@ def test_add_jwks_uri_or_jwks_2():
 
 
 def test_add_jwks_uri_or_jwks_3():
-    client_config = {'client_id': 'client_id', 'client_secret': 'password',
-                     'redirect_uris': ['https://example.com/cli/authz_cb'],
-                     'issuer': 'https://example.com/as',
-                     'client_preferences': {
-                         'id_token_signed_response_alg': 'RS384',
-                         'userinfo_signed_response_alg': 'RS384'
-                     }}
+    client_config = {
+        'client_id': 'client_id', 'client_secret': 'password',
+        'redirect_uris': ['https://example.com/cli/authz_cb'],
+        'issuer': 'https://example.com/as',
+        'client_preferences': {
+            'id_token_signed_response_alg': 'RS384',
+            'userinfo_signed_response_alg': 'RS384'
+        }
+    }
     service_context = ServiceContext(config=client_config, jwks='{"keys":[]}')
     service = factory('Registration', state_db=None,
                       service_context=service_context)

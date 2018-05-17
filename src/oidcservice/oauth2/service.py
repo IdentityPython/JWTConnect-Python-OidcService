@@ -279,11 +279,17 @@ class ProviderInfoDiscovery(Service):
         self.service_context.issuer = _pcr_issuer
         self.service_context.provider_info = resp
 
-        for key, val in resp.items():
-            if key.endswith("_endpoint"):
-                for _srv in self.service_context.service.values():
-                    if _srv.endpoint_name == key:
-                        _srv.endpoint = val
+        try:
+            _srvs = self.service_context.service
+        except AttributeError:
+            pass
+        else:
+            if self.service_context.service:
+                for key, val in resp.items():
+                    if key.endswith("_endpoint"):
+                        for _srv in self.service_context.service.values():
+                            if _srv.endpoint_name == key:
+                                _srv.endpoint = val
 
         try:
             kj = self.service_context.keyjar
