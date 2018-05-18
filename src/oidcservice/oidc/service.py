@@ -110,11 +110,13 @@ class Authorization(service.Authorization):
         except KeyError:
             pass
         else:
+            # If there is a verified ID Token then we have to do nonce
+            # verification
             try:
                 if self.get_state_by_nonce(_idt['nonce']) != state:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
-                raise ValueError('Invalid nonce value')
+                raise ValueError('Missing nonce value')
 
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
@@ -165,22 +167,16 @@ class Authorization(service.Authorization):
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
             if 'id_token' in _response_type or 'code' in _response_type:
-                try:
-                    _nonce = req['nonce']
-                except KeyError:
-                    _nonce = rndstr(32)
-                    req['nonce'] = _nonce
-
-                self.store_nonce2state(_nonce, req['state'])
+                self.store_nonce2state(req['nonce'], req['state'])
 
         try:
-            _request_method = kwargs['request_method']
+            _request_method = kwargs['request_param']
         except KeyError:
             pass
         else:
-            del kwargs['request_method']
+            del kwargs['request_param']
 
-            alg = 'RS256'
+            alg = ''
             for arg in ["request_object_signing_alg", "algorithm"]:
                 try:  # Trumps everything
                     alg = kwargs[arg]
