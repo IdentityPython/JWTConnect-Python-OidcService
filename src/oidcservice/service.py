@@ -66,7 +66,7 @@ class Service(StateInterface):
     def gather_request_args(self, **kwargs):
         """
         Go through the attributes that the message class can contain and
-        add values if they are missing and exists in the client info or
+        add values if they are missing but exists in the client info or
         when there are default values.
 
         :param kwargs: Initial set of attributes.
@@ -98,6 +98,13 @@ class Service(StateInterface):
         return ar_args
 
     def method_args(self, context, **kwargs):
+        """
+        Collect the set of arguments that should be used by a set of methods
+
+        :param context: Which service we're working for
+        :param kwargs: A set of keyword arguments that are added at run-time.
+        :return: A set of keyword arguments
+        """
         try:
             _args = self.conf[context].copy()
         except KeyError:
@@ -230,13 +237,26 @@ class Service(StateInterface):
         return self.construct(request_args, **kwargs)
 
     def get_endpoint(self):
+        """
+        Find the service endpoint
+
+        :return: The service endpoint (a URL)
+        """
         if self.endpoint:
             return self.endpoint
         else:
             return self.service_context.provider_info[self.endpoint_name]
 
     def get_authn_header(self, request, authn_method, **kwargs):
+        """
+        Construct an authorization specification to be sent in the
+        HTTP header.
 
+        :param request: The service request
+        :param authn_method: Which authentication/authorization method to use
+        :param kwargs: Extra keyword arguments
+        :return: A set of keyword arguments to be sent in the HTTP header.
+        """
         headers = {}
         # If I should deal with client authentication
         if authn_method:
@@ -250,6 +270,12 @@ class Service(StateInterface):
         return headers
 
     def get_authn_method(self):
+        """
+        Find the method that the client should use to authenticate against a
+        service.
+
+        :return: The authn/authz method
+        """
         return self.default_authn_method
 
     def get_request_parameters(self, request_body_type="", method="", authn_method='',
@@ -342,6 +368,14 @@ class Service(StateInterface):
         return info
 
     def post_parse_response(self, response, **kwargs):
+        """
+        This method does post processing of the service response.
+        Each service have their own version of this method.
+
+        :param response: The service response
+        :param kwargs: A set of keyword arguments
+        :return: The possibly modified response
+        """
         return response
 
     def gather_verify_arguments(self):
