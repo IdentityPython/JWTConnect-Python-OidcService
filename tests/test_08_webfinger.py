@@ -1,5 +1,7 @@
 import json
 
+import pytest
+from oidcmsg.exception import MissingRequiredAttribute
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import Link
 
@@ -8,44 +10,6 @@ from oidcservice.oidc.service import WebFinger
 from oidcservice.service_context import ServiceContext
 
 __author__ = 'Roland Hedberg'
-
-# examples provided by Nat Sakimura
-# EXAMPLE = {
-#     "example.com": "https://example.com",
-#     "example.com:8080": "https://example.com:8080",
-#     "example.com/path": "https://example.com/path",
-#     "example.com?query": "https://example.com?query",
-#     "example.com#fragment": "https://example.com",
-#     "example.com:8080/path?query#fragment":
-#         "https://example.com:8080/path?query",
-#     "http://example.com": "http://example.com",
-#     "http://example.com:8080": "http://example.com:8080",
-#     "http://example.com/path": "http://example.com/path",
-#     "http://example.com?query": "http://example.com?query",
-#     "http://example.com#fragment": "http://example.com",
-#     "http://example.com:8080/path?query#fragment":
-#         "http://example.com:8080/path?query",
-#     "nov@example.com": "acct:nov@example.com",
-#     "nov@example.com:8080": "https://nov@example.com:8080",
-#     "nov@example.com/path": "https://nov@example.com/path",
-#     "nov@example.com?query": "https://nov@example.com?query",
-#     "nov@example.com#fragment": "acct:nov@example.com",
-#     "nov@example.com:8080/path?query#fragment":
-#         "https://nov@example.com:8080/path?query",
-#     "acct:nov@matake.jp": "acct:nov@matake.jp",
-#     "acct:nov@example.com:8080": "acct:nov@example.com:8080",
-#     "acct:nov@example.com/path": "acct:nov@example.com/path",
-#     "acct:nov@example.com?query": "acct:nov@example.com?query",
-#     "acct:nov@example.com#fragment": "acct:nov@example.com",
-#     "acct:nov@example.com:8080/path?query#fragment":
-#         "acct:nov@example.com:8080/path?query",
-#     "nov@localhost": "acct:nov@localhost",
-#     "nov@localhost:8080": "https://nov@localhost:8080",
-#     "nov@localhost/path": "https://nov@localhost/path",
-#     "nov@localhost?query": "https://nov@localhost?query",
-#     "nov@localhost#fragment": "acct:nov@localhost",
-#     "nov@localhost/path?query#fragment": "https://nov@localhost/path?query",
-#     }
 
 
 def test_query():
@@ -300,3 +264,36 @@ class TestWebFinger(object):
                "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
                ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
                "=acct%3Acarol%40example.com"
+
+    def test_query_acct_resource_kwargs(self):
+        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
+        request_args = {}
+        _info = wf.get_request_parameters(request_args=request_args,
+                                          resource="acct:carol@example.com")
+
+        assert _info['url'] == \
+               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
+               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
+               "=acct%3Acarol%40example.com"
+
+    def test_query_acct_resource_config(self):
+        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
+        wf.service_context.config['resource'] = "acct:carol@example.com"
+        request_args = {}
+        _info = wf.get_request_parameters(request_args=request_args)
+
+        assert _info['url'] == \
+               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
+               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
+               "=acct%3Acarol%40example.com"
+
+    def test_query_acct_no_resource(self):
+        wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
+        try:
+            del wf.service_context.config['resource']
+        except KeyError:
+            pass
+        request_args = {}
+
+        with pytest.raises(MissingRequiredAttribute):
+            wf.get_request_parameters(request_args=request_args)

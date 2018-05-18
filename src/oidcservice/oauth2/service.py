@@ -231,18 +231,22 @@ class ProviderInfoDiscovery(Service):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory, conf=conf)
 
+    def get_endpoint(self):
+        try:
+            _iss = self.service_context.issuer
+        except AttributeError:
+            _iss = self.endpoint
+
+        if _iss.endswith('/'):
+            return OIDCONF_PATTERN.format(_iss[:-1])
+        else:
+            return OIDCONF_PATTERN.format(_iss)
+
     def get_request_parameters(self, request_body_type="", method="GET",
                                authn_method='', request_args=None,
                                http_args=None, **kwargs):
 
-        issuer = self.service_context.issuer
-
-        if issuer.endswith("/"):
-            _issuer = issuer[:-1]
-        else:
-            _issuer = issuer
-
-        return {'url': OIDCONF_PATTERN.format(_issuer), 'method': method}
+        return {'url': self.get_endpoint(), 'method': method}
 
     def _update_service_context(self, resp, **kwargs):
         """

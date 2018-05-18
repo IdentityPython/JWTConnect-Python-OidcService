@@ -414,6 +414,35 @@ class TestProviderInfo(object):
             'scope': ['openid', 'profile', 'email', 'address', 'phone']
         }
 
+    def test_post_parse_2(self):
+        OP_BASEURL = "https://example.com/as"
+
+        provider_info_response = {
+            "version": "3.0",
+            "token_endpoint_auth_methods_supported": [
+                "client_secret_post", "client_secret_basic",
+                "client_secret_jwt", "private_key_jwt"],
+            "issuer": OP_BASEURL,
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
+                OP_BASEURL),
+            "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
+            "token_endpoint": "{}/token".format(OP_BASEURL),
+            "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
+            "registration_endpoint": "{}/registration".format(OP_BASEURL),
+            "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
+        }
+        assert self.service.service_context.behaviour == {}
+        resp = self.service.post_parse_response(provider_info_response)
+        self.service.update_service_context(resp)
+        assert self.service.service_context.behaviour == {
+            'token_endpoint_auth_method': 'client_secret_basic',
+            'response_types': ['code'],
+            'application_type': 'web',
+            'application_name': 'rphandler',
+            'contacts': ['ops@example.org'],
+            'scope': ['openid', 'profile', 'email', 'address', 'phone']
+        }
+
 
 def test_response_types_to_grant_types():
     req_args = ['code']
@@ -524,6 +553,7 @@ class TestUserInfo(object):
                             },
                             _claim_sources={'src1': {'JWT': _jwt}})
 
+        # Add issuer public keys to the service context key jar
         public_keys_keyjar(_keyjar, '', self.service.service_context.keyjar,
                            'https://example.org/op/')
 
@@ -532,6 +562,34 @@ class TestUserInfo(object):
         assert set(_resp.keys()) == {'sub', 'given_name', 'family_name',
                                      '_claim_names', '_claim_sources',
                                      'address', 'phone_number'}
+
+    def test_unpack_aggregated_response_missing_keys(self):
+        claims = {
+            "address": {
+                "street_address": "1234 Hollywood Blvd.",
+                "locality": "Los Angeles",
+                "region": "CA",
+                "postal_code": "90210",
+                "country": "US"
+            },
+            "phone_number": "+1 (555) 123-4567"
+        }
+
+        _keyjar = build_keyjar(KEYSPEC)[1]
+
+        srv = JWT(_keyjar, iss='https://example.org/op/', sign_alg='ES256')
+        _jwt = srv.pack(payload=claims)
+
+        resp = OpenIDSchema(sub='diana', given_name='Diana',
+                            family_name='krall',
+                            _claim_names={
+                                'address': 'src1',
+                                'phone_number': 'src1'
+                            },
+                            _claim_sources={'src1': {'JWT': _jwt}})
+
+        _resp = self.service.parse_response(resp.to_json(), state='abcde')
+        assert _resp
 
 
 class TestCheckSession(object):

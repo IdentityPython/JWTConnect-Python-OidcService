@@ -5,7 +5,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from cryptojwt import jws
 from oidcmsg import oidc
-from oidcmsg.exception import MissingRequiredAttribute
+from oidcmsg.exception import MissingRequiredAttribute, MissingSigningKey
 from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oidc import JRD
@@ -539,17 +539,6 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
             logger.info(
                 'Preloaded keys for {}: {}'.format(resp['issuer'], _jwks))
 
-    def get_endpoint(self):
-        try:
-            _iss = self.service_context.issuer
-        except AttributeError:
-            _iss = self.endpoint
-
-        if _iss.endswith('/'):
-            return OIDCONF_PATTERN.format(_iss[:-1])
-        else:
-            return OIDCONF_PATTERN.format(_iss)
-
     def match_preferences(self, pcr=None, issuer=None):
         """
         Match the clients preferences against what the provider can do.
@@ -586,13 +575,7 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                     logger.info(
                         'No info from provider on {} and no default'.format(
                             _pref))
-                    # Don't know what the right thing to do here
-                    # Fail or hope for the best, made it configurable
-                    if self.service_context.strict_on_preferences:
-                        raise ConfigurationError(
-                            "OP couldn't match preference:%s" % _pref, pcr)
-                    else:
-                        _pvals = vals
+                    _pvals = vals
 
             if isinstance(vals, str):
                 if vals in _pvals:
@@ -856,15 +839,22 @@ class UserInfo(Service):
         else:
             for csrc, spec in _csrc.items():
                 if "JWT" in spec:
-                    aggregated_claims = Message().from_jwt(
-                        spec["JWT"].encode("utf-8"),
-                        keyjar=self.service_context.keyjar)
-                    claims = [value for value, src in
-                              response["_claim_names"].items() if
-                              src == csrc]
+                    try:
+                        aggregated_claims = Message().from_jwt(
+                            spec["JWT"].encode("utf-8"),
+                            keyjar=self.service_context.keyjar)
+                    except MissingSigningKey as err:
+                        logger.warning(
+                            'Error encounterd while unpacking aggregated claims'.format(
+                                err
+                            ))
+                    else:
+                        claims = [value for value, src in
+                                  response["_claim_names"].items() if
+                                  src == csrc]
 
-                    for key in claims:
-                        response[key] = aggregated_claims[key]
+                        for key in claims:
+                            response[key] = aggregated_claims[key]
                 elif 'endpoint' in spec:
                     _info = {
                         "headers": self.get_authn_header(
