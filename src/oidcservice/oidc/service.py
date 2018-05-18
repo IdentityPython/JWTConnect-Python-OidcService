@@ -1,18 +1,19 @@
 import inspect
 import logging
 import sys
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
+from urllib.parse import urlunsplit
 
 from cryptojwt import jws
 from oidcmsg import oidc
-from oidcmsg.exception import MissingRequiredAttribute, MissingSigningKey
+from oidcmsg.exception import MissingRequiredAttribute
+from oidcmsg.exception import MissingSigningKey
 from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import make_openid_request
 from oidcmsg.time_util import time_sans_frac
 
-from oidcservice import OIDCONF_PATTERN
 from oidcservice import rndstr
 from oidcservice.exception import ConfigurationError
 from oidcservice.exception import ParameterError

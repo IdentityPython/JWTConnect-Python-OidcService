@@ -58,14 +58,14 @@ def get_http_body(req, content_type=URL_ENCODED):
             "Unsupported content type: '%s'" % content_type)
 
 
-def add_path(url, path):
-    if url.endswith('/'):
-        if path.startswith('/'):
-            return '{}{}'.format(url, path[1:])
-        else:
-            return '{}{}'.format(url, path)
-    else:
-        if path.startswith('/'):
-            return '{}{}'.format(url, path)
-        else:
-            return '{}/{}'.format(url, path)
+# def add_path(url, path):
+#     if url.endswith('/'):
+#         if path.startswith('/'):
+#             return '{}{}'.format(url, path[1:])
+#         else:
+#             return '{}{}'.format(url, path)
+#     else:
+#         if path.startswith('/'):
+#             return '{}{}'.format(url, path)
+#         else:
+#             return '{}/{}'.format(url, path)
