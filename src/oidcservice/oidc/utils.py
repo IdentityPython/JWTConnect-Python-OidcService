@@ -7,6 +7,14 @@ from oidcmsg.exception import MissingRequiredAttribute
 
 
 def request_object_encryption(msg, service_context, **kwargs):
+    """
+    Created an encrypted JSON Web token with *msg* as body.
+
+    :param msg: The mesaqg
+    :param service_context:
+    :param kwargs:
+    :return:
+    """
     try:
         encalg = kwargs["request_object_encryption_alg"]
     except KeyError:
@@ -56,7 +64,7 @@ def request_object_encryption(msg, service_context, **kwargs):
 
 def construct_request_uri(local_dir, base_path, **kwargs):
     """
-    Contructs a special redirect_uri to be used when communicating with
+    Constructs a special redirect_uri to be used when communicating with
     one OP. Each OP should get their own redirect_uris.
     
     :param local_dir: Local directory in which to place the file
