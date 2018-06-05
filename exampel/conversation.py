@@ -12,20 +12,7 @@ from oidcservice.oidc.service import factory
 from oidcservice.service import build_services
 from oidcservice.service_context import ServiceContext
 from oidcservice.state_interface import State
-
-
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
+from oidcservice.state_interface import InMemoryStateDataBase
 
 
 KEYSPEC = [
@@ -109,7 +96,8 @@ service_context = ServiceContext(
     }
 )
 
-service = build_services(service_spec, factory, state_db=DB(),
+service = build_services(service_spec, factory,
+                         state_db=InMemoryStateDataBase(),
                          service_context=service_context)
 
 service_context.service = service

@@ -3,7 +3,7 @@ import pytest
 from oidcservice.service_context import ServiceContext
 from oidcservice.oauth2.service import factory
 from oidcservice.service import Service
-from oidcservice.state_interface import State
+from oidcservice.state_interface import State, InMemoryStateDataBase
 
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
@@ -19,22 +19,8 @@ class Response(object):
         self.headers = headers or {"content-type": "text/plain"}
 
 
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
-
-
 def test_service_factory():
-    req = factory('Service', state_db=DB(),
+    req = factory('Service', state_db=InMemoryStateDataBase(),
                   service_context=ServiceContext(None),
                   client_authn_method=None)
     assert isinstance(req, Service)
@@ -46,7 +32,8 @@ class TestAuthorization(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        self.service = factory('Authorization', state_db=DB(),
+        self.service = factory('Authorization',
+                               state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct(self):
@@ -94,7 +81,7 @@ class TestAccessTokenRequest(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        db = DB()
+        db = InMemoryStateDataBase()
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state'
@@ -183,7 +170,8 @@ class TestProviderInfo(object):
                 'issuer': self._iss
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('ProviderInfoDiscovery', state_db=DB(),
+        self.service = factory('ProviderInfoDiscovery',
+                               state_db=InMemoryStateDataBase(),
                                service_context=service_context)
         self.service.endpoint = '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -206,7 +194,7 @@ class TestRefreshAccessTokenRequest(object):
         client_config = {'client_id': 'client_id', 'client_secret': 'password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
-        db = DB()
+        db = InMemoryStateDataBase()
         auth_response = AuthorizationResponse(code='access_code')
         token_response = AccessTokenResponse(access_token='bearer_token',
                                              refresh_token='refresh')
@@ -234,7 +222,7 @@ def test_access_token_srv_conf():
                      'redirect_uris': ['https://example.com/cli/authz_cb']}
     service_context = ServiceContext(config=client_config)
 
-    db = DB()
+    db = InMemoryStateDataBase()
     auth_request = AuthorizationRequest(
         redirect_uri='https://example.com/cli/authz_cb', state='state')
     auth_response = AuthorizationResponse(code='access_code')

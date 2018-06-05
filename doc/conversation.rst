@@ -76,8 +76,10 @@ service specifications
 To initiate the services we need to run::
 
     from oidcservice.oic.service import factory
+    from oidcservice.state_interface import InMemoryStateDataBase
 
-    service = build_services(service_spec, factory, state_db=DB(),
+    service = build_services(service_spec, factory,
+                             state_db=InMemoryStateDataBase(),
                              service_context=service_context)
 
 

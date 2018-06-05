@@ -26,7 +26,7 @@ from oidcservice.oidc import service
 from oidcservice.oidc.service import factory
 from oidcservice.service import build_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import State
+from oidcservice.state_interface import State, InMemoryStateDataBase
 
 from oidcmsg.key_bundle import KeyBundle
 from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationRequest
@@ -57,25 +57,14 @@ def get_service_context():
 def get_service():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
     service_context.client_secret = "boarding pass"
-    service = factory('AccessToken', state_db=DB(),
+    service = factory('AccessToken', state_db=InMemoryStateDataBase(),
                       service_context=service_context)
     return service
 
 
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        return self.db[item]
-
-
 @pytest.fixture
 def services():
-    db = DB()
+    db = InMemoryStateDataBase()
     auth_request = AuthorizationRequest(redirect_uri="http://example.com",
                                         state='ABCDE').to_json()
     auth_response = AuthorizationResponse(access_token="token",
