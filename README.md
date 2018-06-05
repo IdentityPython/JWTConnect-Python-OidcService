@@ -27,14 +27,28 @@ import requests
 from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.service import ProviderInfoDiscovery
 
-service = ProviderInfoDiscovery()
+class DB(object):
+    def __init__(self):
+        self.db = {}
 
-service_context = ClientInfo
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, item):
+        try:
+            return self.db[item]
+        except KeyError:
+            return None
+
+service_context = ServiceContext
 service_context.issuer = "https://accounts.google.com"
 service_context.keyjar = None
 
+service = ProviderInfoDiscovery(service_context, DB())
+
 args = service.get_request_parameters(service_context)
 
+# Do the HTTP request
 http_resp = requests.request(**args)
 
 # giassuming that we got a 200 response
@@ -43,5 +57,5 @@ oidc_response = service.parse_response(http_resp.text, service_context)
 print(oidc_response.to_dict())
 ```
 
-The output should the be a dictionary with the provider information for
+The output should then be a dictionary with the provider information for
 Google's OP.

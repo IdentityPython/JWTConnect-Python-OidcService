@@ -17,13 +17,14 @@ from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.service import factory
 from oidcservice.service import build_services
+from oidcservice.state_interface import InMemoryStateDataBase
 
 # ================== SETUP ===========================
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
     {"type": "EC", "crv": "P-256", "use": ["sig"]},
-]
+    ]
 
 JWKS_OP = {
     'keys': [{
@@ -39,7 +40,7 @@ JWKS_OP = {
         'q':
             '6LOHuM7H_0kDrMTwUEX7Aubzr792GoJ6EgTKIQY25SAFTZpYwuC3NnqlAdy8foIa3d7eGU2yICRbBG0S_ITcooDFrOa7nZ6enMUclMTxW8FwwvBXeIHo9cIsrKYtOThGplz43Cvl73MK5M58ZRmuhaNYa6Mk4PL4UokARfEiDus',
         'use': 'sig'
-    },
+        },
         {
             'crv': 'P-256',
             'd': 'N2dg0-DAROBF8owQA4-uY5s0Ab-Fep_42kEFQG4BNVQ',
@@ -48,8 +49,9 @@ JWKS_OP = {
             'use': 'sig',
             'x': 'Ls8SqX8Ti5QAKtw3rdGr5K537-tqQCIbhyebeE_2C38',
             'y': 'S-BrbPQkh8HVFLWg5Wid_5OAk4ewn5skHlHtG08ShaA'
-        }
-    ]}
+            }
+        ]
+}
 
 OP_KEYJAR = KeyJar()
 OP_KEYJAR.import_jwks(JWKS_OP, '')
@@ -70,15 +72,17 @@ RP_JWKS = {
         "p":
             "_STNoJFkX9_uw8whytVmTrHP5K7vcZBIH9nuCTvj137lC48ZpR1UARx4qShxHLfK7DrufHd7TYnJkEMNUHFmdKvkaVQMY0_BsBSvCrUl10gzxsI08hg53L17E1Pe73iZp3f5nA4eB-1YB-km1Cc-Xs10OPWedJHf9brlCPDLAb8",
         "q":
-            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"},
+            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
+    },
         {
             "kty": "EC", "use": "sig",
             "kid": "ME9NV3VQV292OTA4T1pNLXZoVjd2TldVSjNrNEkycjU2ZjkycldQOTcyUQ",
             "crv": "P-256",
             "x": "WWoO_Exim-LOD1k8QPi_CdU8M_VUSF7DkJCKR7PFWhQ",
             "y": "EpxHNZp6ykyeLiS6r7l9ly2in1Zju7hnLk7RFraklxE",
-            "d": "pepDloEcTyHnoEuqFirZ8hpt861piMDgiuvHIhhRSpM"}]
-}
+            "d": "pepDloEcTyHnoEuqFirZ8hpt861piMDgiuvHIhhRSpM"
+        }]
+    }
 
 RP_KEYJAR = KeyJar()
 RP_KEYJAR.import_jwks(RP_JWKS, '')
@@ -89,22 +93,7 @@ SERVICE_PUBLIC_JWKS = RP_KEYJAR.export_jwks('')
 OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
-
-
 # ---------------------------------------------------
-
 
 def test_conversation():
     service_context = ServiceContext(
@@ -118,16 +107,17 @@ def test_conversation():
                     "response_types": ["code"],
                     "scope": ["openid", "profile", "email", "address", "phone"],
                     "token_endpoint_auth_method": "client_secret_basic",
-                },
+                    },
             "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
             "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
-        }
-    )
+            }
+        )
 
     service_spec = DEFAULT_SERVICES.copy()
     service_spec['WebFinger'] = {}
 
-    service = build_services(service_spec, factory, state_db=DB(),
+    service = build_services(service_spec, factory,
+                             state_db=InMemoryStateDataBase(),
                              service_context=service_context)
 
     assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
@@ -142,23 +132,28 @@ def test_conversation():
         request_args={'resource': 'foobar@example.org'})
 
     assert info[
-               'url'] == 'https://example.org/.well-known/webfinger?rel=http%3A%2F' \
-                         '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource' \
+               'url'] == 'https://example.org/.well-known/webfinger?rel=http' \
+                         '%3A%2F' \
+                         '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer' \
+                         '&resource' \
                          '=acct%3Afoobar%40example.org'
 
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
-        "links": [{"rel": "http://openid.net/specs/connect/1.0/issuer",
-                   "href": "https://example.org/op"}],
-        "expires": "2018-02-04T11:08:41Z"})
+        "links": [{
+                      "rel": "http://openid.net/specs/connect/1.0/issuer",
+                      "href": "https://example.org/op"
+                  }],
+        "expires": "2018-02-04T11:08:41Z"
+    })
 
     response = service['webfinger'].parse_response(webfinger_response)
 
     assert isinstance(response, JRD)
     assert set(response.keys()) == {'subject', 'links', 'expires'}
     assert response['links'] == [
-        Link(rel= 'http://openid.net/specs/connect/1.0/issuer',
-             href= 'https://example.org/op')]
+        Link(rel='http://openid.net/specs/connect/1.0/issuer',
+             href='https://example.org/op')]
 
     service['webfinger'].update_service_context(resp=response)
     assert service_context.issuer == OP_BASEURL
@@ -253,7 +248,8 @@ def test_conversation():
         "token_endpoint": "{}/token".format(OP_BASEURL),
         "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
         "registration_endpoint": "{}/registration".format(OP_BASEURL),
-        "end_session_endpoint": "{}/end_session".format(OP_BASEURL)})
+        "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
+    })
 
     resp = service['provider_info'].parse_response(provider_info_response)
 
@@ -273,13 +269,15 @@ def test_conversation():
 
     assert info['url'] == 'https://example.org/op/registration'
     _body = json.loads(info['body'])
-    assert _body == {"application_type": "web",
-                     "response_types": ["code"],
-                     "contacts": ["ops@example.org"],
-                     "jwks_uri": "https://example.com/rp/static/jwks.json",
-                     "redirect_uris": ["https://example.com/rp/authz_cb"],
-                     'token_endpoint_auth_method': 'client_secret_basic',
-                     "grant_types": ["authorization_code"]}
+    assert _body == {
+        "application_type": "web",
+        "response_types": ["code"],
+        "contacts": ["ops@example.org"],
+        "jwks_uri": "https://example.com/rp/static/jwks.json",
+        "redirect_uris": ["https://example.com/rp/authz_cb"],
+        'token_endpoint_auth_method': 'client_secret_basic',
+        "grant_types": ["authorization_code"]
+    }
     assert info['headers'] == {'Content-Type': 'application/json'}
 
     now = int(time.time())
@@ -296,7 +294,8 @@ def test_conversation():
         "response_types": ["code"],
         "contacts": ["ops@example.com"],
         "token_endpoint_auth_method": "client_secret_basic",
-        "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)]})
+        "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)]
+    })
 
     response = service['registration'].parse_response(
         op_client_registration_response)
@@ -333,7 +332,8 @@ def test_conversation():
         'scope': 'openid',
         'code': 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01',
         'iss': OP_BASEURL,
-        'client_id': 'zls2qhN1jO6A'}
+        'client_id': 'zls2qhN1jO6A'
+    }
 
     _authz_rep = AuthorizationResponse(**op_authz_resp)
 
@@ -345,29 +345,36 @@ def test_conversation():
 
     # =================== Access token ====================
 
-    request_args = {'state': STATE,
-                    'redirect_uri': service_context.redirect_uris[0]}
+    request_args = {
+        'state': STATE,
+        'redirect_uri': service_context.redirect_uris[0]
+    }
 
     info = service['accesstoken'].get_request_parameters(
         request_args=request_args)
 
     assert info['url'] == 'https://example.org/op/token'
     _qp = parse_qs(info['body'])
-    assert _qp == {'grant_type': ['authorization_code'],
-                   'redirect_uri': ['https://example.com/rp/authz_cb'],
-                   'client_id': ['zls2qhN1jO6A'],
-                   'state': ['Oh3w3gKlvoM2ehFqlxI3HIK5'],
-                   'code': ['Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01']}
+    assert _qp == {
+        'grant_type': ['authorization_code'],
+        'redirect_uri': ['https://example.com/rp/authz_cb'],
+        'client_id': ['zls2qhN1jO6A'],
+        'state': ['Oh3w3gKlvoM2ehFqlxI3HIK5'],
+        'code': ['Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01']
+    }
     assert info['headers'] == {
         'Authorization': 'Basic '
                          'emxzMnFoTjFqTzZBOmM4NDM0ZjI4Y2Y5Mzc1ZDlhNw==',
-        'Content-Type': 'application/x-www-form-urlencoded'}
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
 
     # create the IdToken
     _jwt = JWT(OP_KEYJAR, OP_BASEURL, lifetime=3600, sign=True,
                sign_alg='RS256')
-    payload = {'sub': '1b2fc9341a16ae4e30082965d537', 'acr': 'PASSWORD',
-               'auth_time': 1517736988, 'nonce': NONCE}
+    payload = {
+        'sub': '1b2fc9341a16ae4e30082965d537', 'acr': 'PASSWORD',
+        'auth_time': 1517736988, 'nonce': NONCE
+    }
     _jws = _jwt.pack(payload=payload, recv='zls2qhN1jO6A')
 
     _resp = {
@@ -376,7 +383,8 @@ def test_conversation():
         "access_token": "Z0FBQUFBQmFkdFF",
         "token_type": "Bearer",
         'expires_in': 600,
-        "id_token": _jws}
+        "id_token": _jws
+    }
 
     service_context.issuer = OP_BASEURL
     _resp = service['accesstoken'].parse_response(json.dumps(_resp),
@@ -392,7 +400,8 @@ def test_conversation():
                                               'token_response', STATE)
 
     assert set(_item.keys()) == {'state', 'scope', 'access_token',
-                                 'token_type', 'id_token', '__verified_id_token',
+                                 'token_type', 'id_token',
+                                 '__verified_id_token',
                                  'expires_in', '__expires_at'}
 
     assert _item['token_type'] == 'Bearer'

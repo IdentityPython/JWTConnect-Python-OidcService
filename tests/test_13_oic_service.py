@@ -9,6 +9,7 @@ from oidcservice.exception import ParameterError
 from oidcservice.oidc.service import factory, add_jwks_uri_or_jwks
 from oidcservice.oidc.service import response_types_to_grant_types
 from oidcservice.service import Service
+from oidcservice.state_interface import InMemoryStateDataBase
 from oidcservice.state_interface import State
 
 from oidcmsg.jwt import JWT
@@ -47,23 +48,10 @@ issuer_jwks = issuer_keyjar.export_jwks()
 _jwks = keyjar.export_jwks()
 issuer_keyjar.import_jwks(_jwks, 'client_id')
 
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
-
 
 def test_request_factory():
     req = factory('Service', service_context=ServiceContext(None),
-                  state_db=DB(), client_authn_method=None)
+                  state_db=InMemoryStateDataBase(), client_authn_method=None)
     assert isinstance(req, Service)
 
 
@@ -75,7 +63,8 @@ class TestAuthorization(object):
         service_context = ServiceContext(keyjar, config=client_config)
         service_context.keyjar.import_jwks(issuer_jwks, 'https://example.com')
         service_context.issuer = 'https://example.com'
-        self.service = factory('Authorization', state_db=DB(),
+        self.service = factory('Authorization',
+                               state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct(self):
@@ -245,7 +234,8 @@ class TestAuthorizationCallback(object):
             }
         }
         service_context = ServiceContext(keyjar, config=client_config)
-        self.service = factory('Authorization', state_db=DB(),
+        self.service = factory('Authorization',
+                               state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct_code(self):
@@ -293,7 +283,7 @@ class TestAccessTokenRequest(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(keyjar, config=client_config)
-        _db = DB()
+        _db = InMemoryStateDataBase()
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state', response_type='code').to_json()
@@ -586,7 +576,7 @@ class TestUserInfo(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        db = DB()
+        db = InMemoryStateDataBase()
         auth_response = AuthorizationResponse(code='access_code').to_json()
         token_response = AccessTokenResponse(
             access_token='access_token', id_token='a.signed.jwt',
@@ -684,7 +674,7 @@ class TestCheckSession(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckSession', state_db=DB(),
+        self.service = factory('CheckSession', state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct(self):
@@ -707,7 +697,7 @@ class TestCheckID(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckID', state_db=DB(),
+        self.service = factory('CheckID', state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct(self):
@@ -729,7 +719,7 @@ class TestEndSession(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('EndSession', state_db=DB(),
+        self.service = factory('EndSession', state_db=InMemoryStateDataBase(),
                                service_context=service_context)
 
     def test_construct(self):
@@ -749,7 +739,7 @@ def test_authz_service_conf():
     }
 
     srv = factory(
-        'Authorization', state_db=DB(),
+        'Authorization', state_db=InMemoryStateDataBase(),
         service_context=ServiceContext(keyjar, config=client_config),
         conf={
             'request_args': {

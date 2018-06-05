@@ -17,6 +17,27 @@ class State(Message):
     }
 
 
+# The simplest possible implementation of the state database
+class InMemoryStateDataBase(object):
+    def __init__(self):
+        self.db = {}
+
+    def set(self, key, value):
+        self.db[key] = value
+
+    def get(self, key):
+        try:
+            return self.db[key]
+        except KeyError:
+            return None
+
+    def delete(self, key):
+        try:
+            del self.db[key]
+        except KeyError:
+            return None
+
+
 class StateInterface(object):
     def __init__(self, state_db):
         self.state_db = state_db

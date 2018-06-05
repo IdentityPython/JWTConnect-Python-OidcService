@@ -2,22 +2,9 @@ import pytest
 
 from oidcservice.oauth2.client_credentials import AccessToken, RefreshAccessToken
 from oidcservice.service_context import ServiceContext
+from oidcservice.state_interface import InMemoryStateDataBase
 
 KEYDEF = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
-
-
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
 
 
 class TestRP():
@@ -25,7 +12,7 @@ class TestRP():
     def create_service(self):
         client_config = {'client_id': 'client_id', 'client_secret': 'password'}
         service_context = ServiceContext(config=client_config)
-        db = DB()
+        db = InMemoryStateDataBase()
         self.service = {
             'token': AccessToken(state_db=db, service_context=service_context),
             'refresh_token': RefreshAccessToken(state_db=db,

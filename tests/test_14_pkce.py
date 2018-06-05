@@ -9,6 +9,7 @@ from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.pkce import add_code_challenge
 from oidcservice.oidc.pkce import add_code_verifier
 from oidcservice.oidc.pkce import put_state_in_post_args
+from oidcservice.state_interface import InMemoryStateDataBase
 
 
 class DummyMessage(Message):
@@ -21,20 +22,6 @@ class DummyService(Service):
     msg_type = DummyMessage
 
 
-class DB(object):
-    def __init__(self):
-        self.db = {}
-
-    def set(self, key, value):
-        self.db[key] = value
-
-    def get(self, item):
-        try:
-            return self.db[item]
-        except KeyError:
-            return None
-
-
 def test_add_code_challenge_default_values():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
@@ -44,7 +31,7 @@ def test_add_code_challenge_default_values():
     service_context = ServiceContext(client_id='client_id',
                                      issuer='https://www.example.org/as',
                                      config=config)
-    service = DummyService(service_context, state_db=DB())
+    service = DummyService(service_context, state_db=InMemoryStateDataBase())
     _state = State(iss='Issuer')
     service.state_db.set('state', _state.to_json())
     spec = add_code_challenge({'state': 'state'}, service)
@@ -67,7 +54,7 @@ def test_add_code_challenge_spec_values():
     }
     service_context = ServiceContext(config=config)
 
-    service = DummyService(service_context, state_db=DB())
+    service = DummyService(service_context, state_db=InMemoryStateDataBase())
     _state = State(iss='Issuer')
     service.state_db.set('state', _state.to_json())
 
@@ -88,7 +75,7 @@ def test_authorization_and_pkce():
         'behaviour': {'response_types': ['code']}
     }
     service_context = ServiceContext(config=client_config)
-    service = factory('Authorization', state_db=DB(),
+    service = factory('Authorization', state_db=InMemoryStateDataBase(),
                       service_context=service_context)
     service.post_construct.append(add_code_challenge)
     request = service.construct_request()
@@ -105,7 +92,7 @@ def test_access_token_and_pkce():
         'behaviour': {'response_types': ['code']}
     }
     service_context = ServiceContext(config=client_config)
-    db = DB()
+    db = InMemoryStateDataBase()
     # Construct an authorization request.
     # Gives us a state value and stores code_verifier in state_db
     authz_service = factory('Authorization', state_db=db,
