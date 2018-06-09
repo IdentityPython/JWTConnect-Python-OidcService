@@ -1,6 +1,9 @@
 # oidccli
 #Implementation of OIDC/OAuth2 services
 
+oidcservice is the 3rd layer in the
+JWTConnect stack (cryptojwt, oidcmsg, oidcservice, oidcrp)
+
 An OIDC OP or an OAuth2 AS provides a set of services to be used by an
 RP/client.
 
