@@ -12,6 +12,7 @@ from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import make_openid_request
+from oidcmsg.oidc import verified_claim_name
 from oidcmsg.time_util import time_sans_frac
 
 from oidcservice import rndstr
@@ -107,7 +108,7 @@ class Authorization(service.Authorization):
 
     def update_service_context(self, resp, state='', **kwargs):
         try:
-            _idt = resp['__verified_id_token']
+            _idt = resp[verified_claim_name('id_token')]
         except KeyError:
             pass
         else:
@@ -296,7 +297,7 @@ class AccessToken(service.AccessToken):
 
     def update_service_context(self, resp, state='', **kwargs):
         try:
-            _idt = resp['__verified_id_token']
+            _idt = resp[verified_claim_name('id_token')]
         except KeyError:
             pass
         else:
@@ -817,12 +818,12 @@ class UserInfo(Service):
 
     def post_parse_response(self, response, **kwargs):
         _args = self.multiple_extend_request_args(
-            {}, kwargs['state'], ['__verified_id_token'],
+            {}, kwargs['state'], ['id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
         )
 
         try:
-            _sub = _args['__verified_id_token']['sub']
+            _sub = _args['id_token']['sub']
         except KeyError:
             logger.warning("Can not verify value on sub")
         else:

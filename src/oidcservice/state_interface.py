@@ -1,6 +1,7 @@
 from oidcmsg.message import Message
 from oidcmsg.message import SINGLE_OPTIONAL_JSON
 from oidcmsg.message import SINGLE_REQUIRED_STRING
+from oidcmsg.oidc import verified_claim_name
 
 from oidcservice import rndstr
 
@@ -131,9 +132,12 @@ class StateInterface(object):
         else:
             for parameter in parameters:
                 try:
-                    args[parameter] = item[parameter]
+                    args[parameter] = item[verified_claim_name(parameter)]
                 except KeyError:
-                    pass
+                    try:
+                        args[parameter] = item[parameter]
+                    except KeyError:
+                        pass
 
         return args
 
@@ -161,9 +165,12 @@ class StateInterface(object):
 
             for parameter in parameters:
                 try:
-                    args[parameter] = _item[parameter]
+                    args[parameter] = _item[verified_claim_name(parameter)]
                 except KeyError:
-                    pass
+                    try:
+                        args[parameter] = _item[parameter]
+                    except KeyError:
+                        pass
 
         return args
 
