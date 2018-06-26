@@ -4,22 +4,24 @@ import os
 import pytest
 from cryptojwt import jws
 from oidcmsg.jwt import JWT
-from oidcmsg.key_jar import build_keyjar, init_key_jar
-from oidcmsg.key_jar import public_keys_keyjar
+from oidcmsg.key_jar import build_keyjar
+from oidcmsg.key_jar import init_key_jar
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import Message
-from oidcmsg.oidc import CheckIDRequest, verified_claim_name
+from oidcmsg.oidc import CheckIDRequest
 from oidcmsg.oidc import CheckSessionRequest
 from oidcmsg.oidc import EndSessionRequest
 from oidcmsg.oidc import IdToken
 from oidcmsg.oidc import OpenIDSchema
 from oidcmsg.oidc import RegistrationRequest
+from oidcmsg.oidc import verified_claim_name
 
 from oidcservice.exception import ParameterError
-from oidcservice.oidc.service import add_jwks_uri_or_jwks, factory
+from oidcservice.oidc.service import add_jwks_uri_or_jwks
+from oidcservice.oidc.service import factory
 from oidcservice.oidc.service import response_types_to_grant_types
 from oidcservice.service import Service
 from oidcservice.service_context import ServiceContext

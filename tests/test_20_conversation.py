@@ -274,7 +274,7 @@ def test_conversation():
         "response_types": ["code"],
         "contacts": ["ops@example.org"],
         "jwks_uri": "https://example.com/rp/static/jwks.json",
-        "redirect_uris": ["https://example.com/rp/authz_cb"],
+        "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
         'token_endpoint_auth_method': 'client_secret_basic',
         "grant_types": ["authorization_code"]
     }
@@ -293,8 +293,9 @@ def test_conversation():
         "application_type": "web",
         "response_types": ["code"],
         "contacts": ["ops@example.com"],
+        "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
         "token_endpoint_auth_method": "client_secret_basic",
-        "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)]
+        "grant_types": ["authorization_code"]
     })
 
     response = service['registration'].parse_response(
@@ -309,7 +310,8 @@ def test_conversation():
         'client_secret_expires_at', 'contacts', 'client_id',
         'token_endpoint_auth_method', 'redirect_uris', 'response_types',
         'client_id_issued_at', 'client_secret', 'application_type',
-        'registration_client_uri', 'registration_access_token'}
+        'registration_client_uri', 'registration_access_token',
+        'grant_types'}
 
     # =================== Authorization ====================
 
