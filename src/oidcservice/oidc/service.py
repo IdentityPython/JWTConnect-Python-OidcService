@@ -26,7 +26,6 @@ from oidcservice.oidc import WF_URL
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
 from oidcservice.service import Service
-from oidcservice.state_interface import State
 
 __author__ = 'Roland Hedberg'
 
@@ -99,11 +98,10 @@ class Authorization(service.Authorization):
             try:
                 _state = request_args['state']
             except KeyError:
-                _state = rndstr(24)
+                _state = ''
 
-        request_args['state'] = _state
-        _item = State(iss=self.service_context.issuer)
-        self.state_db.set(_state, _item.to_json())
+        request_args['state'] = self.create_state(self.service_context.issuer,
+                                                  _state)
         return request_args, {}
 
     def update_service_context(self, resp, state='', **kwargs):
