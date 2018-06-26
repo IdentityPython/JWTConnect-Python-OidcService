@@ -199,8 +199,14 @@ class StateInterface(object):
         else:
             raise KeyError('Unknown nonce: "{}"'.format(nonce))
 
-    def create_state(self, iss):
-        key = rndstr(32)
+    def create_state(self, iss, key=''):
+        if not key:
+            key = rndstr(32)
+        else:
+            if key.startswith('__') and key.endswith('__'):
+                raise ValueError(
+                    'Invalid format. Leading and trailing "__" not allowed')
+
         _state = State(iss=iss)
         self.state_db.set(key, _state.to_json())
         return key
