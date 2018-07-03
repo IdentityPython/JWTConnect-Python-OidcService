@@ -1,3 +1,5 @@
+.. _oidcservice_service_context:
+
 ++++++++++++++
 ServiceContext
 ++++++++++++++
