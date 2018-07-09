@@ -102,7 +102,7 @@ class Authorization(Service):
 
     def post_parse_response(self, response, **kwargs):
         """
-        Add scope claim to responsefrom the request if not present in the
+        Add scope claim to response, from the request, if not present in the
         response
 
         :param response: The response
