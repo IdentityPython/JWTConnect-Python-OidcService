@@ -98,7 +98,7 @@ class ServiceContext(object):
             pass
 
         if 'keydefs' in config:
-            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)[1]
+            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)
 
     def get_client_secret(self):
         return self._c_secret

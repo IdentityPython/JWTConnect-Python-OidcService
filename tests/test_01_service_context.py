@@ -266,7 +266,7 @@ class TestClientInfo(object):
         # One EC key for signing
         key_def = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
 
-        keyjar = build_keyjar(key_def)[1]
+        keyjar = build_keyjar(key_def)
 
         httpserver.serve_content(keyjar.export_jwks_as_json())
 

@@ -6,6 +6,7 @@ from cryptojwt import jws
 from oidcmsg.jwt import JWT
 from oidcmsg.key_jar import build_keyjar
 from oidcmsg.key_jar import init_key_jar
+from oidcmsg.key_jar import public_keys_keyjar
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
@@ -47,11 +48,17 @@ ISS = 'https://example.com'
 
 CLI_KEY = init_key_jar(public_path='{}/pub_client.jwks'.format(_dirname),
                        private_path='{}/priv_client.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, iss='client_id')
+                       key_defs=KEYSPEC)
+
+# Store public versions of the keys under the entity's ID
+public_keys_keyjar(CLI_KEY, '', CLI_KEY, 'client_id')
 
 ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
                        private_path='{}/priv_iss.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, iss=ISS)
+                       key_defs=KEYSPEC)
+
+# Store public versions of the keys under the entity's ID
+public_keys_keyjar(ISS_KEY, '', ISS_KEY, ISS)
 
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
@@ -682,7 +689,7 @@ class TestUserInfo(object):
             "phone_number": "+1 (555) 123-4567"
         }
 
-        _keyjar = build_keyjar(KEYSPEC)[1]
+        _keyjar = build_keyjar(KEYSPEC)
 
         srv = JWT(_keyjar, iss=ISS, sign_alg='ES256')
         _jwt = srv.pack(payload=claims)

@@ -15,7 +15,7 @@ KEYSPEC = [
 
 RECEIVER = 'https://example.org/op'
 
-keyjar = build_keyjar(KEYSPEC)[1]
+keyjar = build_keyjar(KEYSPEC)
 
 
 # reading and writing to the same KeyJAr instance
