@@ -35,9 +35,9 @@ def add_code_challenge(request_args, service, **kwargs):
         # Pick hash method
         _hash_method = CC_METHOD[_method]
         # Use it on the code_verifier
-        _hv = _hash_method(_cv).hexdigest()
+        _hv = _hash_method(_cv).digest()
         # base64 encode the hash value
-        code_challenge = b64e(_hv.encode()).decode()
+        code_challenge = b64e(_hv).decode('ascii')
     except KeyError:
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
