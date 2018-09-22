@@ -3,10 +3,8 @@ from oidcmsg.oidc import AuthorizationRequest
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
 
-from oidcmsg.key_jar import build_keyjar
-from oidcmsg.key_jar import public_keys_keyjar
-
-from cryptojwt.jwe import factory
+from cryptojwt.key_jar import build_keyjar
+from cryptojwt.jwe.jwe import factory
 
 KEYSPEC = [
     {"type": "RSA", "use": ["enc"]},
@@ -15,11 +13,7 @@ KEYSPEC = [
 
 RECEIVER = 'https://example.org/op'
 
-keyjar = build_keyjar(KEYSPEC)[1]
-
-
-# reading and writing to the same KeyJAr instance
-public_keys_keyjar(keyjar, '', keyjar, RECEIVER)
+keyjar = build_keyjar(KEYSPEC, owner=RECEIVER)
 
 
 def test_request_object_encryption():

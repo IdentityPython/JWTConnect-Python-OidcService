@@ -25,7 +25,8 @@ class DummyService(Service):
 def test_add_code_challenge_default_values():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
-        'client_secret': 'client_secret', 'base_url': 'https://example.com',
+        'client_secret': 'longer_client_secret',
+        'base_url': 'https://example.com',
         'requests_dir': 'requests',
     }
     service_context = ServiceContext(client_id='client_id',
@@ -48,7 +49,8 @@ def test_add_code_challenge_default_values():
 def test_add_code_challenge_spec_values():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
-        'client_secret': 'client_secret', 'base_url': 'https://example.com',
+        'client_secret': 'longer_client_secret',
+        'base_url': 'https://example.com',
         'requests_dir': 'requests',
         'code_challenge': {'length': 128, 'method': 'S384'}
     }
@@ -70,7 +72,7 @@ def test_add_code_challenge_spec_values():
 def test_authorization_and_pkce():
     client_config = {
         'client_id': 'client_id',
-        'client_secret': 'password',
+        'client_secret': 'password example one',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'behaviour': {'response_types': ['code']}
     }
@@ -87,7 +89,7 @@ def test_authorization_and_pkce():
 def test_access_token_and_pkce():
     client_config = {
         'client_id': 'client_id',
-        'client_secret': 'password',
+        'client_secret': 'password example one',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'behaviour': {'response_types': ['code']}
     }

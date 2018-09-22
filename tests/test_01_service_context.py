@@ -3,7 +3,7 @@ import pytest
 
 from urllib.parse import urlsplit
 
-from oidcmsg.key_jar import build_keyjar
+from cryptojwt.key_jar import build_keyjar
 
 from oidcservice import DEF_SIGN_ALG
 from oidcservice.service_context import ServiceContext, ATTRMAP
@@ -12,7 +12,8 @@ from oidcservice.service_context import ServiceContext, ATTRMAP
 def test_client_info_init():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
-        'client_secret': 'client_secret', 'base_url': 'https://example.com',
+        'client_secret': 'client_secret_wordplay',
+        'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
     ci = ServiceContext(config=config)
@@ -23,8 +24,8 @@ def test_client_info_init():
 
 def test_set_and_get_client_secret():
     service_context = ServiceContext()
-    service_context.client_secret = 'supersecret'
-    assert service_context.client_secret == 'supersecret'
+    service_context.client_secret = 'longenoughsupersecret'
+    assert service_context.client_secret == 'longenoughsupersecret'
 
 
 def test_set_and_get_client_id():
@@ -36,7 +37,7 @@ def test_set_and_get_client_id():
 def test_client_filename():
     config = {
         'client_id': 'client_id', 'issuer': 'issuer',
-        'client_secret': 'client_secret', 'base_url': 'https://example.com',
+        'client_secret': 'longenoughsupersecret', 'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
     ci = ServiceContext(config=config)
@@ -100,7 +101,8 @@ class TestClientInfo(object):
     def create_client_info_instance(self):
         config = {
             'client_id': 'client_id', 'issuer': 'issuer',
-            'client_secret': 'client_secret', 'base_url': 'https://example.com',
+            'client_secret': 'longenoughsupersecret',
+            'base_url': 'https://example.com',
             'requests_dir': 'requests'
         }
         self.service_context = ServiceContext(config=config)
@@ -247,9 +249,9 @@ class TestClientInfo(object):
         assert np[2] != p[2]
 
     def test_import_keys_file(self):
-        # Should only be two and that a symmetric key (client_secret) usable
+        # Should only be one and that a symmetric key (client_secret) usable
         # for signing and encryption
-        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
 
         file_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), 'salesforce.key'))
@@ -257,16 +259,16 @@ class TestClientInfo(object):
         keyspec = {'file': {'rsa': [file_path]}}
         self.service_context.import_keys(keyspec)
 
-        # Now there should be 3, the third a RSA key for signing
-        assert len(self.service_context.keyjar.get_issuer_keys('')) == 3
+        # Now there should be 2, the second a RSA key for signing
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
 
     def test_import_keys_url(self, httpserver):
-        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
 
         # One EC key for signing
         key_def = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
 
-        keyjar = build_keyjar(key_def)[1]
+        keyjar = build_keyjar(key_def)
 
         httpserver.serve_content(keyjar.export_jwks_as_json())
 

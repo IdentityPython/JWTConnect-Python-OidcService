@@ -2,7 +2,7 @@ import base64
 import logging
 from urllib.parse import quote_plus
 
-from cryptojwt.jws import alg2keytype
+from cryptojwt.jws.utils import alg2keytype
 
 from oidcservice import rndstr
 from oidcservice import sanitize

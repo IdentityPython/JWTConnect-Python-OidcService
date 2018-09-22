@@ -1,9 +1,10 @@
 import os
 
-from cryptojwt import jwe
-from cryptojwt.jwe import JWE
-from oidcservice import rndstr
+from cryptojwt.jwe.jwe import JWE
+from cryptojwt.jwe.utils import alg2keytype
 from oidcmsg.exception import MissingRequiredAttribute
+
+from oidcservice import rndstr
 
 
 def request_object_encryption(msg, service_context, **kwargs):
@@ -40,7 +41,7 @@ def request_object_encryption(msg, service_context, **kwargs):
             "No request_object_encryption_enc specified")
 
     _jwe = JWE(msg, alg=encalg, enc=encenc)
-    _kty = jwe.alg2keytype(encalg)
+    _kty = alg2keytype(encalg)
 
     try:
         _kid = kwargs["enc_kid"]
@@ -52,12 +53,12 @@ def request_object_encryption(msg, service_context, **kwargs):
 
     if _kid:
         _keys = service_context.keyjar.get_encrypt_key(_kty,
-                                                   owner=kwargs["target"],
-                                                   kid=_kid)
+                                                       owner=kwargs["target"],
+                                                       kid=_kid)
         _jwe["kid"] = _kid
     else:
         _keys = service_context.keyjar.get_encrypt_key(_kty,
-                                                   owner=kwargs["target"])
+                                                       owner=kwargs["target"])
 
     return _jwe.encrypt(_keys)
 

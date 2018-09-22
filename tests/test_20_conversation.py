@@ -4,8 +4,9 @@ import json
 import time
 from urllib.parse import urlparse, parse_qs
 
-from oidcmsg.jwt import JWT
-from oidcmsg.key_jar import KeyJar
+from cryptojwt.jwt import JWT
+from cryptojwt.key_jar import KeyJar
+
 from oidcmsg.oidc import AccessTokenResponse, Link
 from oidcmsg.oidc import AuthorizationResponse
 from oidcmsg.oidc import JRD

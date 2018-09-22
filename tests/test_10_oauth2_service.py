@@ -29,7 +29,8 @@ def test_service_factory():
 class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+        client_config = {'client_id': 'client_id',
+                         'client_secret': 'a longesh password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
         self.service = factory('Authorization',
@@ -78,7 +79,8 @@ class TestAuthorization(object):
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+        client_config = {'client_id': 'client_id',
+                         'client_secret': 'a longesh password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
         db = InMemoryStateDataBase()
@@ -156,7 +158,7 @@ class TestProviderInfo(object):
 
         client_config = {
             'client_id': 'client_id',
-            'client_secret': 'password',
+            'client_secret': 'a longesh password',
             "client_preferences":
                 {
                     "application_type": "web",
@@ -191,7 +193,8 @@ class TestProviderInfo(object):
 class TestRefreshAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password',
+        client_config = {'client_id': 'client_id',
+                         'client_secret': 'a longesh password',
                          'redirect_uris': ['https://example.com/cli/authz_cb']}
         service_context = ServiceContext(config=client_config)
         db = InMemoryStateDataBase()
@@ -218,7 +221,8 @@ class TestRefreshAccessTokenRequest(object):
 
 
 def test_access_token_srv_conf():
-    client_config = {'client_id': 'client_id', 'client_secret': 'password',
+    client_config = {'client_id': 'client_id',
+                     'client_secret': 'a longesh password',
                      'redirect_uris': ['https://example.com/cli/authz_cb']}
     service_context = ServiceContext(config=client_config)
 

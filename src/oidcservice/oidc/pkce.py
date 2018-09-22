@@ -1,4 +1,4 @@
-from cryptojwt import b64e
+from cryptojwt.utils import b64e
 from oidcmsg.message import Message
 
 from oidcservice import unreserved, CC_METHOD

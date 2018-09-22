@@ -4,7 +4,7 @@
 What a service should do
 ************************
 
-This document is a companion to oidcservice_service_ where the how is covered.
+This document is a companion to oidcservice-service_ where the how is covered.
 This document aims to tell you the what. What is divided into two part one is
 what happens before the HTTP request is sent and the other is what happens
 once the response has been reveived. In the following I am concentrating on
@@ -76,7 +76,7 @@ example would be::
     }
 
 The service will parse this JSON object and store the *href* value in the
-oidcservice_service_context_ as value on *issuer*.::
+oidcservice-service-context_ as value on *issuer*.::
 
     # _jrd is A parsed JRD response
     OIDC_REL = "http://openid.net/specs/connect/1.0/issuer"

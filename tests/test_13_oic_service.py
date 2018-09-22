@@ -2,10 +2,11 @@ import json
 import os
 
 import pytest
-from cryptojwt import jws
-from oidcmsg.jwt import JWT
-from oidcmsg.key_jar import build_keyjar
-from oidcmsg.key_jar import init_key_jar
+from cryptojwt.jws import jws
+from cryptojwt.jws.utils import left_hash
+from cryptojwt.jwt import JWT
+from cryptojwt.key_jar import build_keyjar
+from cryptojwt.key_jar import init_key_jar
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
@@ -47,11 +48,11 @@ ISS = 'https://example.com'
 
 CLI_KEY = init_key_jar(public_path='{}/pub_client.jwks'.format(_dirname),
                        private_path='{}/priv_client.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, iss='client_id')
+                       key_defs=KEYSPEC, owner='client_id')
 
 ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
                        private_path='{}/priv_iss.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, iss=ISS)
+                       key_defs=KEYSPEC, owner=ISS)
 
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
@@ -70,7 +71,7 @@ class TestAuthorization(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
@@ -162,7 +163,8 @@ class TestAuthorization(object):
                                          owner='client_id'))
         assert _resp
         assert set(_resp.keys()) == {'response_type', 'client_id', 'scope',
-                                     'redirect_uri', 'state', 'nonce'}
+                                     'redirect_uri', 'state', 'nonce',
+                                     'iss', 'aud', 'kid', 'iat'}
 
     def test_request_param(self):
         req_args = {'response_type': 'code', 'state': 'state'}
@@ -192,12 +194,12 @@ class TestAuthorization(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
         # Build an ID Token
-        idt = JWT(ISS_KEY, iss=ISS, lifetime=3600)
+        idt = JWT(key_jar=ISS_KEY, iss=ISS, lifetime=3600)
         payload = {'sub': '123456789', 'aud': ['client_id'], 'nonce': 'nonce'}
         # have to calculate c_hash
         alg = 'RS256'
         halg = "HS%s" % alg[-3:]
-        payload["c_hash"] = jws.left_hash('code', halg)
+        payload["c_hash"] = left_hash('code', halg)
 
         _idt = idt.pack(payload)
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -217,7 +219,7 @@ class TestAuthorization(object):
         # have to calculate c_hash
         alg = 'RS256'
         halg = "HS%s" % alg[-3:]
-        payload["c_hash"] = jws.left_hash('code', halg)
+        payload["c_hash"] = left_hash('code', halg)
 
         _idt = idt.pack(payload)
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -235,7 +237,7 @@ class TestAuthorization(object):
         # have to calculate c_hash
         alg = 'RS256'
         halg = "HS%s" % alg[-3:]
-        payload["c_hash"] = jws.left_hash('code', halg)
+        payload["c_hash"] = left_hash('code', halg)
 
         _idt = idt.pack(payload)
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -248,7 +250,7 @@ class TestAuthorizationCallback(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'callback': {
                 'code': 'https://example.com/cli/authz_cb',
                 'implicit': 'https://example.com/cli/authz_im_cb',
@@ -301,7 +303,7 @@ class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
     def create_request(self):
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
@@ -377,7 +379,7 @@ class TestProviderInfo(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss,
             'client_preferences':
@@ -554,12 +556,10 @@ def test_response_types_to_grant_types():
 
 def create_jws(val):
     lifetime = 3600
-    # idval = {'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'EndUserSubject',
-    #         'iss': 'https://alpha.cloud.nds.rub.de', 'aud': 'TestClient'}
 
     idts = IdToken(**val)
 
-    return idts.to_jwt(key=ISS_KEY.get_signing_key('ec'),
+    return idts.to_jwt(key=ISS_KEY.get_signing_key('ec', owner=ISS),
                        algorithm="ES256", lifetime=lifetime)
 
 
@@ -568,7 +568,7 @@ class TestRegistration(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
             'base_url': 'https://example.com/cli/'
@@ -604,7 +604,7 @@ class TestUserInfo(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
             'base_url': 'https://example.com/cli/'
@@ -614,8 +614,10 @@ class TestUserInfo(object):
         db = InMemoryStateDataBase()
         auth_response = AuthorizationResponse(code='access_code').to_json()
 
-        idtval = {'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'diana',
-                  'iss': ISS, 'aud': 'client_id'}
+        idtval = {
+            'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'diana',
+            'iss': ISS, 'aud': 'client_id'
+        }
         idt = create_jws(idtval)
 
         ver_idt = IdToken().from_jwt(idt, CLI_KEY)
@@ -682,7 +684,7 @@ class TestUserInfo(object):
             "phone_number": "+1 (555) 123-4567"
         }
 
-        _keyjar = build_keyjar(KEYSPEC)[1]
+        _keyjar = build_keyjar(KEYSPEC)
 
         srv = JWT(_keyjar, iss=ISS, sign_alg='ES256')
         _jwt = srv.pack(payload=claims)
@@ -704,7 +706,7 @@ class TestCheckSession(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
             'base_url': 'https://example.com/cli/'
@@ -727,7 +729,7 @@ class TestCheckID(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
             'base_url': 'https://example.com/cli/'
@@ -749,7 +751,7 @@ class TestEndSession(object):
     def create_request(self):
         self._iss = ISS
         client_config = {
-            'client_id': 'client_id', 'client_secret': 'password',
+            'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
             'base_url': 'https://example.com/cli/'
@@ -769,7 +771,7 @@ class TestEndSession(object):
 def test_authz_service_conf():
     client_config = {
         'client_id': 'client_id',
-        'client_secret': 'password',
+        'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'behaviour': {'response_types': ['code']}
     }
@@ -796,7 +798,7 @@ def test_authz_service_conf():
 
 def test_add_jwks_uri_or_jwks_0():
     client_config = {
-        'client_id': 'client_id', 'client_secret': 'password',
+        'client_id': 'client_id', 'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'jwks_uri': 'https://example.com/jwks/jwks.json',
         'issuer': ISS,
@@ -814,7 +816,7 @@ def test_add_jwks_uri_or_jwks_0():
 
 def test_add_jwks_uri_or_jwks_1():
     client_config = {
-        'client_id': 'client_id', 'client_secret': 'password',
+        'client_id': 'client_id', 'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'jwks_uri': 'https://example.com/jwks/jwks.json',
         'jwks': '{"keys":[]}',
@@ -834,7 +836,7 @@ def test_add_jwks_uri_or_jwks_1():
 
 def test_add_jwks_uri_or_jwks_2():
     client_config = {
-        'client_id': 'client_id', 'client_secret': 'password',
+        'client_id': 'client_id', 'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'issuer': ISS,
         'client_preferences': {
@@ -854,7 +856,7 @@ def test_add_jwks_uri_or_jwks_2():
 
 def test_add_jwks_uri_or_jwks_3():
     client_config = {
-        'client_id': 'client_id', 'client_secret': 'password',
+        'client_id': 'client_id', 'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'issuer': ISS,
         'client_preferences': {

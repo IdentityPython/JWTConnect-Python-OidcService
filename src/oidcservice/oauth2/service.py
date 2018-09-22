@@ -2,9 +2,10 @@ import inspect
 import logging
 import sys
 
+from cryptojwt.key_jar import KeyJar
+
 from oidcmsg import oauth2
 from oidcmsg.exception import MissingParameter
-from oidcmsg.key_jar import KeyJar
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.time_util import time_sans_frac
 
@@ -327,7 +328,11 @@ class ProviderInfoDiscovery(Service):
 
         # Load the keys. Note that this only means that the key specification
         # is loaded not necessarily that any keys are fetched.
-        kj.load_keys(resp, _pcr_issuer)
+        if 'jwks_uri' in resp:
+            kj.load_keys(_pcr_issuer, jwks_uri=resp['jwks_uri'])
+        elif 'jwks' in resp:
+            kj.load_keys(_pcr_issuer, jwks=resp['jwks'])
+
         self.service_context.keyjar = kj
 
     def update_service_context(self, resp, **kwargs):

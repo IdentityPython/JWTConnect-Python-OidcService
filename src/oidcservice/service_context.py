@@ -1,12 +1,12 @@
 import hashlib
 import os
 
-from cryptojwt import as_bytes
-from cryptojwt.jwk import import_private_rsa_key_from_file
-from cryptojwt.jwk import RSAKey
-from oidcmsg.key_bundle import KeyBundle
-from oidcmsg.key_jar import build_keyjar
-from oidcmsg.key_jar import KeyJar
+from cryptojwt.utils import as_bytes
+from cryptojwt.jwk.rsa import import_private_rsa_key_from_file
+from cryptojwt.jwk.rsa import RSAKey
+from cryptojwt.key_bundle import KeyBundle
+from cryptojwt.key_jar import build_keyjar
+from cryptojwt.key_jar import KeyJar
 
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
@@ -63,8 +63,7 @@ class ServiceContext(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        for attr in ['client_id', 'issuer', 'client_secret', 'base_url',
-                     'requests_dir']:
+        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir']:
             try:
                 setattr(self, attr, config[attr])
             except:
@@ -76,6 +75,9 @@ class ServiceContext(object):
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, {})
+
+        if 'client_secret' in config:
+            self.set_client_secret(config['client_secret'])
 
         if self.requests_dir:
             # make sure the path exists. If not, then make it.
@@ -98,7 +100,7 @@ class ServiceContext(object):
             pass
 
         if 'keydefs' in config:
-            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)[1]
+            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)
 
     def get_client_secret(self):
         return self._c_secret

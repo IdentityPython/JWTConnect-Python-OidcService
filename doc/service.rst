@@ -1,4 +1,4 @@
-.. _oidcservice_service:
+.. _oidcservice-service:
 
 *****************
 The Service class

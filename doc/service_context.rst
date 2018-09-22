@@ -1,4 +1,4 @@
-.. _oidcservice_service_context:
+.. _oidcservice-service-context:
 
 ++++++++++++++
 ServiceContext

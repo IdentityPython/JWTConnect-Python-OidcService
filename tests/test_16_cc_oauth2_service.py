@@ -10,7 +10,8 @@ KEYDEF = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
 class TestRP():
     @pytest.fixture(autouse=True)
     def create_service(self):
-        client_config = {'client_id': 'client_id', 'client_secret': 'password'}
+        client_config = {'client_id': 'client_id',
+                         'client_secret': 'another password'}
         service_context = ServiceContext(config=client_config)
         db = InMemoryStateDataBase()
         self.service = {
@@ -29,7 +30,7 @@ class TestRP():
         assert _info['url'] == 'https://example.com/token'
         assert _info['body'] == 'grant_type=client_credentials'
         assert _info['headers'] == {
-            'Authorization': 'Basic Y2xpZW50X2lkOnBhc3N3b3Jk',
+            'Authorization': 'Basic Y2xpZW50X2lkOmFub3RoZXIrcGFzc3dvcmQ=',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 

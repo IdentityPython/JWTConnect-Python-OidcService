@@ -4,7 +4,8 @@ import sys
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
-from cryptojwt import jws
+from cryptojwt.jws.utils import alg2keytype
+
 from oidcmsg import oidc
 from oidcmsg.exception import MissingRequiredAttribute
 from oidcmsg.exception import MissingSigningKey
@@ -195,14 +196,21 @@ class Authorization(service.Authorization):
             kwargs["request_object_signing_alg"] = alg
 
             if "keys" not in kwargs and alg and alg != "none":
-                _kty = jws.alg2keytype(alg)
-                try:
-                    _kid = kwargs["sig_kid"]
-                except KeyError:
-                    _kid = self.service_context.kid["sig"].get(_kty, None)
+                # _kty = alg2keytype(alg)
+                # try:
+                #     _kid = kwargs["sig_kid"]
+                # except KeyError:
+                #     _kid = self.service_context.kid["sig"].get(_kty, None)
 
-                kwargs["keys"] = self.service_context.keyjar.get_signing_key(
-                    _kty, kid=_kid)
+                kwargs["keys"] = self.service_context.keyjar
+
+            _srv_cntx = self.service_context
+            kwargs['issuer'] = _srv_cntx.client_id
+            try:
+                kwargs['recv'] = _srv_cntx.provider_info['issuer']
+            except KeyError:
+                kwargs['recv'] = _srv_cntx.issuer
+            del kwargs['service']
 
             _req = make_openid_request(req, **kwargs)
 
