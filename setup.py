@@ -66,7 +66,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
         "cryptojwt>=0.4.4",
-        'oidcmsg>=0.6.1',
+        'oidcmsg>=0.6.2',
     ],
     tests_require=[
         "responses",
