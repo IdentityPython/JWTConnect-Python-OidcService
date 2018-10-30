@@ -11,6 +11,7 @@ __author__ = 'roland'
 
 URL_ENCODED = 'application/x-www-form-urlencoded'
 JSON_ENCODED = "application/json"
+JOSE_ENCODED = "application/jose"
 
 
 def get_http_url(url, req, method='GET'):
@@ -53,6 +54,8 @@ def get_http_body(req, content_type=URL_ENCODED):
         return req.to_urlencoded()
     elif JSON_ENCODED in content_type:
         return req.to_json()
+    elif JOSE_ENCODED in content_type:
+        return req  # already packaged
     else:
         raise UnSupported(
             "Unsupported content type: '%s'" % content_type)

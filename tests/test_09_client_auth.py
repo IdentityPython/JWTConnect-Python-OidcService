@@ -6,10 +6,6 @@ import pytest
 
 from cryptojwt.key_bundle import KeyBundle
 from cryptojwt.key_jar import KeyJar
-from cryptojwt.utils import as_bytes
-from cryptojwt.utils import b64e
-from cryptojwt.jwk.hmac import SYMKey
-from cryptojwt.jwk.rsa import rsa_load
 from cryptojwt.jws.jws import JWS
 from cryptojwt.jwt import JWT
 from oidcmsg.message import Message

@@ -55,7 +55,8 @@ PREFERENCE2PROVIDER = {
     "token_endpoint_auth_signing_alg":
         "token_endpoint_auth_signing_alg_values_supported",
     "response_types": "response_types_supported",
-    'grant_types': 'grant_types_supported'
+    'grant_types': 'grant_types_supported',
+    'scope': 'scopes_supported'
 }
 
 PROVIDER2PREFERENCE = dict([(v, k) for k, v in PREFERENCE2PROVIDER.items()])
@@ -641,7 +642,7 @@ def response_types_to_grant_types(response_types):
         try:
             _gt = rt2gt[" ".join(_rt)]
         except KeyError:
-            raise ValueError(
+            logger.warning(
                 'No such response type combination: {}'.format(response_types))
         else:
             _res.update(set(_gt))
@@ -654,7 +655,7 @@ def add_request_uri(request_args=None, service=None, **kwargs):
     if _context.requests_dir:
         try:
             if _context.provider_info[
-                'require_request_uri_registration'] is True:
+                    'require_request_uri_registration'] is True:
                 request_args['request_uris'] = _context.generate_request_uris(
                     _context.requests_dir)
         except KeyError:

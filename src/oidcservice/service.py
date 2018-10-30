@@ -6,6 +6,7 @@ from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
 from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
+from oidcservice.util import JOSE_ENCODED
 from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
 
@@ -278,8 +279,9 @@ class Service(StateInterface):
         """
         return self.default_authn_method
 
-    def get_request_parameters(self, request_body_type="", method="", authn_method='',
-                               request_args=None, http_args=None, **kwargs):
+    def get_request_parameters(self, request_body_type="", method="",
+                               authn_method='', request_args=None,
+                               http_args=None, **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -335,6 +337,8 @@ class Service(StateInterface):
             # How should it be serialized
             if request_body_type == 'urlencoded':
                 content_type = URL_ENCODED
+            elif request_body_type in ['jws','jwe', 'jose']:
+                content_type = JOSE_ENCODED
             else:  # request_body_type == 'json'
                 content_type = JSON_ENCODED
 
@@ -415,6 +419,15 @@ class Service(StateInterface):
             sformat = self.response_body_type
 
         logger.debug('response format: {}'.format(sformat))
+
+        if sformat in ['jose','jws','jwe']:
+            resp = self.post_parse_response(info, state=state)
+
+            if not resp:
+                logger.error('Missing or faulty response')
+                raise ResponseError("Missing or faulty response")
+
+            return resp
 
         # If format is urlencoded 'info' may be a URL
         # in which case I have to get at the query/fragment part
