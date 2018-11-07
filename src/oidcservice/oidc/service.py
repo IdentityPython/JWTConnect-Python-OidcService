@@ -586,18 +586,27 @@ class ProviderInfoDiscovery(service.ProviderInfoDiscovery):
                 if vals in _pvals:
                     self.service_context.behaviour[_pref] = vals
             else:
-                vtyp = regreq.c_param[_pref]
-
-                if isinstance(vtyp[0], list):
-                    self.service_context.behaviour[_pref] = []
-                    for val in vals:
-                        if val in _pvals:
-                            self.service_context.behaviour[_pref].append(val)
+                try:
+                    vtyp = regreq.c_param[_pref]
+                except KeyError:
+                    # Allow non standard claims
+                    if isinstance(vals, list):
+                        self.service_context.behaviour[_pref] = [
+                            v for v in vals if v in _pvals]
+                    elif vals in _pvals:
+                        self.service_context.behaviour[_pref] = vals
                 else:
-                    for val in vals:
-                        if val in _pvals:
-                            self.service_context.behaviour[_pref] = val
-                            break
+                    if isinstance(vtyp[0], list):
+                        self.service_context.behaviour[_pref] = []
+                        for val in vals:
+                            if val in _pvals:
+                                self.service_context.behaviour[_pref].append(
+                                    val)
+                    else:
+                        for val in vals:
+                            if val in _pvals:
+                                self.service_context.behaviour[_pref] = val
+                                break
 
             if _pref not in self.service_context.behaviour:
                 raise ConfigurationError(

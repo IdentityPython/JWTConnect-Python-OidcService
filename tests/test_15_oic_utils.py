@@ -9,7 +9,7 @@ from cryptojwt.jwe.jwe import factory
 KEYSPEC = [
     {"type": "RSA", "use": ["enc"]},
     {"type": "EC", "crv": "P-256", "use": ["enc"]},
-]
+    ]
 
 RECEIVER = 'https://example.org/op'
 
@@ -25,7 +25,7 @@ def test_request_object_encryption():
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'client_id': 'client_1',
         'client_secret': 'abcdefghijklmnop',
-    }
+        }
     service_context = ServiceContext(keyjar=keyjar, config=conf)
     service_context.behaviour["request_object_encryption_alg"] = 'RSA1_5'
     service_context.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
@@ -34,10 +34,9 @@ def test_request_object_encryption():
                                      target=RECEIVER)
     assert _jwe
 
-    _jw = factory(_jwe)
+    _decryptor = factory(_jwe)
 
-    assert _jw.jwt.headers['alg'] == 'RSA1_5'
-    assert _jw.jwt.headers['enc'] == 'A128CBC-HS256'
+    assert _decryptor.jwt.verify_headers(alg='RSA1_5', enc='A128CBC-HS256')
 
 
 def test_construct_request_uri():

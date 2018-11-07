@@ -320,7 +320,7 @@ class TestClientSecretJWT_TE(object):
         _kj.add_symmetric(_service_context.client_id,
                           _service_context.client_secret,
                           ['sig'])
-        jso = JWT(key_jar=_kj).unpack(cas)
+        jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "exp", "iat", 'jti'])
 
         _rj = JWS()
@@ -352,7 +352,7 @@ class TestClientSecretJWT_UI(object):
         _kj.add_symmetric(_service_context.client_id,
                           _service_context.client_secret,
                           usage=['sig'])
-        jso = JWT(key_jar=_kj).unpack(cas)
+        jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
 
         _rj = JWS()
