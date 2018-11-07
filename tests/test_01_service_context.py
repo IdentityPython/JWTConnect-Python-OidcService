@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from cryptojwt.key_jar import build_keyjar
 
 from oidcservice import DEF_SIGN_ALG
-from oidcservice.service_context import ServiceContext, ATTRMAP
+from oidcservice.service_context import ServiceContext
 
 
 def test_client_info_init():
@@ -43,28 +43,6 @@ def test_client_filename():
     ci = ServiceContext(config=config)
     fname = ci.filename_from_webname('https://example.com/rq12345')
     assert fname == 'rq12345'
-
-
-def sign_enc_algs(service_context, typ):
-    """
-    Reformat the crypto algorithm information gathered from a
-    client registration response into something more palatable.
-
-    :param typ: 'id_token', 'userinfo' or 'request_object'
-    :return: Dictionary with 'sign', 'alg' or 'enc' as keys and the
-        corresponding algorithms as value
-    """
-    resp = {}
-    for key, val in ATTRMAP[typ].items():
-        try:
-            resp[key] = service_context.registration_response[val]
-        except (TypeError, KeyError):
-            if key == "sign":
-                try:
-                    resp[key] = DEF_SIGN_ALG[typ]
-                except KeyError:
-                    pass
-    return resp
 
 
 def verify_alg_support(service_context, alg, usage, typ):
@@ -108,7 +86,7 @@ class TestClientInfo(object):
         self.service_context = ServiceContext(config=config)
 
     def test_registration_userinfo_sign_enc_algs(self):
-        self.service_context.registration_response = {
+        self.service_context.behaviour = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -118,11 +96,12 @@ class TestClientInfo(object):
             "userinfo_encrypted_response_enc": "A128CBC-HS256",
         }
 
-        res = sign_enc_algs(self.service_context, 'userinfo')
-        assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
+        assert self.service_context.get_sign_alg('userinfo') is None
+        assert self.service_context.get_enc_alg_enc('userinfo') == {
+            'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
 
     def test_registration_request_object_sign_enc_algs(self):
-        self.service_context.registration_response = {
+        self.service_context.behaviour = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -133,14 +112,14 @@ class TestClientInfo(object):
             "request_object_signing_alg": "RS384"
         }
 
-        res = sign_enc_algs(self.service_context, 'userinfo')
+        res = self.service_context.get_enc_alg_enc('userinfo')
         # 'sign':'RS256' is an added default
-        assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = sign_enc_algs(self.service_context, 'request')
-        assert res == {'sign': 'RS384'}
+        assert res == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
+        res = self.service_context.get_sign_alg('request_object')
+        assert res == 'RS384'
 
     def test_registration_id_token_sign_enc_algs(self):
-        self.service_context.registration_response = {
+        self.service_context.behaviour = {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -154,13 +133,13 @@ class TestClientInfo(object):
             'id_token_signed_response_alg': "ES384",
         }
 
-        res = sign_enc_algs(self.service_context, 'userinfo')
+        res = self.service_context.get_enc_alg_enc('userinfo')
         # 'sign':'RS256' is an added default
-        assert res == {'sign': 'RS256', 'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = sign_enc_algs(self.service_context, 'request')
-        assert res == {'sign': 'RS384'}
-        res = sign_enc_algs(self.service_context, 'id_token')
-        assert res == {'sign': 'ES384', 'alg': 'ECDH-ES', 'enc': 'A128GCM'}
+        assert res == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
+        res = self.service_context.get_sign_alg('request_object')
+        assert res == 'RS384'
+        res = self.service_context.get_enc_alg_enc('id_token')
+        assert res == {'alg': 'ECDH-ES', 'enc': 'A128GCM'}
 
     def test_verify_alg_support(self):
         self.service_context.provider_info = {

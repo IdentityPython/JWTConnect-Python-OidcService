@@ -11,20 +11,44 @@ from cryptojwt.key_jar import KeyJar
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
 
-ATTRMAP = {
+CLI_REG_MAP = {
     "userinfo": {
         "sign": "userinfo_signed_response_alg",
         "alg": "userinfo_encrypted_response_alg",
-        "enc": "userinfo_encrypted_response_enc"},
+        "enc": "userinfo_encrypted_response_enc"
+    },
     "id_token": {
         "sign": "id_token_signed_response_alg",
         "alg": "id_token_encrypted_response_alg",
-        "enc": "id_token_encrypted_response_enc"},
-    "request": {
+        "enc": "id_token_encrypted_response_enc"
+    },
+    "request_object": {
         "sign": "request_object_signing_alg",
         "alg": "request_object_encryption_alg",
-        "enc": "request_object_encryption_enc"}
-}
+        "enc": "request_object_encryption_enc"
+    }
+    }
+
+PROVIDER_INFO_MAP = {
+    "id_token": {
+        "sign": "id_token_signing_alg_values_supported",
+        "alg": "id_token_encryption_alg_values_supported",
+        "enc": "id_token_encryption_enc_values_supported"
+        },
+    "userinfo": {
+        "sign": "userinfo_signing_alg_values_supported",
+        "alg": "userinfo_encryption_alg_values_supported",
+        "enc": "userinfo_encryption_enc_values_supported"
+        },
+    "request_object": {
+        "sign": "request_object_signing_alg_values_supported",
+        "alg": "request_object_encryption_alg_values_supported",
+        "enc": "request_object_encryption_enc_values_supported"
+        },
+    "token_enpoint_auth": {
+        "sign": "token_endpoint_auth_signing_alg_values_supported"
+        }
+    }
 
 
 class ServiceContext(object):
@@ -189,3 +213,41 @@ class ServiceContext(object):
                 for iss, url in spec.items():
                     kb = KeyBundle(source=url)
                     self.keyjar.add_kb(iss, kb)
+
+    def get_sign_alg(self, typ):
+        """
+
+        :param typ: ['id_token', 'userinfo', 'request_object']
+        :return:
+        """
+
+        try:
+            return self.behaviour[CLI_REG_MAP[typ]['sign']]
+        except KeyError:
+            try:
+                return self.provider_info[PROVIDER_INFO_MAP[typ]['sign']]
+            except KeyError:
+                pass
+
+        return None
+
+    def get_enc_alg_enc(self, typ):
+        """
+
+        :param typ:
+        :return:
+        """
+
+        res = {}
+        for attr in ['enc', 'alg']:
+            try:
+                 _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
+            except KeyError:
+                try:
+                    _alg = self.provider_info[PROVIDER_INFO_MAP[typ][attr]]
+                except KeyError:
+                    _alg = None
+
+            res[attr] = _alg
+
+        return res

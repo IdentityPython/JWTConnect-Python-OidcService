@@ -1,6 +1,8 @@
 import logging
 from urllib.parse import urlparse
 
+from cryptojwt.jwt import JWT
+
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
@@ -433,6 +435,17 @@ class Service(StateInterface):
         # in which case I have to get at the query/fragment part
         if sformat == "urlencoded":
             info = self.get_urlinfo(info)
+
+        if sformat == 'jwt':
+            args = {'allowed_sign_algs':
+                        self.service_context.get_sign_alg(self.service_name)}
+            enc_algs = self.service_context.get_enc_alg_enc(self.service_name)
+            args['allowed_enc_algs'] = enc_algs['alg']
+            args['allowed_enc_encs'] = enc_algs['enc']
+            _jwt = JWT(key_jar=self.service_context.keyjar, **args)
+            _jwt.iss = self.service_context.client_id
+            info = _jwt.unpack(info)
+            sformat = "dict"
 
         logger.debug('response_cls: {}'.format(self.response_cls.__name__))
         try:

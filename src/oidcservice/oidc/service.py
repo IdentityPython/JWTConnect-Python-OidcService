@@ -859,9 +859,8 @@ class UserInfo(Service):
                             keyjar=self.service_context.keyjar)
                     except MissingSigningKey as err:
                         logger.warning(
-                            'Error encounterd while unpacking aggregated claims'.format(
-                                err
-                            ))
+                            'Error encountered while unpacking aggregated '
+                            'claims'.format(err))
                     else:
                         claims = [value for value, src in
                                   response["_claim_names"].items() if

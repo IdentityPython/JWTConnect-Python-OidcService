@@ -611,6 +611,12 @@ class TestUserInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         service_context.keyjar = CLI_KEY
+        service_context.behaviour = {
+            'userinfo_signed_response_alg': 'RS256',
+            "userinfo_encrypted_response_alg": "RSA-OAEP",
+            "userinfo_encrypted_response_enc": "A256GCM"
+            }
+
         db = InMemoryStateDataBase()
         auth_response = AuthorizationResponse(code='access_code').to_json()
 
@@ -698,6 +704,35 @@ class TestUserInfo(object):
                             _claim_sources={'src1': {'JWT': _jwt}})
 
         _resp = self.service.parse_response(resp.to_json(), state='abcde')
+        assert _resp
+
+    def test_unpack_signed_response(self):
+        resp = OpenIDSchema(sub='diana', given_name='Diana',
+                            family_name='krall', iss=ISS)
+        sk = ISS_KEY.get_signing_key('rsa', owner=ISS)
+        alg = self.service.service_context.get_sign_alg('userinfo')
+        _resp = self.service.parse_response(resp.to_jwt(sk, algorithm=alg),
+                                            state='abcde', sformat='jwt')
+        assert _resp
+
+    def test_unpack_encrypted_response(self):
+        # Add encryption key
+        _kj = build_keyjar([{"type": "RSA", "use": ["enc"]}], owner='')
+        # Own key jar gets the private key
+        self.service.service_context.keyjar.import_jwks(
+            _kj.export_jwks(private=True), issuer='client_id')
+        # opponent gets the public key
+        ISS_KEY.import_jwks(_kj.export_jwks(), issuer='client_id')
+
+        resp = OpenIDSchema(sub='diana', given_name='Diana',
+                            family_name='krall', iss=ISS, aud='client_id')
+        enckey = ISS_KEY.get_encrypt_key('rsa', owner='client_id')
+        algspec = self.service.service_context.get_enc_alg_enc(
+            self.service.service_name)
+
+        enc_resp = resp.to_jwe(enckey, **algspec)
+        _resp = self.service.parse_response(enc_resp, state='abcde',
+                                            sformat='jwt')
         assert _resp
 
 
