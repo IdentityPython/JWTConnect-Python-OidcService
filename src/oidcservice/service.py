@@ -180,11 +180,8 @@ class Service(StateInterface):
 
         # If 'state' appears among the keyword argument and is not
         # expected to appear in the request, remove it.
-        if 'state' not in self.msg_type.c_param:
-            try:
-                del kwargs['state']
-            except KeyError:
-                pass
+        if 'state' in self.msg_type.c_param and 'state' in kwargs:
+            request_args['state'] = kwargs['state']
 
         # logger.debug("request_args: %s" % sanitize(request_args))
         _args = self.gather_request_args(**request_args)

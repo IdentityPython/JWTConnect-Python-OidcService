@@ -961,12 +961,26 @@ class EndSession(Service):
                  conf=None):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory, conf=conf)
-        self.pre_construct = [self.oidc_pre_construct]
+        self.pre_construct = [self.get_id_token_hint]
 
-    def oidc_pre_construct(self, request_args=None, **kwargs):
+    def get_id_token_hint(self, request_args=None, **kwargs):
+        """
+        Add id_token_hint to request
+
+        :param request_args:
+        :param kwargs:
+        :return:
+        """
         request_args = self.multiple_extend_request_args(
             request_args, kwargs['state'], ['id_token'],
             ['auth_response', 'token_response', 'refresh_token_response'])
+
+        try:
+            request_args['id_token_hint'] = request_args['id_token']
+        except KeyError:
+            pass
+        else:
+            del request_args['id_token']
 
         return request_args, {}
 
