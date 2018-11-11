@@ -12,13 +12,13 @@ from oidcmsg.oauth2 import AccessTokenResponse
 from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import Message
-from oidcmsg.oidc import CheckIDRequest
-from oidcmsg.oidc import CheckSessionRequest
-from oidcmsg.oidc import EndSessionRequest
 from oidcmsg.oidc import IdToken
 from oidcmsg.oidc import OpenIDSchema
 from oidcmsg.oidc import RegistrationRequest
 from oidcmsg.oidc import verified_claim_name
+from oidcmsg.oidc.session import CheckIDRequest
+from oidcmsg.oidc.session import CheckSessionRequest
+from oidcmsg.oidc.session import EndSessionRequest
 
 from oidcservice.exception import ParameterError
 from oidcservice.oidc.service import add_jwks_uri_or_jwks
@@ -789,7 +789,8 @@ class TestEndSession(object):
             'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb'],
             'issuer': self._iss, 'requests_dir': 'requests',
-            'base_url': 'https://example.com/cli/'
+            'base_url': 'https://example.com/cli/',
+            'post_logout_redirect_uris': ['https://example.com/post_logout']
         }
         service_context = ServiceContext(config=client_config)
         self.service = factory('EndSession', state_db=InMemoryStateDataBase(),

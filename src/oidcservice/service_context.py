@@ -87,7 +87,8 @@ class ServiceContext(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir']:
+        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir',
+                     'post_logout_redirect_uris']:
             try:
                 setattr(self, attr, config[attr])
             except:

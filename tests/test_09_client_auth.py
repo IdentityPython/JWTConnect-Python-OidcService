@@ -323,7 +323,7 @@ class TestClientSecretJWT_TE(object):
         jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "exp", "iat", 'jti'])
 
-        _rj = JWS()
+        _rj = JWS(alg='HS256')
         info = _rj.verify_compact(
             cas, _kj.get_signing_key(owner=_service_context.client_id))
 
@@ -355,7 +355,7 @@ class TestClientSecretJWT_UI(object):
         jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
 
-        _rj = JWS()
+        _rj = JWS(alg='HS256')
         info = _rj.verify_compact(
             cas,
             _kj.get_signing_key(owner=_service_context.client_id))

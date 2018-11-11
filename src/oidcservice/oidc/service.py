@@ -4,8 +4,6 @@ import sys
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
-from cryptojwt.jws.utils import alg2keytype
-
 from oidcmsg import oidc
 from oidcmsg.exception import MissingRequiredAttribute
 from oidcmsg.exception import MissingSigningKey
@@ -14,6 +12,7 @@ from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import make_openid_request
 from oidcmsg.oidc import verified_claim_name
+from oidcmsg.oidc import session
 from oidcmsg.time_util import time_sans_frac
 
 from oidcservice import rndstr
@@ -908,7 +907,7 @@ class UserInfo(Service):
 
 
 class CheckSession(Service):
-    msg_type = oidc.CheckSessionRequest
+    msg_type = session.CheckSessionRequest
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = ''
@@ -929,7 +928,7 @@ class CheckSession(Service):
 
 
 class CheckID(Service):
-    msg_type = oidc.CheckIDRequest
+    msg_type = session.CheckIDRequest
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = ''
@@ -950,7 +949,7 @@ class CheckID(Service):
 
 
 class EndSession(Service):
-    msg_type = oidc.EndSessionRequest
+    msg_type = session.EndSessionRequest
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = 'end_session_endpoint'
