@@ -128,7 +128,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         # then we should add client_id to the request if it's not already
         # there
         if isinstance(request, AccessTokenRequest) and request[
-            'grant_type'] == 'authorization_code':
+                'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
                     request['client_id'] = service.service_context.client_id
@@ -138,7 +138,7 @@ class ClientSecretBasic(ClientAuthnMethod):
             # remove client_id if not required by the request definition
             try:
                 _req = request.c_param["client_id"][VREQUIRED]
-            except KeyError:
+            except (KeyError, AttributeError):
                 _req = False
 
             # if it's not required remove it
