@@ -18,6 +18,12 @@ class State(Message):
     }
 
 
+KEY_PATTERN = {
+    'nonce': '__{}__',
+    'logout state': '::{}::'
+}
+
+
 # The simplest possible implementation of the state database
 class InMemoryStateDataBase(object):
     def __init__(self):
@@ -108,7 +114,7 @@ class StateInterface(object):
             return item_cls().from_json(_state[item_type])
 
     def extend_request_args(self, args, item_cls, item_type, key,
-                            parameters):
+                            parameters, orig=False):
         """
         Add a set of parameters and their value to a set of request arguments.
 
@@ -120,6 +126,8 @@ class StateInterface(object):
         :param key: The key to the information in the database
         :param parameters: A list of parameters who's values this method
             will return.
+        :param orig: Where the value of a claim is a signed JWT return
+            that.
         :return: A dictionary with keys from the list of parameters and
             values being the values of those parameters in the item.
             If the parameter does not a appear in the item it will not appear
@@ -131,17 +139,24 @@ class StateInterface(object):
             pass
         else:
             for parameter in parameters:
-                try:
-                    args[parameter] = item[verified_claim_name(parameter)]
-                except KeyError:
+                if orig:
                     try:
                         args[parameter] = item[parameter]
                     except KeyError:
                         pass
+                else:
+                    try:
+                        args[parameter] = item[verified_claim_name(parameter)]
+                    except KeyError:
+                        try:
+                            args[parameter] = item[parameter]
+                        except KeyError:
+                            pass
 
         return args
 
-    def multiple_extend_request_args(self, args, key, parameters, item_types):
+    def multiple_extend_request_args(self, args, key, parameters, item_types,
+                                     orig=False):
         """
         Go through a set of items (by their type) and add the attribute-value
         that match the list of parameters to the arguments
@@ -153,6 +168,8 @@ class StateInterface(object):
         :param parameters: A list of parameters that we're looking for
         :param item_types: A list of item_type specifying which items we
             are interested in.
+        :param orig: Where the value of a claim is a signed JWT return
+            that.
         :return: A possibly augmented set of arguments.
         """
         _state = self.get_state(key)
@@ -164,15 +181,46 @@ class StateInterface(object):
                 continue
 
             for parameter in parameters:
-                try:
-                    args[parameter] = _item[verified_claim_name(parameter)]
-                except KeyError:
+                if orig:
                     try:
                         args[parameter] = _item[parameter]
                     except KeyError:
                         pass
+                else:
+                    try:
+                        args[parameter] = _item[verified_claim_name(parameter)]
+                    except KeyError:
+                        try:
+                            args[parameter] = _item[parameter]
+                        except KeyError:
+                            pass
 
         return args
+
+    def store_X2state(self, nonce, state, xtyp):
+        """
+        Store the connection between a nonce value and a state value.
+        This allows us later in the game to find the state if we have the nonce.
+
+        :param nonce: The nonce value
+        :param state: The state value
+        """
+        self.state_db.set(KEY_PATTERN[xtyp].format(nonce), state)
+
+    def get_state_by_X(self, nonce, xtyp):
+        """
+        Find the state value by providing the nonce value.
+        Will raise an exception if the nonce value is absent from the state
+        data base.
+
+        :param nonce: The nonce value
+        :return: The state value
+        """
+        _state = self.state_db.get(KEY_PATTERN[xtyp].format(nonce))
+        if _state:
+            return _state
+        else:
+            raise KeyError('Unknown {}: "{}"'.format(xtyp, nonce))
 
     def store_nonce2state(self, nonce, state):
         """
@@ -182,7 +230,7 @@ class StateInterface(object):
         :param nonce: The nonce value
         :param state: The state value
         """
-        self.state_db.set('__{}__'.format(nonce), state)
+        self.store_X2state(nonce, state, 'nonce')
 
     def get_state_by_nonce(self, nonce):
         """
@@ -193,11 +241,28 @@ class StateInterface(object):
         :param nonce: The nonce value
         :return: The state value
         """
-        _state = self.state_db.get('__{}__'.format(nonce))
-        if _state:
-            return _state
-        else:
-            raise KeyError('Unknown nonce: "{}"'.format(nonce))
+        return self.get_state_by_X(nonce, 'nonce')
+
+    def store_logout_state2state(self, logout_state, state):
+        """
+        Store the connection between a nonce value and a state value.
+        This allows us later in the game to find the state if we have the nonce.
+
+        :param logout_state: The logout state value
+        :param state: The state value
+        """
+        self.store_X2state(logout_state, state, 'logout state')
+
+    def get_state_by_logout_state(self, logout_state):
+        """
+        Find the state value by providing the nonce value.
+        Will raise an exception if the nonce value is absent from the state
+        data base.
+
+        :param nonce: The nonce value
+        :return: The state value
+        """
+        return self.get_state_by_X(logout_state, 'logout state')
 
     def create_state(self, iss, key=''):
         if not key:
@@ -210,3 +275,6 @@ class StateInterface(object):
         _state = State(iss=iss)
         self.state_db.set(key, _state.to_json())
         return key
+
+    def remove_state(self, state):
+        self.state_db.delete(state)

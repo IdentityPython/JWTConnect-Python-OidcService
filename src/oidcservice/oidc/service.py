@@ -11,8 +11,8 @@ from oidcmsg.oauth2 import Message
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.oidc import JRD
 from oidcmsg.oidc import make_openid_request
-from oidcmsg.oidc import verified_claim_name
 from oidcmsg.oidc import session
+from oidcmsg.oidc import verified_claim_name
 from oidcmsg.time_util import time_sans_frac
 
 from oidcservice import rndstr
@@ -517,7 +517,7 @@ def add_redirect_uris(request_args, service=None, **kwargs):
             request_args['redirect_uris'] = _context.redirect_uris
         else:
             # Filter out local additions.
-            _uris = [v for k,v in _cbs.items() if not k.startswith('__')]
+            _uris = [v for k, v in _cbs.items() if not k.startswith('__')]
             request_args['redirect_uris'] = _uris
 
     return request_args, {}
@@ -953,14 +953,16 @@ class EndSession(Service):
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = 'end_session_endpoint'
-    synchronous = True
+    synchronous = False
     service_name = 'end_session'
 
     def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
         Service.__init__(self, service_context, state_db,
                          client_authn_factory=client_authn_factory, conf=conf)
-        self.pre_construct = [self.get_id_token_hint]
+        self.pre_construct = [self.get_id_token_hint,
+                              self.add_post_logout_redirect_uri,
+                              self.add_state]
 
     def get_id_token_hint(self, request_args=None, **kwargs):
         """
@@ -972,7 +974,9 @@ class EndSession(Service):
         """
         request_args = self.multiple_extend_request_args(
             request_args, kwargs['state'], ['id_token'],
-            ['auth_response', 'token_response', 'refresh_token_response'])
+            ['auth_response', 'token_response', 'refresh_token_response'],
+            orig=True
+        )
 
         try:
             request_args['id_token_hint'] = request_args['id_token']
@@ -980,6 +984,26 @@ class EndSession(Service):
             pass
         else:
             del request_args['id_token']
+
+        return request_args, {}
+
+    def add_post_logout_redirect_uri(self, request_args=None, **kwargs):
+        if 'post_logout_redirect_uri' not in request_args:
+            try:
+                request_args[
+                    'post_logout_redirect_uri'
+                ] = self.service_context.post_logout_redirect_uris[0]
+            except KeyError:
+                pass
+
+        return request_args, {}
+
+    def add_state(self, request_args=None, **kwargs):
+        if 'state' not in request_args:
+            request_args['state'] = rndstr(32)
+
+        # As a side effect bind logout state to session state
+        self.store_logout_state2state(request_args['state'], kwargs['state'])
 
         return request_args, {}
 
