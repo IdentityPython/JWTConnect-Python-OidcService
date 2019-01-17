@@ -1,15 +1,15 @@
 from oidcmsg.message import Message
 from oidcmsg.message import SINGLE_REQUIRED_STRING
 from oidcmsg.oidc import AuthorizationResponse
-from oidcservice.state_interface import State
 
-from oidcservice.oidc.service import factory
-from oidcservice.service import Service
-from oidcservice.service_context import ServiceContext
 from oidcservice.oidc.pkce import add_code_challenge
 from oidcservice.oidc.pkce import add_code_verifier
 from oidcservice.oidc.pkce import put_state_in_post_args
+from oidcservice.service import Service
+from oidcservice.service_context import ServiceContext
+from oidcservice.service_factory import service_factory
 from oidcservice.state_interface import InMemoryStateDataBase
+from oidcservice.state_interface import State
 
 
 class DummyMessage(Message):
@@ -77,8 +77,9 @@ def test_authorization_and_pkce():
         'behaviour': {'response_types': ['code']}
     }
     service_context = ServiceContext(config=client_config)
-    service = factory('Authorization', state_db=InMemoryStateDataBase(),
-                      service_context=service_context)
+    service = service_factory('Authorization', ['oidc'],
+                              state_db=InMemoryStateDataBase(),
+                              service_context=service_context)
     service.post_construct.append(add_code_challenge)
     request = service.construct_request()
     assert set(request.keys()) == {'client_id', 'code_challenge',
@@ -97,16 +98,16 @@ def test_access_token_and_pkce():
     db = InMemoryStateDataBase()
     # Construct an authorization request.
     # Gives us a state value and stores code_verifier in state_db
-    authz_service = factory('Authorization', state_db=db,
-                            service_context=service_context)
+    authz_service = service_factory('Authorization', ['oidc'], state_db=db,
+                                    service_context=service_context)
     authz_service.post_construct.append(add_code_challenge)
     request = authz_service.construct_request()
     _state = request['state']
 
     auth_response = AuthorizationResponse(code='access code')
     authz_service.store_item(auth_response, 'auth_response', _state)
-    service = factory('AccessToken', state_db=db,
-                      service_context=service_context)
+    service = service_factory('AccessToken', ['oidc'], state_db=db,
+                              service_context=service_context)
 
     # If I don't have this then state is not carried over to post_construct
     service.pre_construct.append(put_state_in_post_args)
@@ -116,7 +117,6 @@ def test_access_token_and_pkce():
     assert set(request.keys()) == {'client_id', 'redirect_uri', 'grant_type',
                                    'client_secret', 'code_verifier', 'code',
                                    'state'}
-
 
 # class TestPKCE(object):
 #     def test_pkce_create(self):

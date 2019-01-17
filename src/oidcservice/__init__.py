@@ -7,8 +7,9 @@ try:
 except ImportError:
     import random as rnd
 
+
 __author__ = 'Roland Hedberg'
-__version__ = '0.5.15'
+__version__ = '0.6.0'
 
 
 OIDCONF_PATTERN = "{}/.well-known/openid-configuration"

@@ -1,6 +1,6 @@
 import pytest
 
-from oidcservice.oauth2.client_credentials import AccessToken, RefreshAccessToken
+from oidcservice.service_factory import service_factory
 from oidcservice.service_context import ServiceContext
 from oidcservice.state_interface import InMemoryStateDataBase
 
@@ -10,14 +10,22 @@ KEYDEF = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]
 class TestRP():
     @pytest.fixture(autouse=True)
     def create_service(self):
-        client_config = {'client_id': 'client_id',
-                         'client_secret': 'another password'}
+        client_config = {
+            'client_id': 'client_id',
+            'client_secret': 'another password'
+        }
         service_context = ServiceContext(config=client_config)
         db = InMemoryStateDataBase()
         self.service = {
-            'token': AccessToken(state_db=db, service_context=service_context),
-            'refresh_token': RefreshAccessToken(state_db=db,
-                                                service_context=service_context)
+            'token': service_factory("CCAccessToken",
+                                     ['oauth2/client_credentials', 'oauth2'],
+                                     state_db=db,
+                                     service_context=service_context),
+            'refresh_token': service_factory("CCRefreshAccessToken",
+                                             ['oauth2/client_credentials',
+                                              'oauth2'],
+                                             state_db=db,
+                                             service_context=service_context)
         }
         self.service['token'].endpoint = 'https://example.com/token'
         self.service['refresh_token'].endpoint = 'https://example.com/token'
@@ -48,7 +56,7 @@ class TestRP():
         assert _info['method'] == 'POST'
         assert _info['url'] == 'https://example.com/token'
         assert _info[
-            'body'] == 'grant_type=refresh_token'
+                   'body'] == 'grant_type=refresh_token'
         assert _info['headers'] == {
             'Authorization': 'Bearer tGzv3JOkF0XG5Qx2TlKWIA',
             'Content-Type': 'application/x-www-form-urlencoded'

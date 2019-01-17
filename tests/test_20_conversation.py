@@ -2,7 +2,8 @@
 import json
 
 import time
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs
+from urllib.parse import urlparse
 
 from cryptojwt.jwt import JWT
 from cryptojwt.key_jar import KeyJar
@@ -16,7 +17,7 @@ from oidcmsg.oidc import RegistrationResponse
 
 from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.oidc.service import factory
+from oidcservice.service_factory import service_factory
 from oidcservice.service import build_services
 from oidcservice.state_interface import InMemoryStateDataBase
 
@@ -117,7 +118,7 @@ def test_conversation():
     service_spec = DEFAULT_SERVICES.copy()
     service_spec['WebFinger'] = {}
 
-    service = build_services(service_spec, factory,
+    service = build_services(service_spec, service_factory, ['oidc'],
                              state_db=InMemoryStateDataBase(),
                              service_context=service_context)
 

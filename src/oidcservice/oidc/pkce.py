@@ -3,7 +3,7 @@ from oidcmsg.message import Message
 
 from oidcservice import unreserved, CC_METHOD
 from oidcservice.exception import Unsupported
-from oidcservice.oauth2.service import get_state_parameter
+from oidcservice.oauth2.utils import get_state_parameter
 
 
 def add_code_challenge(request_args, service, **kwargs):

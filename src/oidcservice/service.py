@@ -508,8 +508,8 @@ class Service(StateInterface):
             return default
 
 
-def build_services(service_definitions, service_factory, service_context,
-                   state_db, client_authn_factory=None):
+def build_services(service_definitions, service_factory, module_dirs,
+                   service_context, state_db, client_authn_factory=None):
     """
     This function will build a number of :py:class:`oidcservice.service.Service`
     instances based on the service definitions provided.
@@ -517,6 +517,10 @@ def build_services(service_definitions, service_factory, service_context,
     :param service_definitions: A dictionary of service definitions. The keys
         are the names of the subclasses. The values are configurations.
     :param service_factory: A factory that can initiate a service class
+    :param module_dirs: The directories in which to search for service modules.
+        Directory names are expected to be relative to the oidcservice package.
+        e.g. ['oidc', 'oauth2]. The directories will be search in order until
+        a matching module is found.
     :param service_context: A reference to the service context, this is the same
         for all service instances.
     :param state_db: A reference to the state database. Shared by all the
@@ -528,7 +532,9 @@ def build_services(service_definitions, service_factory, service_context,
     """
     service = {}
     for service_name, service_configuration in service_definitions.items():
-        _srv = service_factory(service_name, service_context=service_context,
+        _srv = service_factory(service_name,
+                               module_dirs,
+                               service_context=service_context,
                                state_db=state_db,
                                client_authn_factory=client_authn_factory,
                                conf=service_configuration)

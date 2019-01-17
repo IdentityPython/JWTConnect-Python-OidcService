@@ -21,11 +21,10 @@ from oidcmsg.oidc.session import CheckSessionRequest
 from oidcmsg.oidc.session import EndSessionRequest
 
 from oidcservice.exception import ParameterError
-from oidcservice.oidc.service import add_jwks_uri_or_jwks
-from oidcservice.oidc.service import factory
-from oidcservice.oidc.service import response_types_to_grant_types
-from oidcservice.service import Service
+from oidcservice.oidc.registration import add_jwks_uri_or_jwks
+from oidcservice.oidc.registration import response_types_to_grant_types
 from oidcservice.service_context import ServiceContext
+from oidcservice.service_factory import service_factory
 from oidcservice.state_interface import InMemoryStateDataBase
 from oidcservice.state_interface import State
 
@@ -61,10 +60,10 @@ CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(),
                             ISS)
 
 
-def test_request_factory():
-    req = factory('Service', service_context=ServiceContext(None),
-                  state_db=InMemoryStateDataBase(), client_authn_method=None)
-    assert isinstance(req, Service)
+# def test_request_factory():
+#     req = service_factory('Service', service_context=ServiceContext(None),
+#                   state_db=InMemoryStateDataBase(), client_authn_method=None)
+#     assert isinstance(req, Service)
 
 
 class TestAuthorization(object):
@@ -76,9 +75,9 @@ class TestAuthorization(object):
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
         service_context.issuer = 'https://example.com'
-        self.service = factory('Authorization',
-                               state_db=InMemoryStateDataBase(),
-                               service_context=service_context)
+        self.service = service_factory('Authorization', ['oidc'],
+                                       state_db=InMemoryStateDataBase(),
+                                       service_context=service_context)
 
     def test_construct(self):
         req_args = {
@@ -258,9 +257,9 @@ class TestAuthorizationCallback(object):
             }
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
-        self.service = factory('Authorization',
-                               state_db=InMemoryStateDataBase(),
-                               service_context=service_context)
+        self.service = service_factory('Authorization', ['oidc'],
+                                       state_db=InMemoryStateDataBase(),
+                                       service_context=service_context)
 
     def test_construct_code(self):
         req_args = {
@@ -314,8 +313,8 @@ class TestAccessTokenRequest(object):
         auth_response = AuthorizationResponse(code='access_code').to_json()
         _db.set('state', State(auth_response=auth_response,
                                auth_request=auth_request).to_json())
-        self.service = factory('AccessToken', state_db=_db,
-                               service_context=service_context)
+        self.service = service_factory('AccessToken', ['oidc'], state_db=_db,
+                                       service_context=service_context)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -394,8 +393,9 @@ class TestProviderInfo(object):
                 }
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('ProviderInfoDiscovery', state_db=None,
-                               service_context=service_context)
+        self.service = service_factory('ProviderInfoDiscovery', ['oidc'],
+                                       state_db=None,
+                                       service_context=service_context)
 
     def test_construct(self):
         _req = self.service.construct()
@@ -574,8 +574,8 @@ class TestRegistration(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('Registration', state_db=None,
-                               service_context=service_context)
+        self.service = service_factory('Registration', ['oidc'], state_db=None,
+                                       service_context=service_context)
 
     def test_construct(self):
         _req = self.service.construct()
@@ -615,7 +615,7 @@ class TestUserInfo(object):
             'userinfo_signed_response_alg': 'RS256',
             "userinfo_encrypted_response_alg": "RSA-OAEP",
             "userinfo_encrypted_response_enc": "A256GCM"
-            }
+        }
 
         db = InMemoryStateDataBase()
         auth_response = AuthorizationResponse(code='access_code').to_json()
@@ -633,8 +633,8 @@ class TestUserInfo(object):
             __verified_id_token=ver_idt).to_json()
         db.set('abcde', State(token_response=token_response,
                               auth_response=auth_response).to_json())
-        self.service = factory('UserInfo', state_db=db,
-                               service_context=service_context)
+        self.service = service_factory('UserInfo', ['oidc'], state_db=db,
+                                       service_context=service_context)
 
     def test_construct(self):
         _req = self.service.construct(state='abcde')
@@ -747,8 +747,9 @@ class TestCheckSession(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckSession', state_db=InMemoryStateDataBase(),
-                               service_context=service_context)
+        self.service = service_factory('CheckSession', ['oidc'],
+                                       state_db=InMemoryStateDataBase(),
+                                       service_context=service_context)
 
     def test_construct(self):
         self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
@@ -770,8 +771,9 @@ class TestCheckID(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('CheckID', state_db=InMemoryStateDataBase(),
-                               service_context=service_context)
+        self.service = service_factory('CheckID', ['oidc'],
+                                       state_db=InMemoryStateDataBase(),
+                                       service_context=service_context)
 
     def test_construct(self):
         self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
@@ -793,16 +795,18 @@ class TestEndSession(object):
             'post_logout_redirect_uris': ['https://example.com/post_logout']
         }
         service_context = ServiceContext(config=client_config)
-        self.service = factory('EndSession', state_db=InMemoryStateDataBase(),
-                               service_context=service_context)
+        self.service = service_factory('EndSession', ['oidc'],
+                                       state_db=InMemoryStateDataBase(),
+                                       service_context=service_context)
 
     def test_construct(self):
         self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
                                 'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, EndSessionRequest)
-        assert len(_req) == 2
-        assert set(_req.keys()) == {'state', 'id_token_hint'}
+        assert len(_req) == 3
+        assert set(_req.keys()) == {'state', 'id_token_hint',
+                                    'post_logout_redirect_uri'}
 
 
 def test_authz_service_conf():
@@ -813,8 +817,8 @@ def test_authz_service_conf():
         'behaviour': {'response_types': ['code']}
     }
 
-    srv = factory(
-        'Authorization', state_db=InMemoryStateDataBase(),
+    srv = service_factory(
+        'Authorization', ['oidc'], state_db=InMemoryStateDataBase(),
         service_context=ServiceContext(CLI_KEY, config=client_config),
         conf={
             'request_args': {
@@ -845,8 +849,8 @@ def test_add_jwks_uri_or_jwks_0():
         }
     }
     service_context = ServiceContext(config=client_config)
-    service = factory('Registration', state_db=None,
-                      service_context=service_context)
+    service = service_factory('Registration', ['oidc'], state_db=None,
+                              service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
 
@@ -864,8 +868,8 @@ def test_add_jwks_uri_or_jwks_1():
         }
     }
     service_context = ServiceContext(config=client_config)
-    service = factory('Registration', state_db=None,
-                      service_context=service_context)
+    service = service_factory('Registration', ['oidc'], state_db=None,
+                              service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
     assert set(req_args.keys()) == {'jwks_uri'}
@@ -883,8 +887,8 @@ def test_add_jwks_uri_or_jwks_2():
     }
     service_context = ServiceContext(
         config=client_config, jwks_uri='https://example.com/jwks/jwks.json')
-    service = factory('Registration', state_db=None,
-                      service_context=service_context)
+    service = service_factory('Registration', ['oidc'], state_db=None,
+                              service_context=service_context)
 
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
@@ -902,8 +906,8 @@ def test_add_jwks_uri_or_jwks_3():
         }
     }
     service_context = ServiceContext(config=client_config, jwks='{"keys":[]}')
-    service = factory('Registration', state_db=None,
-                      service_context=service_context)
+    service = service_factory('Registration', ['oidc'], state_db=None,
+                              service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks'] == '{"keys":[]}'
     assert set(req_args.keys()) == {'jwks'}

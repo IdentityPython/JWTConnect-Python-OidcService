@@ -6,7 +6,7 @@ from oidcmsg.oidc import JRD
 from oidcmsg.oidc import Link
 
 from oidcservice.oidc import OIC_ISSUER
-from oidcservice.oidc.service import WebFinger
+from oidcservice.oidc.webfinger import WebFinger
 from oidcservice.service_context import ServiceContext
 
 __author__ = 'Roland Hedberg'

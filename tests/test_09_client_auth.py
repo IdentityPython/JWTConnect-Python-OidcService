@@ -20,14 +20,15 @@ from oidcservice.client_auth import ClientSecretPost
 from oidcservice.client_auth import PrivateKeyJWT
 from oidcservice.client_auth import valid_service_context
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.oidc import service
-from oidcservice.oidc.service import factory
+from oidcservice.service_factory import service_factory
 from oidcservice.service import build_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import State, InMemoryStateDataBase
+from oidcservice.state_interface import InMemoryStateDataBase
+from oidcservice.state_interface import State
 
-from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationRequest
+from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.oauth2 import AuthorizationRequest
 from oidcmsg.oauth2 import AuthorizationResponse
 from oidcmsg.oauth2 import CCAccessTokenRequest
 from oidcmsg.oauth2 import ResourceRequest
@@ -54,8 +55,9 @@ def get_service_context():
 def get_service():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
     service_context.client_secret = "white boarding pass"
-    service = factory('AccessToken', state_db=InMemoryStateDataBase(),
-                      service_context=service_context)
+    service = service_factory('AccessToken', ['oidc'],
+                              state_db=InMemoryStateDataBase(),
+                              service_context=service_context)
     return service
 
 
@@ -68,7 +70,7 @@ def services():
                                         state='ABCDE').to_json()
     db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
                           auth_response=auth_response).to_json())
-    return build_services(DEFAULT_SERVICES, service.factory,
+    return build_services(DEFAULT_SERVICES, service_factory, ['oidc'],
                           get_service_context(), db)
 
 
