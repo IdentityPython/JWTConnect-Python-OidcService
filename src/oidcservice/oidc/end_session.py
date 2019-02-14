@@ -17,8 +17,9 @@ class EndSession(Service):
     response_cls = Message
     error_msg = ResponseMessage
     endpoint_name = 'end_session_endpoint'
-    synchronous = False
+    synchronous = True
     service_name = 'end_session'
+    response_body_type = 'html'
 
     def __init__(self, service_context, state_db, client_authn_factory=None,
                  conf=None):
@@ -56,7 +57,8 @@ class EndSession(Service):
             try:
                 request_args[
                     'post_logout_redirect_uri'
-                ] = self.service_context.post_logout_redirect_uris[0]
+                ] = self.service_context.register_args[
+                    'post_logout_redirect_uris'][0]
             except KeyError:
                 pass
 

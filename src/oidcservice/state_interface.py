@@ -1,3 +1,5 @@
+import json
+
 from oidcmsg.message import Message
 from oidcmsg.message import SINGLE_OPTIONAL_JSON
 from oidcmsg.message import SINGLE_REQUIRED_STRING
@@ -20,7 +22,9 @@ class State(Message):
 
 KEY_PATTERN = {
     'nonce': '__{}__',
-    'logout state': '::{}::'
+    'logout state': '::{}::',
+    'session id': '..{}..',
+    'subject id': '=={}=='
 }
 
 
@@ -197,30 +201,38 @@ class StateInterface(object):
 
         return args
 
-    def store_X2state(self, nonce, state, xtyp):
+    def store_X2state(self, x, state, xtyp):
         """
-        Store the connection between a nonce value and a state value.
+        Store the connection between some value and a state value.
         This allows us later in the game to find the state if we have the nonce.
 
-        :param nonce: The nonce value
+        :param x: The value of x
         :param state: The state value
+        :param xtyp: The type of value x is (e.g. nonce, ...)
         """
-        self.state_db.set(KEY_PATTERN[xtyp].format(nonce), state)
+        self.state_db.set(KEY_PATTERN[xtyp].format(x), state)
+        _val = self.state_db.get("ref{}ref".format(state))
+        if _val is None:
+            refs = {xtyp:x}
+        else:
+            refs = json.loads(_val)
+            refs[xtyp] = x
+        self.state_db.set("ref{}ref".format(state), json.dumps(refs))
 
-    def get_state_by_X(self, nonce, xtyp):
+    def get_state_by_X(self, x, xtyp):
         """
-        Find the state value by providing the nonce value.
-        Will raise an exception if the nonce value is absent from the state
+        Find the state value by providing the x value.
+        Will raise an exception if the x value is absent from the state
         data base.
 
-        :param nonce: The nonce value
+        :param x: The x value
         :return: The state value
         """
-        _state = self.state_db.get(KEY_PATTERN[xtyp].format(nonce))
+        _state = self.state_db.get(KEY_PATTERN[xtyp].format(x))
         if _state:
             return _state
         else:
-            raise KeyError('Unknown {}: "{}"'.format(xtyp, nonce))
+            raise KeyError('Unknown {}: "{}"'.format(xtyp, x))
 
     def store_nonce2state(self, nonce, state):
         """
@@ -245,8 +257,9 @@ class StateInterface(object):
 
     def store_logout_state2state(self, logout_state, state):
         """
-        Store the connection between a nonce value and a state value.
-        This allows us later in the game to find the state if we have the nonce.
+        Store the connection between a logout state value and a state value.
+        This allows us later in the game to find the state if we have the
+        logout state value.
 
         :param logout_state: The logout state value
         :param state: The state value
@@ -255,14 +268,58 @@ class StateInterface(object):
 
     def get_state_by_logout_state(self, logout_state):
         """
-        Find the state value by providing the nonce value.
-        Will raise an exception if the nonce value is absent from the state
-        data base.
+        Find the state value by providing the logout state value.
+        Will raise an exception if the logout state value is absent from the
+        state data base.
 
-        :param nonce: The nonce value
+        :param logout_state: The logout state value
         :return: The state value
         """
         return self.get_state_by_X(logout_state, 'logout state')
+
+    def store_sid2state(self, sid, state):
+        """
+        Store the connection between a session id (sid) value and a state value.
+        This allows us later in the game to find the state if we have the
+        sid value.
+
+        :param sid: The session ID value
+        :param state: The state value
+        """
+        self.store_X2state(sid, state, 'session id')
+
+    def get_state_by_sid(self, sid):
+        """
+        Find the state value by providing the logout state value.
+        Will raise an exception if the logout state value is absent from the
+        state data base.
+
+        :param sid: The session ID value
+        :return: The state value
+        """
+        return self.get_state_by_X(sid, 'session id')
+
+    def store_sub2state(self, sub, state):
+        """
+        Store the connection between a subject id (sub) value and a state value.
+        This allows us later in the game to find the state if we have the
+        sub value.
+
+        :param sub: The Subject ID value
+        :param state: The state value
+        """
+        self.store_X2state(sub, state, 'subject id')
+
+    def get_state_by_sub(self, sub):
+        """
+        Find the state value by providing the subject id value.
+        Will raise an exception if the subject id value is absent from the
+        state data base.
+
+        :param sub: The Subject ID value
+        :return: The state value
+        """
+        return self.get_state_by_X(sub, 'subject id')
 
     def create_state(self, iss, key=''):
         if not key:
@@ -278,3 +335,7 @@ class StateInterface(object):
 
     def remove_state(self, state):
         self.state_db.delete(state)
+        refs = json.loads(self.state_db.get("ref{}ref".format(state)))
+        if refs:
+            for xtyp, x in refs.items():
+                self.state_db.delete(KEY_PATTERN[xtyp].format(x))

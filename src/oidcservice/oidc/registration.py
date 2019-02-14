@@ -43,7 +43,7 @@ def add_request_uri(request_args=None, service=None, **kwargs):
     if _context.requests_dir:
         try:
             if _context.provider_info[
-                'require_request_uri_registration'] is True:
+                    'require_request_uri_registration'] is True:
                 request_args['request_uris'] = _context.generate_request_uris(
                     _context.requests_dir)
         except KeyError:
@@ -64,8 +64,9 @@ def add_post_logout_redirect_uris(request_args=None, service=None, **kwargs):
 
     if "post_logout_redirect_uris" not in request_args:
         try:
-            _uris = service.service_context.post_logout_redirect_uris
-        except AttributeError:
+            _uris = service.service_context.register_args[
+                'post_logout_redirect_uris']
+        except KeyError:
             pass
         else:
             request_args["post_logout_redirect_uris"] = _uris

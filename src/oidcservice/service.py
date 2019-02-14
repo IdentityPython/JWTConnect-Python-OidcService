@@ -94,9 +94,12 @@ class Service(StateInterface):
                         ar_args[prop] = self.conf['request_args'][prop]
                     except KeyError:
                         try:
-                            ar_args[prop] = self.default_request_args[prop]
+                            ar_args[prop] = self.service_context.register_args[prop]
                         except KeyError:
-                            pass
+                            try:
+                                ar_args[prop] = self.default_request_args[prop]
+                            except KeyError:
+                                pass
 
         return ar_args
 
@@ -286,7 +289,7 @@ class Service(StateInterface):
         """
         Builds the request message and constructs the HTTP headers.
 
-        This is the starting pont for a pipeline that will:
+        This is the starting point for a pipeline that will:
 
         - construct the request message
         - add/remove information to/from the request message in the way a

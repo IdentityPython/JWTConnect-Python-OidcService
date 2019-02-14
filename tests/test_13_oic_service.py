@@ -583,8 +583,8 @@ class TestRegistration(object):
         assert len(_req) == 4
 
     def test_config_with_post_logout(self):
-        self.service.service_context.post_logout_redirect_uris = [
-            'https://example.com/post_logout']
+        self.service.service_context.register_args[
+            'post_logout_redirect_uris'] = ['https://example.com/post_logout']
         _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5

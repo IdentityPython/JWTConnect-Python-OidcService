@@ -10,6 +10,7 @@ from cryptojwt.key_jar import KeyJar
 
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
+from oidcmsg.oidc import RegistrationRequest
 
 CLI_REG_MAP = {
     "userinfo": {
@@ -72,6 +73,7 @@ class ServiceContext(object):
         # Below so my IDE won't complain
         self.base_url = ''
         self.requests_dir = ''
+        self.register_args = {}
         self.allow = {}
         self.behaviour = {}
         self.client_preferences = {}
@@ -87,12 +89,17 @@ class ServiceContext(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir',
-                     'post_logout_redirect_uris']:
+        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir']:
             try:
                 setattr(self, attr, config[attr])
             except:
                 setattr(self, attr, '')
+
+        for attr in RegistrationRequest.c_param.keys():
+            try:
+                self.register_args[attr] = config[attr]
+            except KeyError:
+                pass
 
         for attr in ['allow', 'client_preferences', 'behaviour',
                      'provider_info']:
