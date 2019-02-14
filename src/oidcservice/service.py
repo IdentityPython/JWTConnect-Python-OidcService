@@ -459,7 +459,7 @@ class Service(StateInterface):
                 try:
                     resp = self.response_cls().deserialize(
                         info, 'jwt', iss=self.service_context.issuer, **kwargs)
-                except Exception as err:
+                except Exception as err2:
                     pass
 
             if resp is None:
