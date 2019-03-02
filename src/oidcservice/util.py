@@ -3,6 +3,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
+import yaml
 from oidcmsg.exception import UnSupported
 
 logger = logging.getLogger(__name__)
@@ -59,3 +60,7 @@ def get_http_body(req, content_type=URL_ENCODED):
     else:
         raise UnSupported(
             "Unsupported content type: '%s'" % content_type)
+
+
+def load_yaml_config(file):
+    return yaml.load(file)
