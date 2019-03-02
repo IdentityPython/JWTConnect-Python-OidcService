@@ -541,6 +541,9 @@ def build_services(service_definitions, service_factory, module_dirs,
                                state_db=state_db,
                                client_authn_factory=client_authn_factory,
                                conf=service_configuration)
-        service[_srv.service_name] = _srv
+        try:
+            service[_srv.service_name] = _srv
+        except AttributeError:
+            raise ValueError("Could not load '{}'".format(service_name))
 
     return service
