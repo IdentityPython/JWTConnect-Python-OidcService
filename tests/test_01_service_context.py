@@ -1,11 +1,9 @@
 import os
-import pytest
-
 from urllib.parse import urlsplit
 
+import pytest
 from cryptojwt.key_jar import build_keyjar
 
-from oidcservice import DEF_SIGN_ALG
 from oidcservice.service_context import ServiceContext
 
 

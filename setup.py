@@ -61,17 +61,17 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: Apache Software License",
-        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
-        "cryptojwt>=0.4.4",
+        "cryptojwt>=0.6.6",
         'oidcmsg>=0.6.2',
     ],
     tests_require=[
         "responses",
         "testfixtures",
+        "pytest-localserver"
     ],
     zip_safe=False,
     cmdclass={'test': PyTest},
