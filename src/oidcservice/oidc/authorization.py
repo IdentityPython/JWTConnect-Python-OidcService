@@ -104,11 +104,14 @@ class Authorization(authorization.Authorization):
         return request_args, post_args
 
     def oidc_post_construct(self, req, **kwargs):
-
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
             if 'id_token' in _response_type or 'code' in _response_type:
                 self.store_nonce2state(req['nonce'], req['state'])
+
+        if 'offline_access' in req['scope']:
+            if 'prompt' not in req:
+                req['prompt'] = 'consent'
 
         try:
             _request_method = kwargs['request_param']
