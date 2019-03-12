@@ -63,6 +63,8 @@ class AccessToken(access_token.AccessToken):
             except KeyError:
                 raise ValueError('Invalid nonce value')
 
+            self.store_sub2state(_idt['sub'], state)
+
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(
                 resp['expires_in'])

@@ -59,6 +59,8 @@ class Authorization(authorization.Authorization):
             except KeyError:
                 raise ValueError('Missing nonce value')
 
+            self.store_sub2state(_idt['sub'], state)
+
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp.to_json(), 'auth_response', state)
