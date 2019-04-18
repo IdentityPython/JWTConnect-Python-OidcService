@@ -15,7 +15,6 @@ from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
 from oidcservice.util import get_http_body
 from oidcservice.util import get_http_url
-from oidcservice.util import importer
 
 __author__ = 'Roland Hedberg'
 
@@ -510,44 +509,6 @@ class Service(StateInterface):
             return self.conf[attr]
         else:
             return default
-
-
-# def build_services(service_definitions, service_factory, module_dirs,
-#                    service_context, state_db, client_authn_factory=None):
-#     """
-#     This function will build a number of :py:class:`oidcservice.service.Service`
-#     instances based on the service definitions provided.
-#
-#     :param service_definitions: A dictionary of service definitions. The keys
-#         are the names of the subclasses. The values are configurations.
-#     :param service_factory: A factory that can initiate a service class
-#     :param module_dirs: The directories in which to search for service modules.
-#         Directory names are expected to be relative to the oidcservice package.
-#         e.g. ['oidc', 'oauth2]. The directories will be search in order until
-#         a matching module is found.
-#     :param service_context: A reference to the service context, this is the same
-#         for all service instances.
-#     :param state_db: A reference to the state database. Shared by all the
-#         services.
-#     :param client_authn_factory: A list of methods the services can use to
-#         authenticate the client to a service.
-#     :return: A dictionary, with service name as key and the service instance as
-#         value.
-#     """
-#     service = {}
-#     for service_name, service_configuration in service_definitions.items():
-#         _srv = service_factory(service_name,
-#                                module_dirs,
-#                                service_context=service_context,
-#                                state_db=state_db,
-#                                client_authn_factory=client_authn_factory,
-#                                conf=service_configuration)
-#         try:
-#             service[_srv.service_name] = _srv
-#         except AttributeError:
-#             raise ValueError("Could not load '{}'".format(service_name))
-#
-#     return service
 
 
 def init_services(service_definitions, service_context, state_db,
