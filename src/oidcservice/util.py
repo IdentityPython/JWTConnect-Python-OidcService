@@ -1,3 +1,4 @@
+import importlib
 import logging
 from urllib.parse import parse_qs
 from urllib.parse import urlsplit
@@ -62,5 +63,28 @@ def get_http_body(req, content_type=URL_ENCODED):
             "Unsupported content type: '%s'" % content_type)
 
 
-def load_yaml_config(file):
-    return yaml.load(file)
+def load_yaml_config(filename):
+    with open(filename, "rt", encoding='utf-8') as file:
+        config_dict = yaml.load(file)
+    return config_dict
+
+
+def modsplit(s):
+    """Split importable"""
+    if ':' in s:
+        c = s.split(':')
+        if len(c) != 2:
+            raise ValueError("Syntax error: {s}")
+        return c[0], c[1]
+    else:
+        c = s.split('.')
+        if len(c) < 2:
+            raise ValueError("Syntax error: {s}")
+        return '.'.join(c[:-1]), c[-1]
+
+
+def importer(name):
+    """Import by name"""
+    c1, c2 = modsplit(name)
+    module = importlib.import_module(c1)
+    return getattr(module, c2)

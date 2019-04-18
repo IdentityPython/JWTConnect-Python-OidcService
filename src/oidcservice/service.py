@@ -2,20 +2,20 @@ import logging
 from urllib.parse import urlparse
 
 from cryptojwt.jwt import JWT
+from oidcmsg.message import Message
+from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oauth2 import is_error_message
 
+from oidcservice import util
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
-from oidcservice.util import get_http_body
-from oidcservice.util import get_http_url
 from oidcservice.util import JOSE_ENCODED
 from oidcservice.util import JSON_ENCODED
 from oidcservice.util import URL_ENCODED
-
-from oidcmsg.oauth2 import is_error_message
-from oidcmsg.oauth2 import ResponseMessage
-from oidcmsg.message import Message
-
+from oidcservice.util import get_http_body
+from oidcservice.util import get_http_url
+from oidcservice.util import importer
 
 __author__ = 'Roland Hedberg'
 
@@ -46,9 +46,9 @@ class Service(StateInterface):
         StateInterface.__init__(self, state_db)
 
         if client_authn_factory is None:
-            self.client_authn_factory=ca_factory
+            self.client_authn_factory = ca_factory
         else:
-            self.client_authn_factory=client_authn_factory
+            self.client_authn_factory = client_authn_factory
 
         self.service_context = service_context
         self.default_request_args = {}
@@ -94,7 +94,8 @@ class Service(StateInterface):
                         ar_args[prop] = self.conf['request_args'][prop]
                     except KeyError:
                         try:
-                            ar_args[prop] = self.service_context.register_args[prop]
+                            ar_args[prop] = self.service_context.register_args[
+                                prop]
                         except KeyError:
                             try:
                                 ar_args[prop] = self.default_request_args[prop]
@@ -337,11 +338,11 @@ class Service(StateInterface):
         _info['url'] = get_http_url(endpoint_url, request, method=method)
 
         # If there is to be a body part
-        if method  == 'POST':
+        if method == 'POST':
             # How should it be serialized
             if request_body_type == 'urlencoded':
                 content_type = URL_ENCODED
-            elif request_body_type in ['jws','jwe', 'jose']:
+            elif request_body_type in ['jws', 'jwe', 'jose']:
                 content_type = JOSE_ENCODED
             else:  # request_body_type == 'json'
                 content_type = JSON_ENCODED
@@ -424,7 +425,7 @@ class Service(StateInterface):
 
         logger.debug('response format: {}'.format(sformat))
 
-        if sformat in ['jose','jws','jwe']:
+        if sformat in ['jose', 'jws', 'jwe']:
             resp = self.post_parse_response(info, state=state)
 
             if not resp:
@@ -511,19 +512,50 @@ class Service(StateInterface):
             return default
 
 
-def build_services(service_definitions, service_factory, module_dirs,
-                   service_context, state_db, client_authn_factory=None):
-    """
-    This function will build a number of :py:class:`oidcservice.service.Service`
-    instances based on the service definitions provided.
+# def build_services(service_definitions, service_factory, module_dirs,
+#                    service_context, state_db, client_authn_factory=None):
+#     """
+#     This function will build a number of :py:class:`oidcservice.service.Service`
+#     instances based on the service definitions provided.
+#
+#     :param service_definitions: A dictionary of service definitions. The keys
+#         are the names of the subclasses. The values are configurations.
+#     :param service_factory: A factory that can initiate a service class
+#     :param module_dirs: The directories in which to search for service modules.
+#         Directory names are expected to be relative to the oidcservice package.
+#         e.g. ['oidc', 'oauth2]. The directories will be search in order until
+#         a matching module is found.
+#     :param service_context: A reference to the service context, this is the same
+#         for all service instances.
+#     :param state_db: A reference to the state database. Shared by all the
+#         services.
+#     :param client_authn_factory: A list of methods the services can use to
+#         authenticate the client to a service.
+#     :return: A dictionary, with service name as key and the service instance as
+#         value.
+#     """
+#     service = {}
+#     for service_name, service_configuration in service_definitions.items():
+#         _srv = service_factory(service_name,
+#                                module_dirs,
+#                                service_context=service_context,
+#                                state_db=state_db,
+#                                client_authn_factory=client_authn_factory,
+#                                conf=service_configuration)
+#         try:
+#             service[_srv.service_name] = _srv
+#         except AttributeError:
+#             raise ValueError("Could not load '{}'".format(service_name))
+#
+#     return service
 
-    :param service_definitions: A dictionary of service definitions. The keys
-        are the names of the subclasses. The values are configurations.
-    :param service_factory: A factory that can initiate a service class
-    :param module_dirs: The directories in which to search for service modules.
-        Directory names are expected to be relative to the oidcservice package.
-        e.g. ['oidc', 'oauth2]. The directories will be search in order until
-        a matching module is found.
+
+def init_services(service_definitions, service_context, state_db,
+                  client_authn_factory=None):
+    """
+    Initiates a set of services
+
+    :param service_definitions: A dictionary cotaining service definitions
     :param service_context: A reference to the service context, this is the same
         for all service instances.
     :param state_db: A reference to the state database. Shared by all the
@@ -535,12 +567,20 @@ def build_services(service_definitions, service_factory, module_dirs,
     """
     service = {}
     for service_name, service_configuration in service_definitions.items():
-        _srv = service_factory(service_name,
-                               module_dirs,
-                               service_context=service_context,
-                               state_db=state_db,
-                               client_authn_factory=client_authn_factory,
-                               conf=service_configuration)
+        try:
+            kwargs = service_configuration['kwargs']
+        except KeyError:
+            kwargs = {}
+
+        kwargs.update({'service_context': service_context,
+                       'state_db': state_db,
+                       'client_authn_factory': client_authn_factory})
+
+        if isinstance(service_configuration['class'], str):
+            _srv = util.importer(service_configuration['class'])(**kwargs)
+        else:
+            _srv = service_configuration['class'](**kwargs)
+
         try:
             service[_srv.service_name] = _srv
         except AttributeError:

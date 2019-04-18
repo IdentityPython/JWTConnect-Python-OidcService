@@ -21,7 +21,7 @@ from oidcservice.client_auth import PrivateKeyJWT
 from oidcservice.client_auth import valid_service_context
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.service_factory import service_factory
-from oidcservice.service import build_services
+from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
 from oidcservice.state_interface import InMemoryStateDataBase
 from oidcservice.state_interface import State
@@ -70,8 +70,7 @@ def services():
                                         state='ABCDE').to_json()
     db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
                           auth_response=auth_response).to_json())
-    return build_services(DEFAULT_SERVICES, service_factory, ['oidc'],
-                          get_service_context(), db)
+    return init_services(DEFAULT_SERVICES, get_service_context(), db)
 
 
 def test_quote():

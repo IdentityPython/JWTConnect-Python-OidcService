@@ -14,11 +14,11 @@ from oidcmsg.oidc import JRD
 from oidcmsg.oidc import OpenIDSchema
 from oidcmsg.oidc import ProviderConfigurationResponse
 from oidcmsg.oidc import RegistrationResponse
+from oidcservice.oidc.webfinger import WebFinger
 
+from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.service_factory import service_factory
-from oidcservice.service import build_services
 from oidcservice.state_interface import InMemoryStateDataBase
 
 # ================== SETUP ===========================
@@ -116,9 +116,9 @@ def test_conversation():
         )
 
     service_spec = DEFAULT_SERVICES.copy()
-    service_spec['WebFinger'] = {}
+    service_spec['WebFinger'] = {'class': WebFinger}
 
-    service = build_services(service_spec, service_factory, ['oidc'],
+    service = init_services(service_spec,
                              state_db=InMemoryStateDataBase(),
                              service_context=service_context)
 
