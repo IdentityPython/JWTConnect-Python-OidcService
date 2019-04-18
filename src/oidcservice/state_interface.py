@@ -203,15 +203,19 @@ class StateInterface(object):
 
     def store_X2state(self, x, state, xtyp):
         """
-        Store the connection between some value and a state value.
-        This allows us later in the game to find the state if we have the nonce.
+        Store the connection between some value (x) and a state value.
+        This allows us later in the game to find the state if we have x.
 
         :param x: The value of x
         :param state: The state value
         :param xtyp: The type of value x is (e.g. nonce, ...)
         """
         self.state_db.set(KEY_PATTERN[xtyp].format(x), state)
-        _val = self.state_db.get("ref{}ref".format(state))
+        try:
+            _val = self.state_db.get("ref{}ref".format(state))
+        except KeyError:
+            _val = None
+
         if _val is None:
             refs = {xtyp:x}
         else:
