@@ -543,6 +543,32 @@ def init_services(service_definitions, service_context, state_db,
             _srv = service_configuration['class'](**kwargs)
 
         try:
+            post_methods = service_configuration['post_functions']
+        except KeyError:
+            pass
+        else:
+            for meth in post_methods:
+                try:
+                    func = meth['function']
+                except KeyError:
+                    pass
+                else:
+                    _srv.post_construct.append(util.importer(func))
+
+        try:
+            post_methods = service_configuration['pre_functions']
+        except KeyError:
+            pass
+        else:
+            for meth in post_methods:
+                try:
+                    func = meth['function']
+                except KeyError:
+                    pass
+                else:
+                    _srv.pre_construct.append(util.importer(func))
+
+        try:
             service[_srv.service_name] = _srv
         except AttributeError:
             raise ValueError("Could not load '{}'".format(service_name))
