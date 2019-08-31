@@ -2,7 +2,7 @@
 __author__ = 'roland'
 
 
-# The base exception class for oidcservice specific exceptions
+# The base exception class for oidc service specific exceptions
 class OidcServiceError(Exception):
     def __init__(self, errmsg, content_type="", *args):
         Exception.__init__(self, errmsg, *args)
