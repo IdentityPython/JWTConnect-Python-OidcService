@@ -516,7 +516,7 @@ def init_services(service_definitions, service_context, state_db,
     """
     Initiates a set of services
 
-    :param service_definitions: A dictionary cotaining service definitions
+    :param service_definitions: A dictionary containing service definitions
     :param service_context: A reference to the service context, this is the same
         for all service instances.
     :param state_db: A reference to the state database. Shared by all the

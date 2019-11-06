@@ -65,7 +65,7 @@ def get_http_body(req, content_type=URL_ENCODED):
 
 def load_yaml_config(filename):
     with open(filename, "rt", encoding='utf-8') as file:
-        config_dict = yaml.load(file)
+        config_dict = yaml.safe_load(file)
     return config_dict
 
 

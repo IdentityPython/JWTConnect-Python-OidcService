@@ -92,8 +92,8 @@ class ServiceContext(object):
         for attr in ['client_id', 'issuer', 'base_url', 'requests_dir']:
             try:
                 setattr(self, attr, config[attr])
-            except:
-                setattr(self, attr, '')
+            except KeyError:
+                pass
 
         for attr in RegistrationRequest.c_param.keys():
             try:
@@ -105,8 +105,8 @@ class ServiceContext(object):
                      'provider_info']:
             try:
                 setattr(self, attr, config[attr])
-            except:
-                setattr(self, attr, {})
+            except KeyError:
+                pass
 
         if 'client_secret' in config:
             self.set_client_secret(config['client_secret'])
