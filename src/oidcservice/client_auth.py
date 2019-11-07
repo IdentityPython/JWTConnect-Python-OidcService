@@ -267,7 +267,7 @@ def find_token(request, token_type, service, **kwargs):
         # I should pick the latest acquired token, this should be the right
         # order for that.
         _arg = service.multiple_extend_request_args(
-            {}, kwargs['state'], ['access_token'],
+            {}, kwargs['key'], ['access_token'],
             ['auth_response', 'token_response', 'refresh_token_response'])
         return _arg['access_token']
 

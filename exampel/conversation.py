@@ -278,7 +278,7 @@ op_authz_resp = {
 _authz_rep = AuthorizationResponse(**op_authz_resp)
 print(_authz_rep.to_urlencoded())
 _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
-service['authorization'].update_service_context(_resp, state=STATE)
+service['authorization'].update_service_context(_resp, key=STATE)
 print()
 print('--- Authorization registration, response ----')
 print(_resp)
@@ -316,7 +316,7 @@ _resp = {
 
 service_context.issuer = OP_BASEURL
 _resp = service['accesstoken'].parse_response(json.dumps(_resp), state=STATE)
-service['accesstoken'].update_service_context(_resp, state=STATE)
+service['accesstoken'].update_service_context(_resp, key=STATE)
 print()
 print('--- Access token, response ----')
 print(_resp)
@@ -334,7 +334,7 @@ print('headers: {}'.format(info['headers']))
 op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
 _resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
-service['userinfo'].update_service_context(_resp, state=STATE)
+service['userinfo'].update_service_context(_resp, key=STATE)
 print()
 print('--- User info, response ----')
 print(_resp)

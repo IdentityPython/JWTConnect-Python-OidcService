@@ -45,7 +45,7 @@ class Authorization(authorization.Authorization):
                                                   _state)
         return request_args, {}
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         try:
             _idt = resp[verified_claim_name('id_token')]
         except KeyError:
@@ -54,16 +54,16 @@ class Authorization(authorization.Authorization):
             # If there is a verified ID Token then we have to do nonce
             # verification
             try:
-                if self.get_state_by_nonce(_idt['nonce']) != state:
+                if self.get_state_by_nonce(_idt['nonce']) != key:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 raise ValueError('Missing nonce value')
 
-            self.store_sub2state(_idt['sub'], state)
+            self.store_sub2state(_idt['sub'], key)
 
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp.to_json(), 'auth_response', state)
+        self.store_item(resp.to_json(), 'auth_response', key)
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
         if request_args is None:

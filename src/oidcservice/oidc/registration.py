@@ -144,7 +144,7 @@ class Registration(Service):
 
         return request_args
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         self.service_context.registration_response = resp
         if "token_endpoint_auth_method" not in \
                 self.service_context.registration_response:

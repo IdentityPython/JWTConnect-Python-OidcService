@@ -168,7 +168,7 @@ class TestBearerHeader(object):
         resp1 = AuthorizationResponse(code="auth_grant", state=_state)
         response = services['authorization'].parse_response(
             resp1.to_urlencoded(), "urlencoded")
-        services['authorization'].update_service_context(response, state=_state)
+        services['authorization'].update_service_context(response, key=_state)
 
         # based on state find the code and then get an access token
         resp2 = AccessTokenResponse(access_token="token1",
@@ -177,12 +177,12 @@ class TestBearerHeader(object):
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
 
-        services['accesstoken'].update_service_context(response, state=_state)
+        services['accesstoken'].update_service_context(response, key=_state)
 
         # and finally use the access token, bound to a state, to
         # construct the authorization header
         http_args = BearerHeader().construct(
-            ResourceRequest(), services['accesstoken'], state=_state)
+            ResourceRequest(), services['accesstoken'], key=_state)
         assert http_args == {"headers": {"Authorization": "Bearer token1"}}
 
 
@@ -210,7 +210,7 @@ class TestBearerBody(object):
         _srv.store_item(atr, 'token_response', 'FFFFF')
 
         request = ResourceRequest()
-        http_args = BearerBody().construct(request, service=_srv, state="FFFFF")
+        http_args = BearerBody().construct(request, service=_srv, key="FFFFF")
         assert request["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
@@ -220,17 +220,17 @@ class TestBearerBody(object):
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
         response = authz_service.parse_response(resp1.to_urlencoded(),
                                                 "urlencoded")
-        authz_service.update_service_context(response, state='EEEE')
+        authz_service.update_service_context(response, key='EEEE')
 
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
                                     state="EEEE")
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
-        services['accesstoken'].update_service_context(response, state='EEEE')
+        services['accesstoken'].update_service_context(response, key='EEEE')
 
         request = ResourceRequest()
-        BearerBody().construct(request, service=authz_service, state="EEEE")
+        BearerBody().construct(request, service=authz_service, key="EEEE")
 
         assert "access_token" in request
         assert request["access_token"] == "token1"

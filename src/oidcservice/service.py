@@ -154,12 +154,12 @@ class Service(StateInterface):
 
         return request_args
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         """
         A method run after the response has been parsed and verified.
 
         :param resp: The response as a :py:class:`oidcmsg.Message` instance
-        :param state: state value
+        :param key: The key under which the response should be stored
         :param kwargs: Extra key word arguments
         """
 
@@ -280,8 +280,8 @@ class Service(StateInterface):
         """
         return self.default_authn_method
 
-    def get_request_parameters(self, request_body_type="", method="",
-                               authn_method='', request_args=None, **kwargs):
+    def get_request_parameters(self, request_args=None, method="",
+                               request_body_type="", authn_method='', **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 

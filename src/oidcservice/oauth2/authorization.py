@@ -1,3 +1,4 @@
+"""The service that talks to the OAuth2 Authorization endpoint."""
 import logging
 
 from oidcmsg import oauth2
@@ -11,10 +12,11 @@ from oidcservice.oauth2.utils import set_state_parameter
 from oidcservice.service import Service
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class Authorization(Service):
+    """The service that talks to the OAuth2 Authorization endpoint."""
     msg_type = oauth2.AuthorizationRequest
     response_cls = oauth2.AuthorizationResponse
     error_msg = ResponseMessage
@@ -30,12 +32,13 @@ class Authorization(Service):
         self.pre_construct.extend([pick_redirect_uris, set_state_parameter])
         self.post_construct.append(self.store_auth_request)
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp, 'auth_response', state)
+        self.store_item(resp, 'auth_response', key)
 
     def store_auth_request(self, request_args=None, **kwargs):
+        """Store the authorization request in the state DB."""
         _key = get_state_parameter(request_args, kwargs)
         self.store_item(request_args, 'auth_request', _key)
         return request_args
@@ -75,4 +78,3 @@ class Authorization(Service):
                     except KeyError:
                         pass
         return response
-

@@ -370,7 +370,7 @@ class TestAccessTokenRequest(object):
         resp[verified_claim_name('id_token')] = {'nonce': 'nonce'}
         self.service.store_nonce2state('nonce2', 'state2')
         with pytest.raises(ParameterError):
-            self.service.update_service_context(resp, state='state2')
+            self.service.update_service_context(resp, key='state2')
 
 
 class TestProviderInfo(object):
