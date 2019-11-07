@@ -1,35 +1,32 @@
+"""Implementation of a number of client authentication methods."""
 import base64
 import logging
 from urllib.parse import quote_plus
 
+from cryptojwt.exception import MissingKey
 from cryptojwt.jws.utils import alg2keytype
-
-from oidcservice import rndstr
-from oidcservice import sanitize
-from oidcservice import DEF_SIGN_ALG
-from oidcservice import JWT_BEARER
-
 from oidcmsg.message import VREQUIRED
 from oidcmsg.oauth2 import AccessTokenRequest
 from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
 from oidcmsg.oidc import AuthnToken
 from oidcmsg.time_util import utc_time_sans_frac
 
-logger = logging.getLogger(__name__)
+from oidcservice import DEF_SIGN_ALG
+from oidcservice import JWT_BEARER
+from oidcservice import rndstr
+from oidcservice import sanitize
+
+LOGGER = logging.getLogger(__name__)
 
 __author__ = 'roland hedberg'
 
 
 class AuthnFailure(Exception):
-    pass
-
-
-class NoMatchingKey(Exception):
-    pass
+    """Unspecified Authentication failure"""
 
 
 class UnknownAuthnMethod(Exception):
-    pass
+    """Unknown Authentication method."""
 
 
 # ========================================================================
@@ -46,24 +43,30 @@ def assertion_jwt(client_id, keys, audience, algorithm, lifetime=600):
     """
     _now = utc_time_sans_frac()
 
-    at = AuthnToken(iss=client_id, sub=client_id,
-                    aud=audience, jti=rndstr(32),
-                    exp=_now + lifetime, iat=_now)
-    logger.debug('AuthnToken: {}'.format(at.to_dict()))
-    return at.to_jwt(key=keys, algorithm=algorithm)
+    _token = AuthnToken(iss=client_id, sub=client_id,
+                        aud=audience, jti=rndstr(32),
+                        exp=_now + lifetime, iat=_now)
+    LOGGER.debug('AuthnToken: %s', _token.to_dict())
+    return _token.to_jwt(key=keys, algorithm=algorithm)
 
 
-class ClientAuthnMethod(object):
+class ClientAuthnMethod:
     """
     Basic Client Authentication Method class.
     Only has one public method: *construct*
     """
 
-    def construct(self, **kwargs):
-        """ Add authentication information to a request
-        :return:
-        """
+    def construct(self, request, service=None, http_args=None, **kwargs):
+        """ Add authentication information to a request"""
         raise NotImplementedError()
+
+    def modify_request(self, request, service, **kwargs):
+        """
+        Modify the request if necessary.
+
+        :param request: The request
+        :param service: The service using this authentication method.
+        """
 
 
 class ClientSecretBasic(ClientAuthnMethod):
@@ -79,24 +82,8 @@ class ClientSecretBasic(ClientAuthnMethod):
     Note that both username and password
     """
 
-    def construct(self, request, service=None, http_args=None, **kwargs):
-        """
-        Construct a dictionary to be added to the HTTP request headers
-
-        :param request: The request
-        :param service: A
-            :py:class:`oidcservice.service.Service` instance
-        :param http_args: HTTP arguments
-        :return: dictionary of HTTP arguments
-        """
-
-        if http_args is None:
-            http_args = {}
-
-        if "headers" not in http_args:
-            http_args["headers"] = {}
-
-        # get the username (client_id) and the password (client_secret)
+    @staticmethod
+    def _get_passwd(request, service, **kwargs):
         try:
             passwd = kwargs["password"]
         except KeyError:
@@ -104,29 +91,42 @@ class ClientSecretBasic(ClientAuthnMethod):
                 passwd = request["client_secret"]
             except KeyError:
                 passwd = service.service_context.client_secret
+        return passwd
 
+    @staticmethod
+    def _get_user(service, **kwargs):
         try:
             user = kwargs["user"]
         except KeyError:
             user = service.service_context.client_id
+        return user
 
-        # The credential is username and password concatenated with a ':'
-        # in between and then base 64 encoded becomes the authentication
-        # token.
+    def _get_authentication_token(self, request, service, **kwargs):
+        """
+        Return authentication Token.
+
+        The credential is username and password concatenated with a ':'
+        in between and then base 64 encoded becomes the authentication token.
+        :param request: The request
+        :param service: A :py:class:`oidcservice.service.Service` instance
+        :param kwargs: Extra key word arguments
+        :return: An authentication token
+        """
+        passwd = self._get_passwd(request, service, **kwargs)
+        user = self._get_user(service, **kwargs)
+
         credentials = "{}:{}".format(quote_plus(user), quote_plus(passwd))
-        authz = base64.urlsafe_b64encode(credentials.encode("utf-8")).decode(
-            "utf-8")
-        http_args["headers"]["Authorization"] = "Basic {}".format(authz)
+        return base64.urlsafe_b64encode(credentials.encode("utf-8")).decode("utf-8")
 
-        # If client_secret was part of the request message instance remove it
-        try:
-            del request["client_secret"]
-        except (KeyError, TypeError):
-            pass
+    @staticmethod
+    def _with_or_without_client_id(request, service):
+        """ Add or delete client_id from request.
 
-        # If we're doing an access token request with an authorization code
-        # then we should add client_id to the request if it's not already
-        # there
+        If we're doing an access token request with an authorization code
+        then we should add client_id to the request if it's not already there.
+        :param request: A request
+        :param service: A :py:class:`oidcservice.service.Service` instance
+        """
         if isinstance(request, AccessTokenRequest) and request[
                 'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
@@ -148,6 +148,44 @@ class ClientSecretBasic(ClientAuthnMethod):
                 except KeyError:
                     pass
 
+    def modify_request(self, request, service, **kwargs):
+        """
+        Modify the request if necessary.
+
+        :param request: The request
+        :param service: The service using this authentication method.
+        """
+        # If client_secret was part of the request message instance remove it
+        try:
+            del request["client_secret"]
+        except (KeyError, TypeError):
+            pass
+
+        # Modifies the request
+        self._with_or_without_client_id(request, service)
+
+    def construct(self, request, service=None, http_args=None, **kwargs):
+        """
+        Construct a dictionary to be added to the HTTP request headers
+
+        :param request: The request
+        :param service: A :py:class:`oidcservice.service.Service` instance
+        :param http_args: HTTP arguments
+        :return: dictionary of HTTP arguments
+        """
+
+        if http_args is None:
+            http_args = {}
+
+        if "headers" not in http_args:
+            http_args["headers"] = {}
+
+        _token = self._get_authentication_token(request, service, **kwargs)
+
+        http_args["headers"]["Authorization"] = "Basic {}".format(_token)
+
+        self.modify_request(request, service)
+
         return http_args
 
 
@@ -161,11 +199,15 @@ class ClientSecretPost(ClientSecretBasic):
     These means putting both client_secret and client_id in the request body.
     """
 
-    def construct(self, request, service=None, http_args=None, **kwargs):
-        # I MUST have a client_secret, there are 3 possible places
-        # where I can find it. In the request, as an argument in http_args
-        # or among the client information.
+    def modify_request(self, request, service, **kwargs):
+        """
+        I MUST have a client_secret, there are 3 possible places
+        where I can find it. In the request, as an argument in http_args
+        or among the client information.
 
+        :param request: The request
+        :param service: The service that is using this authentication method
+        """
         _context = service.service_context
         if "client_secret" not in request:
             try:
@@ -179,7 +221,17 @@ class ClientSecretPost(ClientSecretBasic):
         # Add the client_id to the request
         request["client_id"] = _context.client_id
 
-        # return a possbly modified http_args dictionary
+    def construct(self, request, service=None, http_args=None, **kwargs):
+        """
+        Does not add any authentication information to the HTTP arguments.
+        Adds authentication information to the request.
+
+        :param request: The request
+        :param service: The service that is using this authentication method
+        :param http_args: HTTP arguments
+        :param kwargs: Extra keyword arguments.
+        """
+        self.modify_request(request, service, **kwargs)
         return http_args
 
 
@@ -221,6 +273,7 @@ def find_token(request, token_type, service, **kwargs):
 
 
 class BearerHeader(ClientAuthnMethod):
+    """The bearer header authentication method."""
 
     def construct(self, request=None, service=None, http_args=None,
                   **kwargs):
@@ -261,18 +314,15 @@ class BearerHeader(ClientAuthnMethod):
 
 
 class BearerBody(ClientAuthnMethod):
-    def construct(self, request, service=None, http_args=None, **kwargs):
+    """The bearer body authentication method."""
+    def modify_request(self, request, service, **kwargs):
         """
-        Will add a token to the request if not present
+        Modify the request if necessary.
 
         :param request: The request
-        :param service_context: A
-            :py:class:`oidcservice.service.Service` instance
-        :param http_args: HTTP arguments
-        :param kwargs: extra keyword arguments
-        :return: A possibly modified dictionary with HTTP arguments.
+        :param service: The service using this authentication method.
+        :param kwargs: Extra keyword arguments
         """
-
         _acc_token = ''
         for _token_type in ['access_token', 'refresh_token']:
             _acc_token = find_token(request, _token_type, service, **kwargs)
@@ -281,8 +331,21 @@ class BearerBody(ClientAuthnMethod):
 
         if not _acc_token:
             raise KeyError('No access or refresh token available')
-        else:
-            request["access_token"] = _acc_token
+
+        request["access_token"] = _acc_token
+
+    def construct(self, request, service=None, http_args=None, **kwargs):
+        """
+        Will add a token to the request if not present
+
+        :param request: The request
+        :param service_context: A :py:class:`oidcservice.service.Service` instance
+        :param http_args: HTTP arguments
+        :param kwargs: extra keyword arguments
+        :return: A possibly modified dictionary with HTTP arguments.
+        """
+
+        self.modify_request(request, service, **kwargs)
 
         return http_args
 
@@ -311,7 +374,8 @@ class JWSAuthnMethod(ClientAuthnMethod):
     Web Tokens.
     """
 
-    def choose_algorithm(self, context, **kwargs):
+    @staticmethod
+    def choose_algorithm(context, **kwargs):
         """
         Pick signing algorithm
 
@@ -328,19 +392,20 @@ class JWSAuthnMethod(ClientAuthnMethod):
             raise AuthnFailure("Missing algorithm specification")
         return algorithm
 
-    def get_signing_key(self, algorithm, service_context):
+    @staticmethod
+    def get_signing_key_from_keyjar(algorithm, service_context):
         """
         Pick signing key based on signing algorithm to be used
 
         :param algorithm: Signing algorithm
-        :param service_context: A
-            :py:class:`oidcservice.service_context.ServiceContext` instance
+        :param service_context: A :py:class:`oidcservice.service_context.ServiceContext` instance
         :return: A key
         """
         return service_context.keyjar.get_signing_key(
             alg2keytype(algorithm), alg=algorithm)
 
-    def get_key_by_kid(self, kid, algorithm, service_context):
+    @staticmethod
+    def _get_key_by_kid(kid, algorithm, service_context):
         """
         Pick a key that matches a given key ID and signing algorithm.
 
@@ -354,24 +419,77 @@ class JWSAuthnMethod(ClientAuthnMethod):
         if _key:
             ktype = alg2keytype(algorithm)
             if _key.kty != ktype:
-                raise NoMatchingKey("Wrong key type")
-            else:
-                return _key
-        else:
-            raise NoMatchingKey("No key with kid:%s" % kid)
+                raise MissingKey("Wrong key type")
 
-    def construct(self, request, service=None, http_args=None, **kwargs):
+            return _key
+
+        raise MissingKey("No key with kid:%s" % kid)
+
+    def _get_signing_key(self, algorithm, context, kid=None):
+        ktype = alg2keytype(algorithm)
+        try:
+            if kid:
+                signing_key = [self._get_key_by_kid(kid, algorithm, context)]
+            elif ktype in context.kid["sig"]:
+                try:
+                    signing_key = [self._get_key_by_kid(
+                        context.kid["sig"][ktype], algorithm, context)]
+                except KeyError:
+                    signing_key = self.get_signing_key_from_keyjar(algorithm, context)
+            else:
+                signing_key = self.get_signing_key_from_keyjar(algorithm, context)
+        except (MissingKey,) as err:
+            LOGGER.error("%s", sanitize(err))
+            raise
+
+        return signing_key
+
+    def _get_audience_and_algorithm(self, context, **kwargs):
+        algorithm = None
+
+        # audience for the signed JWT depends on which endpoint
+        # we're talking to.
+        if 'authn_endpoint' in kwargs and kwargs['authn_endpoint'] in ['token_endpoint']:
+            try:
+                algorithm = context.behaviour[
+                    'token_endpoint_auth_signing_alg']
+            except (KeyError, AttributeError):
+                pass
+            audience = context.provider_info['token_endpoint']
+        else:
+            audience = context.provider_info['issuer']
+
+        if not algorithm:
+            algorithm = self.choose_algorithm(**kwargs)
+        return audience, algorithm
+
+    def _construct_client_assertion(self, service, **kwargs):
+        _context = service.service_context
+
+        audience, algorithm = self._get_audience_and_algorithm(_context, **kwargs)
+
+        if 'kid' in kwargs:
+            signing_key = self._get_signing_key(algorithm, _context, kid=kwargs['kid'])
+        else:
+            signing_key = self._get_signing_key(algorithm, _context)
+
+        try:
+            _args = {'lifetime': kwargs['lifetime']}
+        except KeyError:
+            _args = {}
+
+        # construct the signed JWT with the assertions and add
+        # it as value to the 'client_assertion' claim of the request
+        return assertion_jwt(_context.client_id, signing_key, audience, algorithm, **_args)
+
+    def modify_request(self, request, service, **kwargs):
         """
-        Constructs a client assertion and signs it with a key.
-        The request is modified as a side effect.
+        Modify the request if necessary.
 
         :param request: The request
-        :param service: A :py:class:`oidcservice.service.Service` instance
-        :param http_args: HTTP arguments
-        :param kwargs: Extra arguments
-        :return: Constructed HTTP arguments, in this case none
+        :param service: The service using this authentication method.
+        :param kwargs: Extra keyword arguments
         """
-
         if 'client_assertion' in kwargs:
             request["client_assertion"] = kwargs['client_assertion']
             if 'client_assertion_type' in kwargs:
@@ -383,51 +501,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
             if 'client_assertion_type' not in request:
                 request["client_assertion_type"] = JWT_BEARER
         else:
-            algorithm = None
-            _context = service.service_context
-            # audience for the signed JWT depends on which endpoint
-            # we're talking to.
-            if kwargs['authn_endpoint'] in ['token_endpoint']:
-                try:
-                    algorithm = _context.behaviour[
-                        'token_endpoint_auth_signing_alg']
-                except (KeyError, AttributeError):
-                    pass
-                audience = _context.provider_info['token_endpoint']
-            else:
-                audience = _context.provider_info['issuer']
-
-            if not algorithm:
-                algorithm = self.choose_algorithm(**kwargs)
-
-            ktype = alg2keytype(algorithm)
-            try:
-                if 'kid' in kwargs:
-                    signing_key = [self.get_key_by_kid(kwargs["kid"], algorithm,
-                                                       _context)]
-                elif ktype in _context.kid["sig"]:
-                    try:
-                        signing_key = [self.get_key_by_kid(
-                            _context.kid["sig"][ktype], algorithm, _context)]
-                    except KeyError:
-                        signing_key = self.get_signing_key(algorithm, _context)
-                else:
-                    signing_key = self.get_signing_key(algorithm, _context)
-            except NoMatchingKey as err:
-                logger.error("%s" % sanitize(err))
-                raise
-
-            try:
-                _args = {'lifetime': kwargs['lifetime']}
-            except KeyError:
-                _args = {}
-
-            # construct the signed JWT with the assertions and add
-            # it as value to the 'client_assertion' claim of the request
-            request["client_assertion"] = assertion_jwt(
-                _context.client_id, signing_key, audience,
-                algorithm, **_args)
-
+            request["client_assertion"] = self._construct_client_assertion(service, **kwargs)
             request["client_assertion_type"] = JWT_BEARER
 
         try:
@@ -442,6 +516,19 @@ class JWSAuthnMethod(ClientAuthnMethod):
             except KeyError:
                 pass
 
+    def construct(self, request, service=None, http_args=None, **kwargs):
+        """
+        Constructs a client assertion and signs it with a key.
+        The request is modified as a side effect.
+
+        :param request: The request
+        :param service: A :py:class:`oidcservice.service.Service` instance
+        :param http_args: HTTP arguments
+        :param kwargs: Extra arguments
+        :return: Constructed HTTP arguments, in this case none
+        """
+        self.modify_request(request, service, **kwargs)
+
         return {}
 
 
@@ -455,11 +542,10 @@ class ClientSecretJWT(JWSAuthnMethod):
     """
 
     def choose_algorithm(self, context="client_secret_jwt", **kwargs):
-        return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
+        return JWSAuthnMethod.choose_algorithm(context, **kwargs)
 
-    def get_signing_key(self, algorithm, service_context):
-        return service_context.keyjar.get_signing_key(
-            alg2keytype(algorithm), alg=algorithm)
+    def get_signing_key_from_keyjar(self, algorithm, service_context):
+        return service_context.keyjar.get_signing_key(alg2keytype(algorithm), alg=algorithm)
 
 
 class PrivateKeyJWT(JWSAuthnMethod):
@@ -468,11 +554,10 @@ class PrivateKeyJWT(JWSAuthnMethod):
     """
 
     def choose_algorithm(self, context="private_key_jwt", **kwargs):
-        return JWSAuthnMethod.choose_algorithm(self, context, **kwargs)
+        return JWSAuthnMethod.choose_algorithm(context, **kwargs)
 
-    def get_signing_key(self, algorithm, service_context=None):
-        return service_context.keyjar.get_signing_key(
-            alg2keytype(algorithm), "", alg=algorithm)
+    def get_signing_key_from_keyjar(self, algorithm, service_context=None):
+        return service_context.keyjar.get_signing_key(alg2keytype(algorithm), "", alg=algorithm)
 
 
 # Map from client authentication identifiers to corresponding class
@@ -505,9 +590,12 @@ def valid_service_context(service_context, when=0):
 
 
 def factory(auth_method):
+    """Return an instance of a client authentication class.
+
+    :param auth_method: The name of the client authentication method
+    """
     try:
         return CLIENT_AUTHN_METHOD[auth_method]()
     except KeyError:
-        logger.error(
-            'Unknown client authentication method: {}'.format(auth_method))
+        LOGGER.error('Unknown client authentication method: %s', auth_method)
         raise ValueError(auth_method)

@@ -1,3 +1,7 @@
+"""
+Implements a service context. A Service context is used to keep information that are
+common to all the services by an OpenID Connect Relying Party.
+"""
 import hashlib
 import os
 
@@ -52,7 +56,7 @@ PROVIDER_INFO_MAP = {
     }
 
 
-class ServiceContext(object):
+class ServiceContext:
     """
     This class keeps information that a client needs to be able to talk
     to a server. Some of this information comes from configuration and some
@@ -80,6 +84,8 @@ class ServiceContext(object):
         self.client_id = ''
         self._c_secret = ''
         self.issuer = ''
+        self.redirect_uris = []
+        self.callback = None
 
         try:
             self.clock_skew = config['clock_skew']
@@ -89,22 +95,18 @@ class ServiceContext(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir']:
+        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir',
+                     'allow', 'client_preferences', 'behaviour',
+                     'provider_info', 'redirect_uris', 'callback'
+                     ]:
             try:
                 setattr(self, attr, config[attr])
             except KeyError:
                 pass
 
-        for attr in RegistrationRequest.c_param.keys():
+        for attr in RegistrationRequest.c_param:
             try:
                 self.register_args[attr] = config[attr]
-            except KeyError:
-                pass
-
-        for attr in ['allow', 'client_preferences', 'behaviour',
-                     'provider_info']:
-            try:
-                setattr(self, attr, config[attr])
             except KeyError:
                 pass
 
@@ -117,16 +119,6 @@ class ServiceContext(object):
                 os.makedirs(self.requests_dir)
 
         try:
-            self.redirect_uris = config['redirect_uris']
-        except:
-            self.redirect_uris = []
-
-        try:
-            self.callback = config['callback']
-        except KeyError:
-            self.callback = {}
-
-        try:
             self.import_keys(config['keys'])
         except KeyError:
             pass
@@ -135,9 +127,11 @@ class ServiceContext(object):
             self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)
 
     def get_client_secret(self):
+        """Return the client secret."""
         return self._c_secret
 
     def set_client_secret(self, val):
+        """Set client secret."""
         if not val:
             self._c_secret = ""
         else:
@@ -175,8 +169,8 @@ class ServiceContext(object):
         _name = webname[len(self.base_url):]
         if _name.startswith('/'):
             return _name[1:]
-        else:
-            return _name
+
+        return _name
 
     def generate_request_uris(self, path):
         """
@@ -186,16 +180,16 @@ class ServiceContext(object):
         :param path: Leading path
         :return: A list of one unique URL
         """
-        m = hashlib.sha256()
+        _hash = hashlib.sha256()
         try:
-            m.update(as_bytes(self.provider_info['issuer']))
+            _hash.update(as_bytes(self.provider_info['issuer']))
         except KeyError:
-            m.update(as_bytes(self.issuer))
-        m.update(as_bytes(self.base_url))
+            _hash.update(as_bytes(self.issuer))
+        _hash.update(as_bytes(self.base_url))
         if not path.startswith('/'):
-            return ['{}/{}/{}'.format(self.base_url, path, m.hexdigest())]
-        else:
-            return ['{}{}/{}'.format(self.base_url, path, m.hexdigest())]
+            return ['{}/{}/{}'.format(self.base_url, path, _hash.hexdigest())]
+
+        return ['{}{}/{}'.format(self.base_url, path, _hash.hexdigest())]
 
     def import_keys(self, keyspec):
         """
@@ -214,13 +208,13 @@ class ServiceContext(object):
                             _key = RSAKey(
                                 key=import_private_rsa_key_from_file(fil),
                                 use='sig')
-                            _kb = KeyBundle()
-                            _kb.append(_key)
-                            self.keyjar.add_kb('', _kb)
+                            _bundle = KeyBundle()
+                            _bundle.append(_key)
+                            self.keyjar.add_kb('', _bundle)
             elif where == 'url':
                 for iss, url in spec.items():
-                    kb = KeyBundle(source=url)
-                    self.keyjar.add_kb(iss, kb)
+                    _bundle = KeyBundle(source=url)
+                    self.keyjar.add_kb(iss, _bundle)
 
     def get_sign_alg(self, typ):
         """
@@ -249,7 +243,7 @@ class ServiceContext(object):
         res = {}
         for attr in ['enc', 'alg']:
             try:
-                 _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
+                _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
             except KeyError:
                 try:
                     _alg = self.provider_info[PROVIDER_INFO_MAP[typ][attr]]
@@ -259,4 +253,3 @@ class ServiceContext(object):
             res[attr] = _alg
 
         return res
-

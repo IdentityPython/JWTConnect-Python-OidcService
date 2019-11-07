@@ -1,3 +1,4 @@
+"""Utilities"""
 import importlib
 import logging
 from urllib.parse import parse_qs
@@ -7,7 +8,7 @@ from urllib.parse import urlunsplit
 import yaml
 from oidcmsg.exception import UnSupported
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 __author__ = 'roland'
 
@@ -36,10 +37,10 @@ def get_http_url(url, req, method='GET'):
             _query = str(_req.to_urlencoded())
             return urlunsplit((comp.scheme, comp.netloc, comp.path,
                                _query, comp.fragment))
-        else:
-            return url
-    else:
+
         return url
+
+    return url
 
 
 def get_http_body(req, content_type=URL_ENCODED):
@@ -54,37 +55,41 @@ def get_http_body(req, content_type=URL_ENCODED):
     """
     if URL_ENCODED in content_type:
         return req.to_urlencoded()
-    elif JSON_ENCODED in content_type:
+
+    if JSON_ENCODED in content_type:
         return req.to_json()
-    elif JOSE_ENCODED in content_type:
+
+    if JOSE_ENCODED in content_type:
         return req  # already packaged
-    else:
-        raise UnSupported(
-            "Unsupported content type: '%s'" % content_type)
+
+    raise UnSupported(
+        "Unsupported content type: '%s'" % content_type)
 
 
 def load_yaml_config(filename):
+    """Load a YAML configuration file."""
     with open(filename, "rt", encoding='utf-8') as file:
         config_dict = yaml.safe_load(file)
     return config_dict
 
 
-def modsplit(s):
+def modsplit(name):
     """Split importable"""
-    if ':' in s:
-        c = s.split(':')
-        if len(c) != 2:
+    if ':' in name:
+        _part = name.split(':')
+        if len(_part) != 2:
             raise ValueError("Syntax error: {s}")
-        return c[0], c[1]
-    else:
-        c = s.split('.')
-        if len(c) < 2:
-            raise ValueError("Syntax error: {s}")
-        return '.'.join(c[:-1]), c[-1]
+        return _part[0], _part[1]
+
+    _part = name.split('.')
+    if len(_part) < 2:
+        raise ValueError("Syntax error: {s}")
+
+    return '.'.join(_part[:-1]), _part[-1]
 
 
 def importer(name):
     """Import by name"""
-    c1, c2 = modsplit(name)
-    module = importlib.import_module(c1)
-    return getattr(module, c2)
+    _part = modsplit(name)
+    module = importlib.import_module(_part[0])
+    return getattr(module, _part[1])

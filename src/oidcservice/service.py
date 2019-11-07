@@ -1,3 +1,4 @@
+""" The basic Service class upon which all the specific services are built. """
 import logging
 from urllib.parse import urlparse
 
@@ -18,7 +19,7 @@ from oidcservice.util import get_http_url
 
 __author__ = 'Roland Hedberg'
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 SUCCESSFUL = [200, 201, 202, 203, 204, 205, 206]
 
@@ -28,6 +29,7 @@ REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 
 class Service(StateInterface):
+    """The basic Service class."""
     msg_type = Message
     response_cls = Message
     error_msg = ResponseMessage
@@ -82,24 +84,24 @@ class Service(StateInterface):
         # 1. A keyword argument
         # 2. configured set of default attribute values
         # 3. default attribute values defined in the OIDC standard document
-        for prop in self.msg_type.c_param.keys():
+        for prop in self.msg_type.c_param:
             if prop in ar_args:
                 continue
-            else:
+
+            try:
+                ar_args[prop] = getattr(self.service_context, prop)
+            except AttributeError:
                 try:
-                    ar_args[prop] = getattr(self.service_context, prop)
-                except AttributeError:
+                    ar_args[prop] = self.conf['request_args'][prop]
+                except KeyError:
                     try:
-                        ar_args[prop] = self.conf['request_args'][prop]
+                        ar_args[prop] = self.service_context.register_args[
+                            prop]
                     except KeyError:
                         try:
-                            ar_args[prop] = self.service_context.register_args[
-                                prop]
+                            ar_args[prop] = self.default_request_args[prop]
                         except KeyError:
-                            try:
-                                ar_args[prop] = self.default_request_args[prop]
-                            except KeyError:
-                                pass
+                            pass
 
         return ar_args
 
@@ -160,7 +162,6 @@ class Service(StateInterface):
         :param state: state value
         :param kwargs: Extra key word arguments
         """
-        pass
 
     def construct(self, request_args=None, **kwargs):
         """
@@ -215,11 +216,11 @@ class Service(StateInterface):
             http_args = {}
 
         if authn_method:
-            logger.debug('Client authn method: {}'.format(authn_method))
+            LOGGER.debug('Client authn method: %s', authn_method)
             return self.client_authn_factory(authn_method).construct(
                 request, self, http_args=http_args, **kwargs)
-        else:
-            return http_args
+
+        return http_args
 
     def construct_request(self, request_args=None, **kwargs):
         """
@@ -235,10 +236,6 @@ class Service(StateInterface):
         if request_args is None:
             request_args = {}
 
-        # remove arguments that should not be included in the request
-        # _args = dict(
-        #    [(k, v) for k, v in kwargs.items() if v and k not in SPECIAL_ARGS])
-
         return self.construct(request_args, **kwargs)
 
     def get_endpoint(self):
@@ -249,8 +246,8 @@ class Service(StateInterface):
         """
         if self.endpoint:
             return self.endpoint
-        else:
-            return self.service_context.provider_info[self.endpoint_name]
+
+        return self.service_context.provider_info[self.endpoint_name]
 
     def get_authn_header(self, request, authn_method, **kwargs):
         """
@@ -284,8 +281,7 @@ class Service(StateInterface):
         return self.default_authn_method
 
     def get_request_parameters(self, request_body_type="", method="",
-                               authn_method='', request_args=None,
-                               http_args=None, **kwargs):
+                               authn_method='', request_args=None, **kwargs):
         """
         Builds the request message and constructs the HTTP headers.
 
@@ -302,7 +298,6 @@ class Service(StateInterface):
         :param method: HTTP method used.
         :param authn_method: Client authentication method
         :param request_args: Message arguments
-        :param http_args: Initial HTTP header arguments
         :param kwargs: extra keyword arguments
         :return: Dictionary with the necessary information for the HTTP
             request
@@ -367,12 +362,11 @@ class Service(StateInterface):
         # If info is a whole URL pick out the query or fragment part
         if '?' in info or '#' in info:
             parts = urlparse(info)
-            scheme, netloc, path, params, query, fragment = parts[:6]
             # either query of fragment
-            if query:
-                info = query
+            if parts.query:
+                info = parts.query
             else:
-                info = fragment
+                info = parts.fragment
         return info
 
     def post_parse_response(self, response, **kwargs):
@@ -399,6 +393,37 @@ class Service(StateInterface):
                   'verify': True}
         return kwargs
 
+    def _do_jwt(self, info):
+        args = {'allowed_sign_algs':
+                    self.service_context.get_sign_alg(self.service_name)}
+        enc_algs = self.service_context.get_enc_alg_enc(self.service_name)
+        args['allowed_enc_algs'] = enc_algs['alg']
+        args['allowed_enc_encs'] = enc_algs['enc']
+        _jwt = JWT(key_jar=self.service_context.keyjar, **args)
+        _jwt.iss = self.service_context.client_id
+        return _jwt.unpack(info)
+
+    def _do_response(self, info, sformat, **kwargs):
+        try:
+            resp = self.response_cls().deserialize(
+                info, sformat, iss=self.service_context.issuer, **kwargs)
+        except Exception as err:
+            resp = None
+            if sformat == 'json':
+                # Could be JWS or JWE but wrongly tagged
+                # Adding issuer is just a fail-safe. If one things was wrong
+                # then two can be.
+                try:
+                    resp = self.response_cls().deserialize(
+                        info, 'jwt', iss=self.service_context.issuer, **kwargs)
+                except Exception:
+                    pass
+
+            if resp is None:
+                LOGGER.error('Error while deserializing: %s', err)
+                raise
+        return resp
+
     def parse_response(self, info, sformat="", state="", **kwargs):
         """
         This the start of a pipeline that will:
@@ -422,13 +447,13 @@ class Service(StateInterface):
         if not sformat:
             sformat = self.response_body_type
 
-        logger.debug('response format: {}'.format(sformat))
+        LOGGER.debug('response format: %s', sformat)
 
         if sformat in ['jose', 'jws', 'jwe']:
             resp = self.post_parse_response(info, state=state)
 
             if not resp:
-                logger.error('Missing or faulty response')
+                LOGGER.error('Missing or faulty response')
                 raise ResponseError("Missing or faulty response")
 
             return resp
@@ -439,58 +464,34 @@ class Service(StateInterface):
             info = self.get_urlinfo(info)
 
         if sformat == 'jwt':
-            args = {'allowed_sign_algs':
-                        self.service_context.get_sign_alg(self.service_name)}
-            enc_algs = self.service_context.get_enc_alg_enc(self.service_name)
-            args['allowed_enc_algs'] = enc_algs['alg']
-            args['allowed_enc_encs'] = enc_algs['enc']
-            _jwt = JWT(key_jar=self.service_context.keyjar, **args)
-            _jwt.iss = self.service_context.client_id
-            info = _jwt.unpack(info)
+            info = self._do_jwt(info)
             sformat = "dict"
 
-        logger.debug('response_cls: {}'.format(self.response_cls.__name__))
-        try:
-            resp = self.response_cls().deserialize(
-                info, sformat, iss=self.service_context.issuer, **kwargs)
-        except Exception as err:
-            resp = None
-            if sformat == 'json':
-                # Could be JWS or JWE but wrongly tagged
-                # Adding issuer is just a fail-safe. If one things was wrong
-                # then two can be.
-                try:
-                    resp = self.response_cls().deserialize(
-                        info, 'jwt', iss=self.service_context.issuer, **kwargs)
-                except Exception as err2:
-                    pass
+        LOGGER.debug('response_cls: %s', self.response_cls.__name__)
 
-            if resp is None:
-                logger.error('Error while deserializing: {}'.format(err))
-                raise
+        resp = self._do_response(info, sformat, **kwargs)
 
-        msg = 'Initial response parsing => "{}"'
-        logger.debug(msg.format(resp.to_dict()))
+        LOGGER.debug('Initial response parsing => "%s"', resp.to_dict())
 
         # is this an error message
         if is_error_message(resp):
-            logger.debug('Error response: {}'.format(resp))
+            LOGGER.debug('Error response: %s', resp)
         else:
             vargs = self.gather_verify_arguments()
-            logger.debug("Verify response with {}".format(vargs))
+            LOGGER.debug("Verify response with %s", vargs)
             try:
                 # verify the message. If something is wrong an exception is
                 # thrown
                 resp.verify(**vargs)
             except Exception as err:
-                logger.error(
-                    'Got exception while verifying response: {}'.format(err))
+                LOGGER.error(
+                    'Got exception while verifying response: %s', err)
                 raise
 
             resp = self.post_parse_response(resp, state=state)
 
         if not resp:
-            logger.error('Missing or faulty response')
+            LOGGER.error('Missing or faulty response')
             raise ResponseError("Missing or faulty response")
 
         return resp
@@ -507,8 +508,24 @@ class Service(StateInterface):
         """
         if attr in self.conf:
             return self.conf[attr]
-        else:
-            return default
+
+        return default
+
+
+def gather_constructors(service_methods, construct):
+    """Loads the construct methods that are defined."""
+    try:
+        _methods = service_methods
+    except KeyError:
+        pass
+    else:
+        for meth in _methods:
+            try:
+                func = meth['function']
+            except KeyError:
+                pass
+            else:
+                construct.append(util.importer(func))
 
 
 def init_services(service_definitions, service_context, state_db,
@@ -542,31 +559,10 @@ def init_services(service_definitions, service_context, state_db,
         else:
             _srv = service_configuration['class'](**kwargs)
 
-        try:
-            post_methods = service_configuration['post_functions']
-        except KeyError:
-            pass
-        else:
-            for meth in post_methods:
-                try:
-                    func = meth['function']
-                except KeyError:
-                    pass
-                else:
-                    _srv.post_construct.append(util.importer(func))
-
-        try:
-            post_methods = service_configuration['pre_functions']
-        except KeyError:
-            pass
-        else:
-            for meth in post_methods:
-                try:
-                    func = meth['function']
-                except KeyError:
-                    pass
-                else:
-                    _srv.pre_construct.append(util.importer(func))
+        if 'post_functions' in service_configuration:
+            gather_constructors(service_configuration['post_functions'], _srv.post_construct)
+        if 'pre_functions' in service_configuration:
+            gather_constructors(service_configuration['pre_functions'], _srv.pre_construct)
 
         try:
             service[_srv.service_name] = _srv
