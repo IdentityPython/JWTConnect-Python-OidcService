@@ -2,6 +2,7 @@ from oidcmsg.exception import MissingParameter
 
 
 def get_state_parameter(request_args, kwargs):
+    """Find a state value from a set of possible places."""
     try:
         _state = kwargs['state']
     except KeyError:
@@ -14,6 +15,7 @@ def get_state_parameter(request_args, kwargs):
 
 
 def pick_redirect_uris(request_args=None, service=None, **kwargs):
+    """Pick one redirect_uri base on response_mode out of a list of such."""
     _context = service.service_context
     if 'redirect_uri' in request_args:
         pass
@@ -43,6 +45,6 @@ def pick_redirect_uris(request_args=None, service=None, **kwargs):
 
 
 def set_state_parameter(request_args=None, **kwargs):
+    """Assigned a state value."""
     request_args['state'] = get_state_parameter(request_args, kwargs)
     return request_args, {'state': request_args['state']}
-

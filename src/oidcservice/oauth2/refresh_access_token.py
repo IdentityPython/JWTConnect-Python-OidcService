@@ -1,3 +1,4 @@
+"""The service that talks to the OAuth2 refresh access token endpoint."""
 import logging
 
 from oidcmsg import oauth2
@@ -8,10 +9,11 @@ from oidcservice.oauth2.utils import get_state_parameter
 from oidcservice.service import Service
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class RefreshAccessToken(Service):
+    """The service that talks to the OAuth2 refresh access token endpoint."""
     msg_type = oauth2.RefreshAccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
     error_msg = ResponseMessage
@@ -33,6 +35,7 @@ class RefreshAccessToken(Service):
         self.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, **kwargs):
+        """Preconstructor of request arguments"""
         _state = get_state_parameter(request_args, kwargs)
         parameters = list(self.msg_type.c_param.keys())
 

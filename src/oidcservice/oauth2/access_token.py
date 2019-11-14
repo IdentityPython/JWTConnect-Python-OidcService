@@ -1,3 +1,4 @@
+"""Implements the service that talks to the Access Token endpoint."""
 import logging
 
 from oidcmsg import oauth2
@@ -8,10 +9,11 @@ from oidcservice.oauth2.utils import get_state_parameter
 from oidcservice.service import Service
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class AccessToken(Service):
+    """The access token service."""
     msg_type = oauth2.AccessTokenRequest
     response_cls = oauth2.AccessTokenResponse
     error_msg = ResponseMessage
@@ -60,4 +62,3 @@ class AccessToken(Service):
             request_args = _args
 
         return request_args, {}
-

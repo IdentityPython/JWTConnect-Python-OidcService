@@ -342,7 +342,7 @@ def test_conversation():
     _authz_rep = AuthorizationResponse(**op_authz_resp)
 
     _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
-    service['authorization'].update_service_context(_resp, state=STATE)
+    service['authorization'].update_service_context(_resp, key=STATE)
     _item = service['authorization'].get_item(AuthorizationResponse,
                                               'auth_response', STATE)
     assert _item['code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
@@ -398,7 +398,7 @@ def test_conversation():
     assert set(_resp['__verified_id_token'].keys()) == {
         'iss', 'kid', 'nonce', 'acr', 'auth_time', 'aud', 'iat', 'exp', 'sub'}
 
-    service['accesstoken'].update_service_context(_resp, state=STATE)
+    service['accesstoken'].update_service_context(_resp, key=STATE)
 
     _item = service['authorization'].get_item(AccessTokenResponse,
                                               'token_response', STATE)
@@ -413,8 +413,6 @@ def test_conversation():
 
     # =================== User info ====================
 
-    request_args = {'state': STATE}
-
     info = service['userinfo'].get_request_parameters(state=STATE)
 
     assert info['url'] == 'https://example.org/op/userinfo'
@@ -423,7 +421,7 @@ def test_conversation():
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
     _resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
-    service['userinfo'].update_service_context(_resp, state=STATE)
+    service['userinfo'].update_service_context(_resp, key=STATE)
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}

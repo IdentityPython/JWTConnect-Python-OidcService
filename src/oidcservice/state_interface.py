@@ -1,3 +1,4 @@
+"""A database interface for storing state information."""
 import json
 
 from oidcmsg.message import Message
@@ -9,6 +10,7 @@ from oidcservice import rndstr
 
 
 class State(Message):
+    """A structure to keep information about previous events."""
     c_param = {
         'iss': SINGLE_REQUIRED_STRING,
         'auth_request': SINGLE_OPTIONAL_JSON,
@@ -28,28 +30,32 @@ KEY_PATTERN = {
 }
 
 
-# The simplest possible implementation of the state database
-class InMemoryStateDataBase(object):
+class InMemoryStateDataBase:
+    """The simplest possible implementation of the state database."""
     def __init__(self):
-        self.db = {}
+        self._db = {}
 
     def set(self, key, value):
-        self.db[key] = value
+        """Assign a value to a key."""
+        self._db[key] = value
 
     def get(self, key):
+        """Return the value bound to a key."""
         try:
-            return self.db[key]
+            return self._db[key]
         except KeyError:
             return None
 
     def delete(self, key):
+        """Delete a key and its value."""
         try:
-            del self.db[key]
+            del self._db[key]
         except KeyError:
-            return None
+            pass
 
 
-class StateInterface(object):
+class StateInterface:
+    """A more powerful interface to a state DB."""
     def __init__(self, state_db):
         self.state_db = state_db
 
@@ -63,8 +69,8 @@ class StateInterface(object):
         _data = self.state_db.get(key)
         if not _data:
             raise KeyError(key)
-        else:
-            return State().from_json(_data)
+
+        return State().from_json(_data)
 
     def store_item(self, item, item_type, key):
         """
@@ -201,42 +207,42 @@ class StateInterface(object):
 
         return args
 
-    def store_X2state(self, x, state, xtyp):
+    def store_x2state(self, value, state, xtyp):
         """
         Store the connection between some value (x) and a state value.
         This allows us later in the game to find the state if we have x.
 
-        :param x: The value of x
+        :param value: The value
         :param state: The state value
         :param xtyp: The type of value x is (e.g. nonce, ...)
         """
-        self.state_db.set(KEY_PATTERN[xtyp].format(x), state)
+        self.state_db.set(KEY_PATTERN[xtyp].format(value), state)
         try:
             _val = self.state_db.get("ref{}ref".format(state))
         except KeyError:
             _val = None
 
         if _val is None:
-            refs = {xtyp:x}
+            refs = {xtyp:value}
         else:
             refs = json.loads(_val)
-            refs[xtyp] = x
+            refs[xtyp] = value
         self.state_db.set("ref{}ref".format(state), json.dumps(refs))
 
-    def get_state_by_X(self, x, xtyp):
+    def get_state_by_x(self, value, xtyp):
         """
         Find the state value by providing the x value.
         Will raise an exception if the x value is absent from the state
         data base.
 
-        :param x: The x value
+        :param value: The value
         :return: The state value
         """
-        _state = self.state_db.get(KEY_PATTERN[xtyp].format(x))
+        _state = self.state_db.get(KEY_PATTERN[xtyp].format(value))
         if _state:
             return _state
-        else:
-            raise KeyError('Unknown {}: "{}"'.format(xtyp, x))
+
+        raise KeyError('Unknown {}: "{}"'.format(xtyp, value))
 
     def store_nonce2state(self, nonce, state):
         """
@@ -246,7 +252,7 @@ class StateInterface(object):
         :param nonce: The nonce value
         :param state: The state value
         """
-        self.store_X2state(nonce, state, 'nonce')
+        self.store_x2state(nonce, state, 'nonce')
 
     def get_state_by_nonce(self, nonce):
         """
@@ -257,7 +263,7 @@ class StateInterface(object):
         :param nonce: The nonce value
         :return: The state value
         """
-        return self.get_state_by_X(nonce, 'nonce')
+        return self.get_state_by_x(nonce, 'nonce')
 
     def store_logout_state2state(self, logout_state, state):
         """
@@ -268,7 +274,7 @@ class StateInterface(object):
         :param logout_state: The logout state value
         :param state: The state value
         """
-        self.store_X2state(logout_state, state, 'logout state')
+        self.store_x2state(logout_state, state, 'logout state')
 
     def get_state_by_logout_state(self, logout_state):
         """
@@ -279,7 +285,7 @@ class StateInterface(object):
         :param logout_state: The logout state value
         :return: The state value
         """
-        return self.get_state_by_X(logout_state, 'logout state')
+        return self.get_state_by_x(logout_state, 'logout state')
 
     def store_sid2state(self, sid, state):
         """
@@ -290,7 +296,7 @@ class StateInterface(object):
         :param sid: The session ID value
         :param state: The state value
         """
-        self.store_X2state(sid, state, 'session id')
+        self.store_x2state(sid, state, 'session id')
 
     def get_state_by_sid(self, sid):
         """
@@ -301,7 +307,7 @@ class StateInterface(object):
         :param sid: The session ID value
         :return: The state value
         """
-        return self.get_state_by_X(sid, 'session id')
+        return self.get_state_by_x(sid, 'session id')
 
     def store_sub2state(self, sub, state):
         """
@@ -312,7 +318,7 @@ class StateInterface(object):
         :param sub: The Subject ID value
         :param state: The state value
         """
-        self.store_X2state(sub, state, 'subject id')
+        self.store_x2state(sub, state, 'subject id')
 
     def get_state_by_sub(self, sub):
         """
@@ -323,9 +329,15 @@ class StateInterface(object):
         :param sub: The Subject ID value
         :return: The state value
         """
-        return self.get_state_by_X(sub, 'subject id')
+        return self.get_state_by_x(sub, 'subject id')
 
     def create_state(self, iss, key=''):
+        """
+        Create a State and assign some value to it.
+
+        :param iss: The issuer
+        :param key: A key to use to access the state
+        """
         if not key:
             key = rndstr(32)
         else:
@@ -338,8 +350,13 @@ class StateInterface(object):
         return key
 
     def remove_state(self, state):
+        """
+        Remove a state.
+
+        :param state: Key to the state
+        """
         self.state_db.delete(state)
         refs = json.loads(self.state_db.get("ref{}ref".format(state)))
         if refs:
-            for xtyp, x in refs.items():
-                self.state_db.delete(KEY_PATTERN[xtyp].format(x))
+            for xtyp, _val in refs.items():
+                self.state_db.delete(KEY_PATTERN[xtyp].format(_val))

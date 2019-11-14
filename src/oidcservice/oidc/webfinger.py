@@ -44,7 +44,7 @@ class WebFinger(Service):
 
         self.rel = rel or OIC_ISSUER
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         try:
             links = resp['links']
         except KeyError:

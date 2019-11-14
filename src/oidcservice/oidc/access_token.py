@@ -51,25 +51,25 @@ class AccessToken(access_token.AccessToken):
 
         return kwargs
 
-    def update_service_context(self, resp, state='', **kwargs):
+    def update_service_context(self, resp, key='', **kwargs):
         try:
             _idt = resp[verified_claim_name('id_token')]
         except KeyError:
             pass
         else:
             try:
-                if self.get_state_by_nonce(_idt['nonce']) != state:
+                if self.get_state_by_nonce(_idt['nonce']) != key:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 raise ValueError('Invalid nonce value')
 
-            self.store_sub2state(_idt['sub'], state)
+            self.store_sub2state(_idt['sub'], key)
 
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(
                 resp['expires_in'])
 
-        self.store_item(resp, 'token_response', state)
+        self.store_item(resp, 'token_response', key)
 
     def get_authn_method(self):
         try:
