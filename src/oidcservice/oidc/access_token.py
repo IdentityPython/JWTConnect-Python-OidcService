@@ -10,7 +10,7 @@ from oidcservice.oidc import IDT2REG
 
 __author__ = 'Roland Hedberg'
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class AccessToken(access_token.AccessToken):
