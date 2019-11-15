@@ -15,7 +15,7 @@ from oidcservice.oidc.utils import request_object_encryption
 
 __author__ = 'Roland Hedberg'
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class Authorization(authorization.Authorization):
@@ -105,7 +105,77 @@ class Authorization(authorization.Authorization):
 
         return request_args, post_args
 
+    def get_request_object_signing_alg(self, **kwargs):
+        alg = ''
+        for arg in ["request_object_signing_alg", "algorithm"]:
+            try:  # Trumps everything
+                alg = kwargs[arg]
+            except KeyError:
+                pass
+            else:
+                break
+
+        if not alg:
+            try:
+                alg = self.service_context.behaviour[
+                    "request_object_signing_alg"]
+            except KeyError:  # Use default
+                alg = "RS256"
+        return alg
+
+    def store_request_on_file(self, req, **kwargs):
+        """
+        Stores the request parameter in a file.
+        :param req: The request
+        :param kwargs: Extra keyword arguments
+        :return: The URL the OP should use to access the file
+        """
+        try:
+            _webname = self.service_context.registration_response['request_uris'][0]
+            filename = self.service_context.filename_from_webname(_webname)
+        except KeyError:
+            filename, _webname = construct_request_uri(**kwargs)
+
+        fid = open(filename, mode="w")
+        fid.write(req)
+        fid.close()
+        return _webname
+
+    def construct_request_parameter(self, req, request_method, **kwargs):
+        """Construct a request parameter"""
+        alg = self.get_request_object_signing_alg(**kwargs)
+        kwargs["request_object_signing_alg"] = alg
+
+        if "keys" not in kwargs and alg and alg != "none":
+            kwargs["keys"] = self.service_context.keyjar
+
+        _srv_cntx = self.service_context
+        kwargs['issuer'] = _srv_cntx.client_id
+        try:
+            kwargs['recv'] = _srv_cntx.provider_info['issuer']
+        except KeyError:
+            kwargs['recv'] = _srv_cntx.issuer
+        del kwargs['service']
+
+        _req = make_openid_request(req, **kwargs)
+
+        # Should the request be encrypted
+        _req = request_object_encryption(_req, self.service_context,
+                                         **kwargs)
+
+        if request_method == "request":
+            req["request"] = _req
+        else:  # MUST be request_uri
+            req["request_uri"] = self.store_request_on_file(_req, **kwargs)
+
     def oidc_post_construct(self, req, **kwargs):
+        """
+        Modify the request arguments.
+
+        :param req: The request
+        :param kwargs: Extra keyword arguments
+        :return: A possibly modified request.
+        """
         if 'openid' in req['scope']:
             _response_type = req['response_type'][0]
             if 'id_token' in _response_type or 'code' in _response_type:
@@ -122,61 +192,7 @@ class Authorization(authorization.Authorization):
         else:
             del kwargs['request_param']
 
-            alg = ''
-            for arg in ["request_object_signing_alg", "algorithm"]:
-                try:  # Trumps everything
-                    alg = kwargs[arg]
-                except KeyError:
-                    pass
-                else:
-                    break
-
-            if not alg:
-                try:
-                    alg = self.service_context.behaviour[
-                        "request_object_signing_alg"]
-                except KeyError:  # Use default
-                    alg = "RS256"
-
-            kwargs["request_object_signing_alg"] = alg
-
-            if "keys" not in kwargs and alg and alg != "none":
-                # _kty = alg2keytype(alg)
-                # try:
-                #     _kid = kwargs["sig_kid"]
-                # except KeyError:
-                #     _kid = self.service_context.kid["sig"].get(_kty, None)
-
-                kwargs["keys"] = self.service_context.keyjar
-
-            _srv_cntx = self.service_context
-            kwargs['issuer'] = _srv_cntx.client_id
-            try:
-                kwargs['recv'] = _srv_cntx.provider_info['issuer']
-            except KeyError:
-                kwargs['recv'] = _srv_cntx.issuer
-            del kwargs['service']
-
-            _req = make_openid_request(req, **kwargs)
-
-            # Should the request be encrypted
-            _req = request_object_encryption(_req, self.service_context,
-                                             **kwargs)
-
-            if _request_method == "request":
-                req["request"] = _req
-            else:  # MUST be request_uri
-                try:
-                    _webname = self.service_context.registration_response[
-                        'request_uris'][0]
-                    filename = self.service_context.filename_from_webname(
-                        _webname)
-                except KeyError:
-                    filename, _webname = construct_request_uri(**kwargs)
-                fid = open(filename, mode="w")
-                fid.write(_req)
-                fid.close()
-                req["request_uri"] = _webname
+            self.construct_request_parameter(req, _request_method, **kwargs)
 
         self.store_item(req, 'auth_request', req['state'])
         return req

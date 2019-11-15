@@ -82,7 +82,7 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
             client_authn_factory=client_authn_factory, conf=conf)
 
     def update_service_context(self, resp, **kwargs):
-        self._update_service_context(resp, **kwargs)
+        self._update_service_context(resp)
         self.match_preferences(resp, self.service_context.issuer)
         if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
             _jwks = self.service_context.keyjar.export_jwks_as_json(
