@@ -162,8 +162,7 @@ class TestAuthorization(object):
                                          owner='client_id'))
         assert _resp
         assert set(_resp.keys()) == {'response_type', 'client_id', 'scope',
-                                     'redirect_uri', 'state', 'nonce',
-                                     'iss', 'aud', 'kid', 'iat'}
+                                     'redirect_uri', 'state', 'nonce', 'iss', 'aud', 'iat'}
 
     def test_request_param(self):
         req_args = {'response_type': 'code', 'state': 'state'}

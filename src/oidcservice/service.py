@@ -310,7 +310,7 @@ class Service(StateInterface):
             request_body_type = self.request_body_type
 
         request = self.construct_request(request_args=request_args, **kwargs)
-        LOGGER.debug("Request: %s", request.to_dict())
+        LOGGER.debug("Request: ", request)
         _info = {'method': method}
 
         _args = kwargs.copy()
