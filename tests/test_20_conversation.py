@@ -396,7 +396,7 @@ def test_conversation():
 
     assert isinstance(_resp, AccessTokenResponse)
     assert set(_resp['__verified_id_token'].keys()) == {
-        'iss', 'kid', 'nonce', 'acr', 'auth_time', 'aud', 'iat', 'exp', 'sub'}
+        'iss', 'nonce', 'acr', 'auth_time', 'aud', 'iat', 'exp', 'sub'}
 
     service['accesstoken'].update_service_context(_resp, key=STATE)
 

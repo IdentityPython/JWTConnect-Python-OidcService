@@ -1,7 +1,8 @@
 from cryptojwt.utils import b64e
 from oidcmsg.message import Message
 
-from oidcservice import unreserved, CC_METHOD
+from oidcservice import CC_METHOD
+from oidcservice import unreserved
 from oidcservice.exception import Unsupported
 from oidcservice.oauth2.utils import get_state_parameter
 
@@ -42,12 +43,12 @@ def add_code_challenge(request_args, service, **kwargs):
         raise Unsupported(
             'PKCE Transformation method:{}'.format(_method))
 
-    _item = Message(code_verifier=code_verifier,code_challenge_method=_method)
+    _item = Message(code_verifier=code_verifier, code_challenge_method=_method)
     service.store_item(_item, 'pkce', request_args['state'])
 
     request_args.update({"code_challenge": code_challenge,
                          "code_challenge_method": _method})
-    return request_args
+    return request_args, {}
 
 
 def add_code_verifier(request_args, service, **kwargs):
@@ -68,3 +69,24 @@ def add_code_verifier(request_args, service, **kwargs):
 def put_state_in_post_args(request_args, **kwargs):
     state = get_state_parameter(request_args, kwargs)
     return request_args, {'state': state}
+
+
+def add_pkce_support(service, code_challenge_length, code_challenge_method):
+    """
+
+    :param service: Dictionary of services
+    :param code_challenge_length:
+    :param code_challenge_method:
+    :return:
+    """
+    authn_service = service["authorization"]
+    authn_service.service_context.args['pkce'] = {
+        "code_challenge_length": code_challenge_length,
+        "code_challenge_method": code_challenge_method
+    }
+
+    authn_service.pre_construct.append(add_code_challenge)
+
+    token_service = service['accesstoken']
+    token_service.pre_construct.append(put_state_in_post_args)
+    token_service.post_construct.append(add_code_verifier)

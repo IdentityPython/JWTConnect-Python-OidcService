@@ -2,9 +2,10 @@ from oidcmsg.message import Message
 from oidcmsg.message import SINGLE_REQUIRED_STRING
 from oidcmsg.oidc import AuthorizationResponse
 
-from oidcservice.oidc.pkce import add_code_challenge
-from oidcservice.oidc.pkce import add_code_verifier
-from oidcservice.oidc.pkce import put_state_in_post_args
+from oidcservice.oidc.add_on.pkce import add_code_challenge
+from oidcservice.oidc.add_on.pkce import add_code_verifier
+from oidcservice.oidc.add_on.pkce import add_pkce_support
+from oidcservice.oidc.add_on.pkce import put_state_in_post_args
 from oidcservice.service import Service
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
@@ -36,12 +37,12 @@ def test_add_code_challenge_default_values():
     service = DummyService(service_context, state_db=InMemoryStateDataBase())
     _state = State(iss='Issuer')
     service.state_db.set('state', _state.to_json())
-    spec = add_code_challenge({'state': 'state'}, service)
+    request_args, _  = add_code_challenge({'state': 'state'}, service)
 
     # default values are length:64 method:S256
-    assert set(spec.keys()) == {'code_challenge', 'code_challenge_method',
+    assert set(request_args.keys()) == {'code_challenge', 'code_challenge_method',
                                 'state'}
-    assert spec['code_challenge_method'] == 'S256'
+    assert request_args['code_challenge_method'] == 'S256'
 
     request_args = add_code_verifier({}, service, state='state')
     assert len(request_args['code_verifier']) == 64
@@ -61,10 +62,10 @@ def test_add_code_challenge_spec_values():
     _state = State(iss='Issuer')
     service.state_db.set('state', _state.to_json())
 
-    spec = add_code_challenge({'state': 'state'}, service)
-    assert set(spec.keys()) == {'code_challenge', 'code_challenge_method',
+    request_args, _ = add_code_challenge({'state': 'state'}, service)
+    assert set(request_args.keys()) == {'code_challenge', 'code_challenge_method',
                                 'state'}
-    assert spec['code_challenge_method'] == 'S384'
+    assert request_args['code_challenge_method'] == 'S384'
 
     request_args = add_code_verifier({}, service, state='state')
     assert len(request_args['code_verifier']) == 128
@@ -82,7 +83,7 @@ def test_authorization_and_pkce():
                               state_db=InMemoryStateDataBase(),
                               service_context=service_context)
     service.post_construct.append(add_code_challenge)
-    request = service.construct_request()
+    request, _ = service.construct_request()
     assert set(request.keys()) == {'client_id', 'code_challenge',
                                    'code_challenge_method', 'state', 'nonce',
                                    'redirect_uri', 'response_type', 'scope'}
@@ -102,7 +103,7 @@ def test_access_token_and_pkce():
     authz_service = service_factory('Authorization', ['oidc'], state_db=db,
                                     service_context=service_context)
     authz_service.post_construct.append(add_code_challenge)
-    request = authz_service.construct_request()
+    request, _ = authz_service.construct_request()
     _state = request['state']
 
     auth_response = AuthorizationResponse(code='access code')
@@ -134,27 +135,16 @@ def test_pkce_config():
     service_definitions = {
         'authorization': {
             'class': 'oidcservice.oidc.authorization.Authorization',
-            'kwargs': {},
-            'post_functions': [
-                {
-                    'function': 'oidcservice.oidc.pkce.add_code_challenge'
-                }
-            ]
+            'kwargs': {}
         },
         'access_token': {
             'class': 'oidcservice.oidc.access_token.AccessToken',
-            'kwargs': {},
-            'pre_functions': [
-                {
-                    'function': 'oidcservice.oidc.pkce.put_state_in_post_args'
-                }
-            ],
-            'post_functions': [
-                {'function': 'oidcservice.oidc.pkce.add_code_verifier'}
-            ]
+            'kwargs': {}
         }
     }
     service = init_services(service_definitions, service_context, db)
+
+    add_pkce_support(service, 64, 'S256')
 
     request = service['authorization'].construct_request()
     _state = request['state']
@@ -166,49 +156,3 @@ def test_pkce_config():
     assert set(request.keys()) == {'client_id', 'redirect_uri', 'grant_type',
                                    'client_secret', 'code_verifier', 'code',
                                    'state'}
-
-# class TestPKCE(object):
-#     def test_pkce_create(self):
-#         _cli = Client(
-#             config={'code_challenge': {'method': 'S256', 'length': 64}})
-#         args, cv = _cli.add_code_challenge()
-#         assert args['code_challenge_method'] == 'S256'
-#         assert _eq(list(args.keys()),
-#                    ['code_challenge_method', 'code_challenge'])
-#
-#     def test_pkce_verify_256(self, session_db_factory):
-#         _cli = Client(
-#             config={'code_challenge': {'method': 'S256', 'length': 64}})
-#         args, cv = _cli.add_code_challenge()
-#
-#         authn_broker = AuthnBroker()
-#         authn_broker.add("UNDEFINED", DummyAuthn(None, "username"))
-#         _prov = Provider("as",
-#                          session_db_factory('https://connect-op.heroku.com'),
-#                          {},
-#                          authn_broker, Implicit(), verify_client)
-#
-#         assert _prov.verify_code_challenge(cv, args['code_challenge']) is True
-#         assert _prov.verify_code_challenge(cv, args['code_challenge'],
-#                                            'S256') is True
-#         resp = _prov.verify_code_challenge('XXX', args['code_challenge'])
-#         assert isinstance(resp, Response)
-#         assert resp.info()['status_code'] == 401
-#
-#     def test_pkce_verify_512(self, session_db_factory):
-#         _cli = Client(
-#             config={'code_challenge': {'method': 'S512', 'length': 96}})
-#         args, cv = _cli.add_code_challenge()
-#
-#         authn_broker = AuthnBroker()
-#         authn_broker.add("UNDEFINED", DummyAuthn(None, "username"))
-#         _prov = Provider("as",
-#                          session_db_factory('https://connect-op.heroku.com'),
-#                          {},
-#                          authn_broker, Implicit(), verify_client)
-#
-#         assert _prov.verify_code_challenge(cv, args['code_challenge'],
-#                                            'S512') is True
-#         resp = _prov.verify_code_challenge('XXX', args['code_challenge'])
-#         assert isinstance(resp, Response)
-#         assert resp.info()['status_code'] == 401
