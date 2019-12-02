@@ -56,7 +56,8 @@ setup(
     license="Apache 2.0",
     url='https://github.com/IdentityPython/oidcservice/',
     packages=["oidcservice", "oidcservice/oauth2", "oidcservice/oidc",
-              "oidcservice/oauth2/client_credentials"],
+              "oidcservice/oauth2/client_credentials",
+              "oidcservice/oidc/add_on"],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 4 - Beta",
