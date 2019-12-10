@@ -85,6 +85,7 @@ class ProviderInfoDiscovery(Service):
             # endpoint names used in the provider info
             if _srv.endpoint_name == key:
                 _srv.endpoint = val
+                break
 
     def _set_endpoints(self, resp):
         """
