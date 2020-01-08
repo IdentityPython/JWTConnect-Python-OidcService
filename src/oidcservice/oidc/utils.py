@@ -67,11 +67,11 @@ def construct_request_uri(local_dir, base_path, **kwargs):
     """
     Constructs a special redirect_uri to be used when communicating with
     one OP. Each OP should get their own redirect_uris.
-    
+
     :param local_dir: Local directory in which to place the file
     :param base_path: Base URL to start with
-    :param kwargs: 
-    :return: 2-tuple with (filename, url) 
+    :param kwargs:
+    :return: 2-tuple with (filename, url)
     """
     _filedir = local_dir
     if not os.path.isdir(_filedir):

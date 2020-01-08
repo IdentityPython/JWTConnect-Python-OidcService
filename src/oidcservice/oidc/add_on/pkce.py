@@ -1,3 +1,5 @@
+import logging
+
 from cryptojwt.utils import b64e
 from oidcmsg.message import Message
 
@@ -5,6 +7,8 @@ from oidcservice import CC_METHOD
 from oidcservice import unreserved
 from oidcservice.exception import Unsupported
 from oidcservice.oauth2.utils import get_state_parameter
+
+logger = logging.getLogger(__name__)
 
 
 def add_code_challenge(request_args, service, **kwargs):
@@ -18,8 +22,10 @@ def add_code_challenge(request_args, service, **kwargs):
     :param kwargs: Extra set of keyword arguments
     :return: Updated set of request arguments
     """
+    _kwargs = service.service_context.add_on["pkce"]
+
     try:
-        cv_len = service.service_context.config['code_challenge']['length']
+        cv_len = _kwargs['code_challenge_length']
     except KeyError:
         cv_len = 64  # Use default
 
@@ -28,7 +34,7 @@ def add_code_challenge(request_args, service, **kwargs):
     _cv = code_verifier.encode()
 
     try:
-        _method = service.service_context.config['code_challenge']['method']
+        _method = _kwargs['code_challenge_method']
     except KeyError:
         _method = 'S256'
 
@@ -46,8 +52,11 @@ def add_code_challenge(request_args, service, **kwargs):
     _item = Message(code_verifier=code_verifier, code_challenge_method=_method)
     service.store_item(_item, 'pkce', request_args['state'])
 
-    request_args.update({"code_challenge": code_challenge,
-                         "code_challenge_method": _method})
+    request_args.update(
+        {
+            "code_challenge": code_challenge,
+            "code_challenge_method": _method
+        })
     return request_args, {}
 
 
@@ -73,20 +82,25 @@ def put_state_in_post_args(request_args, **kwargs):
 
 def add_pkce_support(service, code_challenge_length, code_challenge_method):
     """
+    PKCE support can only be considered if this client can access authorization and
+    access token services.
 
     :param service: Dictionary of services
     :param code_challenge_length:
     :param code_challenge_method:
     :return:
     """
-    authn_service = service["authorization"]
-    authn_service.service_context.args['pkce'] = {
-        "code_challenge_length": code_challenge_length,
-        "code_challenge_method": code_challenge_method
-    }
+    if "authorization" in service and "accesstoken" in service:
+        _service = service["authorization"]
+        _service.service_context.add_on['pkce'] = {
+            "code_challenge_length": code_challenge_length,
+            "code_challenge_method": code_challenge_method
+        }
 
-    authn_service.pre_construct.append(add_code_challenge)
+        _service.pre_construct.append(add_code_challenge)
 
-    token_service = service['accesstoken']
-    token_service.pre_construct.append(put_state_in_post_args)
-    token_service.post_construct.append(add_code_verifier)
+        token_service = service['accesstoken']
+        token_service.pre_construct.append(put_state_in_post_args)
+        token_service.post_construct.append(add_code_verifier)
+    else:
+        logger.warning("PKCE support could NOT be added")

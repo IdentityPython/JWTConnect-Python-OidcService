@@ -228,7 +228,7 @@ class Service(StateInterface):
         The request information is gathered and the where and how of sending the
         request is decided.
 
-        :param request_args: Initial request arguments
+        :param request_args: Initial request arguments as a dictionary
         :param kwargs: Extra keyword arguments
         :return: A dictionary with the keys 'url' and possibly 'body', 'kwargs',
             'request' and 'ht_args'.

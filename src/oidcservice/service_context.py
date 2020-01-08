@@ -87,6 +87,7 @@ class ServiceContext:
         self.redirect_uris = []
         self.callback = None
         self.args = {}
+        self.add_on = {}
 
         try:
             self.clock_skew = config['clock_skew']
