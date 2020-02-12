@@ -88,6 +88,7 @@ class ServiceContext:
         self.callback = None
         self.args = {}
         self.add_on = {}
+        self.httpc_params = {}
 
         try:
             self.clock_skew = config['clock_skew']
