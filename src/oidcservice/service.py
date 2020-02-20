@@ -310,7 +310,7 @@ class Service(StateInterface):
             request_body_type = self.request_body_type
 
         request = self.construct_request(request_args=request_args, **kwargs)
-        LOGGER.debug("Request: ", request)
+        LOGGER.debug("Request: %s", request)
         _info = {'method': method}
 
         _args = kwargs.copy()
@@ -391,6 +391,11 @@ class Service(StateInterface):
                   'iss': self.service_context.issuer,
                   'keyjar': self.service_context.keyjar,
                   'verify': True}
+
+        if self.service_name == "provider_info":
+            if self.service_context.config["issuer"].startswith("http://"):
+                kwargs["allow_http"] = True
+
         return kwargs
 
     def _do_jwt(self, info):
