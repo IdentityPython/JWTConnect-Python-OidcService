@@ -262,6 +262,10 @@ class TestPrivateKeyJWT(object):
         _service = services['accesstoken']
         kb_rsa = KeyBundle(source='file://{}'.format(
             os.path.join(BASE_PATH, "data/keys/rsa.key")), fileformat='der')
+
+        for key in kb_rsa:
+            key.add_kid()
+
         _service.service_context.keyjar.add_kb('', kb_rsa)
         _service.service_context.provider_info = {
             'issuer': 'https://example.com/',

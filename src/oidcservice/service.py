@@ -393,7 +393,7 @@ class Service(StateInterface):
                   'verify': True}
 
         if self.service_name == "provider_info":
-            if self.service_context.config["issuer"].startswith("http://"):
+            if self.service_context.issuer.startswith("http://"):
                 kwargs["allow_http"] = True
 
         return kwargs

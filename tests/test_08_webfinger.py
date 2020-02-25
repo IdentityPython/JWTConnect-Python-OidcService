@@ -1,4 +1,7 @@
 import json
+from urllib.parse import parse_qs
+from urllib.parse import unquote_plus
+from urllib.parse import urlsplit
 
 import pytest
 from oidcmsg.exception import MissingRequiredAttribute
@@ -35,12 +38,16 @@ def test_query():
             'https%3A%2F%2Fjoe%40example.com%3A8080'),
         'acct:joe@example.com': ('example.com', rel,
                                  'acct%3Ajoe%40example.com')
-        }
+    }
 
     wf = WebFinger(None, None)
     for key, args in example_oidc.items():
         _q = wf.query(key)
-        assert _q == pattern.format(*args)
+        p = urlsplit(_q)
+        assert p.netloc == args[0]
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == unquote_plus(args[2])
+        assert qs['rel'][0] == unquote_plus(args[1])
 
 
 def test_query_2():
@@ -76,7 +83,7 @@ def test_query_2():
         "nov@example.com#fragment": (
             "nov@example.com", rel,
             "https%3A%2F%2Fnov%40example.com"),
-        "nov@example.com:8080/path?query#fragment":(
+        "nov@example.com:8080/path?query#fragment": (
             "nov@example.com:8080", rel,
             "https%3A%2F%2Fnov%40example.com%3A8080%2Fpath%3Fquery"),
         "acct:nov@example.com:8080": (
@@ -87,7 +94,7 @@ def test_query_2():
             "example.com", rel,
             "acct%3Anov%40example.com%2Fpath"
         ),
-        "acct:nov@example.com?query":(
+        "acct:nov@example.com?query": (
             "example.com", rel,
             "acct%3Anov%40example.com%3Fquery"
         ),
@@ -95,7 +102,7 @@ def test_query_2():
             "example.com", rel,
             "acct%3Anov%40example.com"
         ),
-        "acct:nov@example.com:8080/path?query#fragment":(
+        "acct:nov@example.com:8080/path?query#fragment": (
             "example.com:8080", rel,
             "acct%3Anov%40example.com%3A8080%2Fpath%3Fquery"
         )
@@ -104,7 +111,11 @@ def test_query_2():
     wf = WebFinger(None, None)
     for key, args in example_oidc.items():
         _q = wf.query(key)
-        assert _q == pattern.format(*args)
+        p = urlsplit(_q)
+        assert p.netloc == args[0]
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == unquote_plus(args[2])
+        assert qs['rel'][0] == unquote_plus(args[1])
 
 
 def test_link1():
@@ -112,7 +123,7 @@ def test_link1():
         rel="http://webfinger.net/rel/avatar",
         type="image/jpeg",
         href="http://www.example.com/~bob/bob.jpg"
-        )
+    )
 
     assert set(link.keys()) == {'rel', 'type', 'href'}
     assert link['rel'] == "http://webfinger.net/rel/avatar"
@@ -126,7 +137,7 @@ def test_link2():
                 titles={
                     "en-us": "The Magical World of Bob",
                     "fr": "Le monde magique de Bob"
-                    })
+                })
 
     assert set(link.keys()) == {'rel', 'type', 'href', 'titles'}
     assert link['rel'] == "blog"
@@ -149,20 +160,20 @@ def test_jrd():
         subject="acct:bob@example.com",
         aliases=[
             "http://www.example.com/~bob/"
-            ],
+        ],
         properties={
             "http://example.com/ns/role/": "employee"
-            },
+        },
         links=[
             Link(
                 rel="http://webfinger.net/rel/avatar",
                 type="image/jpeg",
                 href="http://www.example.com/~bob/bob.jpg"
-                ),
+            ),
             Link(
                 rel="http://webfinger.net/rel/profile-page",
                 href="http://www.example.com/~bob/"
-                )])
+            )])
 
     assert set(jrd.keys()) == {'subject', 'aliases', 'properties', 'links'}
 
@@ -172,20 +183,20 @@ def test_jrd2():
         "subject": "acct:bob@example.com",
         "aliases": [
             "http://www.example.com/~bob/"
-            ],
+        ],
         "properties": {
             "http://example.com/ns/role/": "employee"
-            },
+        },
         "links": [
             {
                 "rel": "http://webfinger.net/rel/avatar",
                 "type": "image/jpeg",
                 "href": "http://www.example.com/~bob/bob.jpg"
-                },
+            },
             {
                 "rel": "http://webfinger.net/rel/profile-page",
                 "href": "http://www.example.com/~bob/"
-                },
+            },
             {
                 "rel": "blog",
                 "type": "text/html",
@@ -193,14 +204,14 @@ def test_jrd2():
                 "titles": {
                     "en-us": "The Magical World of Bob",
                     "fr": "Le monde magique de Bob"
-                    }
-                },
+                }
+            },
             {
                 "rel": "vcard",
                 "href": "https://www.example.com/~bob/bob.vcf"
-                }
-            ]
-        }
+            }
+        ]
+    }
 
     jrd0 = JRD().from_json(json.dumps(ex0))
 
@@ -215,18 +226,18 @@ def test_extra_member_response():
         "subject": "acct:bob@example.com",
         "aliases": [
             "http://www.example.com/~bob/"
-            ],
+        ],
         "properties": {
             "http://example.com/ns/role/": "employee"
-            },
+        },
         'dummy': 'foo',
         "links": [
             {
                 "rel": "http://webfinger.net/rel/avatar",
                 "type": "image/jpeg",
                 "href": "http://www.example.com/~bob/bob.jpg"
-                }]
-        }
+            }]
+    }
 
     _resp = JRD().from_json(json.dumps(ex))
     assert _resp['dummy'] == 'foo'
@@ -240,30 +251,32 @@ class TestWebFinger(object):
         wf = WebFinger(SERVICE_CONTEXT, state_db=None)
         request_args = {'resource': "p1.example.com"}
         _info = wf.get_request_parameters(request_args)
-        assert _info[
-                   'url'] == 'https://p1.example.com/.well-known/webfinger' \
-                             '?rel=http%3A%2F' \
-                             '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer' \
-                             '&resource=acct%3Ap1.example.com'
+        p = urlsplit(_info['url'])
+        assert p.netloc == request_args["resource"]
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == "acct:p1.example.com"
+        assert qs['rel'][0] == "http://openid.net/specs/connect/1.0/issuer"
 
     def test_query_rel(self):
         wf = WebFinger(SERVICE_CONTEXT, state_db=None)
         request_args = {'resource': "acct:bob@example.com"}
         _info = wf.get_request_parameters(request_args)
-        assert _info['url'] == \
-               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
-               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource=acct%3Abob" \
-               "%40example.com"
+        p = urlsplit(_info['url'])
+        assert p.netloc == "example.com"
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == "acct:bob@example.com"
+        assert qs['rel'][0] == "http://openid.net/specs/connect/1.0/issuer"
 
     def test_query_acct(self):
         wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
         request_args = {'resource': "acct:carol@example.com"}
         _info = wf.get_request_parameters(request_args=request_args)
 
-        assert _info['url'] == \
-               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
-               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
-               "=acct%3Acarol%40example.com"
+        p = urlsplit(_info['url'])
+        assert p.netloc == "example.com"
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == "acct:carol@example.com"
+        assert qs['rel'][0] == "http://openid.net/specs/connect/1.0/issuer"
 
     def test_query_acct_resource_kwargs(self):
         wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
@@ -271,10 +284,11 @@ class TestWebFinger(object):
         _info = wf.get_request_parameters(request_args=request_args,
                                           resource="acct:carol@example.com")
 
-        assert _info['url'] == \
-               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
-               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
-               "=acct%3Acarol%40example.com"
+        p = urlsplit(_info['url'])
+        assert p.netloc == "example.com"
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == "acct:carol@example.com"
+        assert qs['rel'][0] == "http://openid.net/specs/connect/1.0/issuer"
 
     def test_query_acct_resource_config(self):
         wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
@@ -282,10 +296,11 @@ class TestWebFinger(object):
         request_args = {}
         _info = wf.get_request_parameters(request_args=request_args)
 
-        assert _info['url'] == \
-               "https://example.com/.well-known/webfinger?rel=http%3A%2F%2Fopenid" \
-               ".net%2Fspecs%2Fconnect%2F1.0%2Fissuer&resource" \
-               "=acct%3Acarol%40example.com"
+        p = urlsplit(_info['url'])
+        assert p.netloc == "example.com"
+        qs = parse_qs(p.query)
+        assert qs['resource'][0] == "acct:carol@example.com"
+        assert qs['rel'][0] == "http://openid.net/specs/connect/1.0/issuer"
 
     def test_query_acct_no_resource(self):
         wf = WebFinger(SERVICE_CONTEXT, rel=OIC_ISSUER, state_db=None)
