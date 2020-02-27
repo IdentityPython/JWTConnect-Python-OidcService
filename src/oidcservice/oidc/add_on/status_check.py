@@ -23,8 +23,8 @@ def get_session_status_page(service_context, looked_for_state):
     return as_bytes(_mod_msg)
 
 
-def add_status_check_support(service, template_file, rp_iframe_path,
-                             session_changed_iframe_path, session_unchanged_iframe_path):
+def add_status_check_support(service, rp_iframe_path, template_file="",
+                             session_changed_iframe_path="", session_unchanged_iframe_path=""):
     """
     Setup status check support.
 
