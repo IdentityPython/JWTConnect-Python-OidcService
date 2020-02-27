@@ -63,12 +63,8 @@ def add_post_logout_redirect_uris(request_args=None, service=None, **kwargs):
     """
 
     if "post_logout_redirect_uris" not in request_args:
-        try:
-            _uris = service.service_context.register_args[
-                'post_logout_redirect_uris']
-        except KeyError:
-            pass
-        else:
+        _uris = service.service_context.register_args.get('post_logout_redirect_uris')
+        if _uris:
             request_args["post_logout_redirect_uris"] = _uris
 
     return request_args, {}
