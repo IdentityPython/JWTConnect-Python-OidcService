@@ -31,10 +31,13 @@ class AccessToken(access_token.AccessToken):
         :return: dictionary with arguments to the verify call
         """
         _ctx = self.service_context
+        # Default is RS256
+        _allowed_sign_alg = _ctx.registration_response.get("id_token_signed_response_alg", "RS256")
+
         kwargs = {
             'client_id': _ctx.client_id, 'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
-            'skew': _ctx.clock_skew
+            'skew': _ctx.clock_skew, 'allowed_sign_alg': _allowed_sign_alg
         }
 
         for attr, param in IDT2REG.items():
