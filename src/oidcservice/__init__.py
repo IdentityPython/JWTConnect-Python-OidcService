@@ -9,7 +9,7 @@ except ImportError:
 
 
 __author__ = 'Roland Hedberg'
-__version__ = '0.6.8'
+__version__ = '0.6.9'
 
 
 OIDCONF_PATTERN = "{}/.well-known/openid-configuration"
