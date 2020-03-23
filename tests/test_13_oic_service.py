@@ -47,11 +47,11 @@ ISS = 'https://example.com'
 
 CLI_KEY = init_key_jar(public_path='{}/pub_client.jwks'.format(_dirname),
                        private_path='{}/priv_client.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, owner='client_id')
+                       key_defs=KEYSPEC, owner='client_id', read_only=False)
 
 ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
                        private_path='{}/priv_iss.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, owner=ISS)
+                       key_defs=KEYSPEC, owner=ISS, read_only=False)
 
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
