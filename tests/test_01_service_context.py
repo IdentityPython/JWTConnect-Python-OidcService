@@ -2,6 +2,7 @@ import os
 from urllib.parse import urlsplit
 
 import pytest
+import responses
 from cryptojwt.key_jar import build_keyjar
 
 from oidcservice.service_context import ServiceContext
@@ -239,7 +240,7 @@ class TestClientInfo(object):
         # Now there should be 2, the second a RSA key for signing
         assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
 
-    def test_import_keys_url(self, httpserver):
+    def test_import_keys_url(self):
         assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
 
         # One EC key for signing
@@ -247,12 +248,13 @@ class TestClientInfo(object):
 
         keyjar = build_keyjar(key_def)
 
-        httpserver.serve_content(keyjar.export_jwks_as_json())
+        with responses.RequestsMock() as rsps:
+            _jwks_url = 'https://foobar.com/jwks.json'
+            rsps.add("GET", _jwks_url, body=keyjar.export_jwks_as_json(), status=200,
+                     adding_headers={"Content-Type": "application/json"})
+            keyspec = {'url': {'https://foobar.com': _jwks_url}}
+            self.service_context.import_keys(keyspec)
 
-        keyspec = {'url': {'https://example.com': httpserver.url }}
-
-        self.service_context.import_keys(keyspec)
-
-        # Now there should be one belonging to https://example.com
-        assert len(self.service_context.keyjar.get_issuer_keys(
-            'https://example.com')) == 1
+            # Now there should be one belonging to https://example.com
+            assert len(self.service_context.keyjar.get_issuer_keys(
+                'https://foobar.com')) == 1
