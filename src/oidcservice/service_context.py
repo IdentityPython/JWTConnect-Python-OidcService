@@ -100,7 +100,7 @@ class ServiceContext:
 
         for attr in ['client_id', 'issuer', 'base_url', 'requests_dir',
                      'allow', 'client_preferences', 'behaviour',
-                     'provider_info', 'redirect_uris', 'callback'
+                     'provider_info', 'redirect_uris', 'callback', 'verify_args'
                      ]:
             try:
                 setattr(self, attr, config[attr])

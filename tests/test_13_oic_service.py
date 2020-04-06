@@ -2,6 +2,7 @@ import json
 import os
 
 import pytest
+from cryptojwt.exception import UnsupportedAlgorithm
 from cryptojwt.jws import jws
 from cryptojwt.jws.utils import left_hash
 from cryptojwt.jwt import JWT
@@ -243,6 +244,24 @@ class TestAuthorization(object):
         with pytest.raises(ValueError):
             self.service.update_service_context(resp, 'state')
 
+    @pytest.mark.parametrize("allow_sign_alg_none", [True, False])
+    def test_allow_unsigned_idtoken(self, allow_sign_alg_none):
+        req_args = {'response_type': 'code', 'state': 'state', 'nonce': 'nonce'}
+        self.service.endpoint = 'https://example.com/authorize'
+        self.service.get_request_parameters(request_args=req_args)
+        # Build an ID Token
+        idt = JWT(ISS_KEY, iss=ISS, lifetime=3600, sign_alg='none')
+        payload = {'sub': '123456789', 'aud': ['client_id']}
+        _idt = idt.pack(payload)
+        self.service.service_context.behaviour["verify_args"] = {
+            "allow_sign_alg_none": allow_sign_alg_none
+        }
+        resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
+        if allow_sign_alg_none:
+            resp = self.service.parse_response(resp.to_urlencoded())
+        else:
+            with pytest.raises(UnsupportedAlgorithm):
+                self.service.parse_response(resp.to_urlencoded())
 
 class TestAuthorizationCallback(object):
     @pytest.fixture(autouse=True)

@@ -77,7 +77,7 @@ class Authorization(authorization.Authorization):
 
         # For OIDC 'openid' is required in scope
         if 'scope' not in request_args:
-            request_args['scope'] = ['openid']
+            request_args['scope'] = self.service_context.behaviour.get("scope", ["openid"])
         elif 'openid' not in request_args['scope']:
             request_args['scope'].append('openid')
 
@@ -220,5 +220,9 @@ class Authorization(authorization.Authorization):
             kwargs['allow_missing_kid'] = _ctx.allow['missing_kid']
         except KeyError:
             pass
+
+        _verify_args = _ctx.behaviour.get("verify_args")
+        if _verify_args:
+            kwargs.update(_verify_args)
 
         return kwargs

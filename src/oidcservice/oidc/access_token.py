@@ -32,12 +32,11 @@ class AccessToken(access_token.AccessToken):
         """
         _ctx = self.service_context
         # Default is RS256
-        _allowed_sign_alg = _ctx.registration_response.get("id_token_signed_response_alg", "RS256")
 
         kwargs = {
             'client_id': _ctx.client_id, 'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
-            'skew': _ctx.clock_skew, 'allowed_sign_alg': _allowed_sign_alg
+            'skew': _ctx.clock_skew,
         }
 
         for attr, param in IDT2REG.items():
@@ -51,6 +50,10 @@ class AccessToken(access_token.AccessToken):
                 'missing_kid']
         except KeyError:
             pass
+
+        _verify_args = _ctx.behaviour.get("verify_args")
+        if _verify_args:
+            kwargs.update(_verify_args)
 
         return kwargs
 
