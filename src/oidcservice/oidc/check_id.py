@@ -19,10 +19,9 @@ class CheckID(Service):
     synchronous = True
     service_name = 'check_id'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
-                         client_authn_factory=client_authn_factory, conf=conf)
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
+                         conf=conf)
         self.pre_construct = [self.oidc_pre_construct]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):

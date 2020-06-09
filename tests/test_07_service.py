@@ -37,7 +37,7 @@ class TestDummyService(object):
                                          issuer='https://www.example.org/as')
         db = InMemoryStateDataBase()
         db.set('state', State(iss='Issuer').to_json())
-        self.service = DummyService(service_context, state_db=db)
+        self.service = DummyService(service_context)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -73,9 +73,7 @@ class TestRequest(object):
     @pytest.fixture(autouse=True)
     def create_service(self):
         service_context = ServiceContext(None)
-        self.service = Service(service_context,
-                               state_db=InMemoryStateDataBase(),
-                               client_authn_method=None)
+        self.service = Service(service_context, client_authn_method=None)
 
     def test_construct(self):
         req_args = {'foo': 'bar'}

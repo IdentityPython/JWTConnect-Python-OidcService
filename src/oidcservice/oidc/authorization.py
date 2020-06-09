@@ -23,10 +23,8 @@ class Authorization(authorization.Authorization):
     response_cls = oidc.AuthorizationResponse
     error_msg = oidc.ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        authorization.Authorization.__init__(self, service_context, state_db,
-                                             client_authn_factory, conf=conf)
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        authorization.Authorization.__init__(self, service_context, client_authn_factory, conf=conf)
         self.default_request_args = {'scope': ['openid']}
         self.pre_construct = [self.set_state, pick_redirect_uris,
                               self.oidc_pre_construct]
@@ -41,8 +39,8 @@ class Authorization(authorization.Authorization):
             except KeyError:
                 _state = ''
 
-        request_args['state'] = self.create_state(self.service_context.issuer,
-                                                  _state)
+        request_args['state'] = self.create_state(
+            self.service_context.get('issuer'), _state)
         return request_args, {}
 
     def update_service_context(self, resp, key='', **kwargs):
@@ -72,12 +70,12 @@ class Authorization(authorization.Authorization):
         try:
             _rt = request_args["response_type"]
         except KeyError:
-            _rt = self.service_context.behaviour['response_types'][0]
+            _rt = self.service_context.get('behaviour')['response_types'][0]
             request_args["response_type"] = _rt
 
         # For OIDC 'openid' is required in scope
         if 'scope' not in request_args:
-            request_args['scope'] = self.service_context.behaviour.get("scope", ["openid"])
+            request_args['scope'] = self.service_context.get('behaviour').get("scope", ["openid"])
         elif 'openid' not in request_args['scope']:
             request_args['scope'].append('openid')
 
@@ -117,8 +115,7 @@ class Authorization(authorization.Authorization):
 
         if not alg:
             try:
-                alg = self.service_context.behaviour[
-                    "request_object_signing_alg"]
+                alg = self.service_context.get('behaviour')["request_object_signing_alg"]
             except KeyError:  # Use default
                 alg = "RS256"
         return alg
@@ -131,7 +128,7 @@ class Authorization(authorization.Authorization):
         :return: The URL the OP should use to access the file
         """
         try:
-            _webname = self.service_context.registration_response['request_uris'][0]
+            _webname = self.service_context.get('registration_response')['request_uris'][0]
             filename = self.service_context.filename_from_webname(_webname)
         except KeyError:
             filename, _webname = construct_request_uri(**kwargs)
@@ -150,11 +147,11 @@ class Authorization(authorization.Authorization):
             kwargs["keys"] = self.service_context.keyjar
 
         _srv_cntx = self.service_context
-        kwargs['issuer'] = _srv_cntx.client_id
+        kwargs['issuer'] = _srv_cntx.get('client_id')
         try:
-            kwargs['recv'] = _srv_cntx.provider_info['issuer']
+            kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
         except KeyError:
-            kwargs['recv'] = _srv_cntx.issuer
+            kwargs['recv'] = _srv_cntx.get('issuer')
         del kwargs['service']
 
         _req = make_openid_request(req, **kwargs)
@@ -205,24 +202,27 @@ class Authorization(authorization.Authorization):
         """
         _ctx = self.service_context
         kwargs = {
-            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
         }
 
-        for attr, param in IDT2REG.items():
-            try:
-                kwargs[attr] = _ctx.registration_response[param]
-            except KeyError:
-                pass
+        if 'registration_response' in _ctx:
+            _reg_res = _ctx.get('registration_response')
+            for attr, param in IDT2REG.items():
+                try:
+                    kwargs[attr] = _reg_res[param]
+                except KeyError:
+                    pass
 
         try:
             kwargs['allow_missing_kid'] = _ctx.allow['missing_kid']
         except KeyError:
             pass
 
-        _verify_args = _ctx.behaviour.get("verify_args")
-        if _verify_args:
-            kwargs.update(_verify_args)
+        if 'behaviour' in _ctx:
+            _verify_args = _ctx.get('behaviour').get("verify_args")
+            if _verify_args:
+                kwargs.update(_verify_args)
 
         return kwargs

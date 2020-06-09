@@ -15,16 +15,13 @@ class TestRP():
             'client_secret': 'another password'
         }
         service_context = ServiceContext(config=client_config)
-        db = InMemoryStateDataBase()
         self.service = {
             'token': service_factory("CCAccessToken",
                                      ['oauth2/client_credentials', 'oauth2'],
-                                     state_db=db,
                                      service_context=service_context),
             'refresh_token': service_factory("CCRefreshAccessToken",
                                              ['oauth2/client_credentials',
                                               'oauth2'],
-                                             state_db=db,
                                              service_context=service_context)
         }
         self.service['token'].endpoint = 'https://example.com/token'

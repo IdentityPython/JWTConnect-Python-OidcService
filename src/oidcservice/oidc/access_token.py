@@ -18,11 +18,10 @@ class AccessToken(access_token.AccessToken):
     response_cls = oidc.AccessTokenResponse
     error_msg = oidc.ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
+    def __init__(self, service_context, client_authn_factory=None,
                  conf=None):
-        access_token.AccessToken.__init__(self, service_context, state_db,
-                                          client_authn_factory=client_authn_factory,
-                                          conf=conf)
+        access_token.AccessToken.__init__(self, service_context,
+                                          client_authn_factory=client_authn_factory, conf=conf)
 
     def gather_verify_arguments(self):
         """
@@ -34,26 +33,28 @@ class AccessToken(access_token.AccessToken):
         # Default is RS256
 
         kwargs = {
-            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew,
         }
 
-        for attr, param in IDT2REG.items():
-            try:
-                kwargs[attr] = _ctx.registration_response[param]
-            except KeyError:
-                pass
+        if 'registration_response' in _ctx:
+            _reg_resp = _ctx.get('registration_response')
+            for attr, param in IDT2REG.items():
+                try:
+                    kwargs[attr] = _reg_resp[param]
+                except KeyError:
+                    pass
 
         try:
-            kwargs['allow_missing_kid'] = self.service_context.allow[
-                'missing_kid']
+            kwargs['allow_missing_kid'] = self.service_context.allow['missing_kid']
         except KeyError:
             pass
 
-        _verify_args = _ctx.behaviour.get("verify_args")
-        if _verify_args:
-            kwargs.update(_verify_args)
+        if 'behaviour' in _ctx:
+            _verify_args = _ctx.get('behaviour').get("verify_args")
+            if _verify_args:
+                kwargs.update(_verify_args)
 
         return kwargs
 
@@ -79,6 +80,7 @@ class AccessToken(access_token.AccessToken):
 
     def get_authn_method(self):
         try:
-            return self.service_context.behaviour['token_endpoint_auth_method']
+            return self.service_context.get('behaviour')[
+                'token_endpoint_auth_method']
         except KeyError:
             return self.default_authn_method

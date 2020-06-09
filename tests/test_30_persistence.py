@@ -1,32 +1,28 @@
 #!/usr/bin/env python3
 import json
-
+import shutil
 import time
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
+import responses
 from cryptojwt.jwt import JWT
 from cryptojwt.key_jar import KeyJar
-
-from oidcmsg.oidc import AccessTokenResponse, Link
+from oidcmsg.oidc import AccessTokenResponse
 from oidcmsg.oidc import AuthorizationResponse
-from oidcmsg.oidc import JRD
 from oidcmsg.oidc import OpenIDSchema
-from oidcmsg.oidc import ProviderConfigurationResponse
-from oidcmsg.oidc import RegistrationResponse
-from oidcservice.oidc.webfinger import WebFinger
 
+from oidcservice.oidc import DEFAULT_SERVICES
+from oidcservice.oidc.webfinger import WebFinger
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.state_interface import InMemoryStateDataBase
 
 # ================== SETUP ===========================
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
     {"type": "EC", "crv": "P-256", "use": ["sig"]},
-    ]
+]
 
 JWKS_OP = {
     'keys': [{
@@ -36,13 +32,18 @@ JWKS_OP = {
         'kid': 'c19uYlBJXzVfNjNZeGVnYmxncHZwUzZTZDVwUFdxdVJLU3AxQXdwaFdfbw',
         'kty': 'RSA',
         'n': '3ZblhNL2CjRktLM9vyDn8jnA4G1B1HCpPh'
-             '-gv2AK4m9qDBZPYZGOGqzeW3vanvLTBlqnPm0GHg4rOrfMEwwLrfMcgmg1y4GD0vVU8G9HP1-oUPtKUqaKOp313tFKzFh9_OHGQ6EmhxG7gegPR9kQXduTDXqBFi81MzRplIQ8DHLM3-n2CyDW1V-dhRVh-AM0ZcJyzR_DvZ3mhG44DysPdHQOSeWnpdn1d81-PriqZfhAF9tn1ihgtjXd5swf1HTSjLd7xv1hitGf2245Xmr-V2pQFzeMukLM3JKbTYbElsB7Zm0wZx49hZMtgx35XMoO04bifdbO3yLtTA5ovXN3fQ',
+             '-gv2AK4m9qDBZPYZGOGqzeW3vanvLTBlqnPm0GHg4rOrfMEwwLrfMcgmg1y4GD0vVU8G9HP1'
+             '-oUPtKUqaKOp313tFKzFh9_OHGQ6EmhxG7gegPR9kQXduTDXqBFi81MzRplIQ8DHLM3-n2CyDW1V-dhRVh'
+             '-AM0ZcJyzR_DvZ3mhG44DysPdHQOSeWnpdn1d81'
+             '-PriqZfhAF9tn1ihgtjXd5swf1HTSjLd7xv1hitGf2245Xmr'
+             '-V2pQFzeMukLM3JKbTYbElsB7Zm0wZx49hZMtgx35XMoO04bifdbO3yLtTA5ovXN3fQ',
         'p': '88aNu59aBn0elksaVznzoVKkdbT5B4euhOIEqJoFvFbEocw9mC4k'
-             '-yozIAQSV5FEakoSPOl8lrymCoM3Q1fVHfaM9Rbb9RCRlsV1JOeVVZOE05HUdz8zOIqLBDEGM_oQqDwF_kp-4nDTZ1-dtnGdTo4Cf7QRuApzE_dwVabUCTc',
+             '-yozIAQSV5FEakoSPOl8lrymCoM3Q1fVHfaM9Rbb9RCRlsV1JOeVVZOE05HUdz8zOIqLBDEGM_oQqDwF_kp'
+             '-4nDTZ1-dtnGdTo4Cf7QRuApzE_dwVabUCTc',
         'q':
             '6LOHuM7H_0kDrMTwUEX7Aubzr792GoJ6EgTKIQY25SAFTZpYwuC3NnqlAdy8foIa3d7eGU2yICRbBG0S_ITcooDFrOa7nZ6enMUclMTxW8FwwvBXeIHo9cIsrKYtOThGplz43Cvl73MK5M58ZRmuhaNYa6Mk4PL4UokARfEiDus',
         'use': 'sig'
-        },
+    },
         {
             'crv': 'P-256',
             'd': 'N2dg0-DAROBF8owQA4-uY5s0Ab-Fep_42kEFQG4BNVQ',
@@ -51,13 +52,12 @@ JWKS_OP = {
             'use': 'sig',
             'x': 'Ls8SqX8Ti5QAKtw3rdGr5K537-tqQCIbhyebeE_2C38',
             'y': 'S-BrbPQkh8HVFLWg5Wid_5OAk4ewn5skHlHtG08ShaA'
-            }
-        ]
+        }
+    ]
 }
 
 OP_KEYJAR = KeyJar()
 OP_KEYJAR.import_jwks(JWKS_OP, '')
-OP_PUBLIC_JWKS = OP_KEYJAR.export_jwks()
 OP_BASEURL = "https://example.org/op"
 
 RP_JWKS = {
@@ -74,21 +74,35 @@ RP_JWKS = {
         "p":
             "_STNoJFkX9_uw8whytVmTrHP5K7vcZBIH9nuCTvj137lC48ZpR1UARx4qShxHLfK7DrufHd7TYnJkEMNUHFmdKvkaVQMY0_BsBSvCrUl10gzxsI08hg53L17E1Pe73iZp3f5nA4eB-1YB-km1Cc-Xs10OPWedJHf9brlCPDLAb8",
         "q":
-            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
-    },
-        {
-            "kty": "EC", "use": "sig",
-            "kid": "ME9NV3VQV292OTA4T1pNLXZoVjd2TldVSjNrNEkycjU2ZjkycldQOTcyUQ",
-            "crv": "P-256",
-            "x": "WWoO_Exim-LOD1k8QPi_CdU8M_VUSF7DkJCKR7PFWhQ",
-            "y": "EpxHNZp6ykyeLiS6r7l9ly2in1Zju7hnLk7RFraklxE",
-            "d": "pepDloEcTyHnoEuqFirZ8hpt861piMDgiuvHIhhRSpM"
-        }]
-    }
+            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz"
+            "-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
+    }, {
+        "kty": "RSA", "use": "enc",
+        "kid": "Mk0yN2w0N3BZLWtyOEpQWGFmNDZvQi1hbDl2azR3ai1WNElGdGZQSFd6MA",
+        "e": "AQAB",
+        "n": "yPrOADZtGoa9jxFCmDsJ1nAYmzgznUxCtUlb_ty33"
+             "-AFNEqzW_pSLr5g6RQAPGsvVQqbsb9AB18QNgz"
+             "-eG7cnvKIIR7JXWCuGv_Q9MwoRD0-zaYGRbRvFoTZokZMB6euBfMo6kijJ"
+             "-gdKuSaxIE84X_Fcf1ESAKJ0EX6Cxdm8hKkBelGIDPMW5z7EHQ8OuLCQtTJnDvbjEOk9sKzkKqVj53XFs5vjd4WUhxS6xIDcWE-lTafUpm0BsobklLePidHxyAMGOunL_Pt3RCLZGlWeWOO9fZhLtydiDWiZlcNR0FQEX_mfV1kCOHHBFN1VKOY2pyJpjp9djdtHxPZ9fP35w",
+        "d":
+            "aRBTqGDLYFaXuba4LYSPe_5Vnq8erFg1dzfGU9Fmfi5KCjAS2z5cv_reBnpiNTODJt3Izn7AJhpYCyl3zdWGl8EJ0OabNalY2txoi9A-LI4nyrHEDaRpfkgszVwaWtYZbxrShMc8I5x_wvCGx7sX7Hoy6YgQreRFzw8Fy86MDncpmcUwQTnXVUMLgioeYz5gW6rwXkqj_NVyuHPiheykJG026cXFNBWplCk4ET1bvf_6ZB9QmLwO16Pu2O-dtu1HHDOqI7y6-YgKIC6mcLrQrF9-FO7NkilcOB7zODNiYzhDBQ2YJAbcdn_3M_lkhaFwR-n4WB7vCM0vNqz7lEg6QQ",
+        "p":
+            "_STNoJFkX9_uw8whytVmTrHP5K7vcZBIH9nuCTvj137lC48ZpR1UARx4qShxHLfK7DrufHd7TYnJkEMNUHFmdKvkaVQMY0_BsBSvCrUl10gzxsI08hg53L17E1Pe73iZp3f5nA4eB-1YB-km1Cc-Xs10OPWedJHf9brlCPDLAb8",
+        "q":
+            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz"
+            "-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
+    }, {
+        "kty": "EC", "use": "sig",
+        "kid": "ME9NV3VQV292OTA4T1pNLXZoVjd2TldVSjNrNEkycjU2ZjkycldQOTcyUQ",
+        "crv": "P-256",
+        "x": "WWoO_Exim-LOD1k8QPi_CdU8M_VUSF7DkJCKR7PFWhQ",
+        "y": "EpxHNZp6ykyeLiS6r7l9ly2in1Zju7hnLk7RFraklxE",
+        "d": "pepDloEcTyHnoEuqFirZ8hpt861piMDgiuvHIhhRSpM"
+    }]
+}
 
 RP_KEYJAR = KeyJar()
 RP_KEYJAR.import_jwks(RP_JWKS, '')
-RP_KEYJAR.import_jwks(OP_PUBLIC_JWKS, OP_BASEURL)
 RP_BASEURL = "https://example.com/rp"
 
 SERVICE_PUBLIC_JWKS = RP_KEYJAR.export_jwks('')
@@ -96,11 +110,10 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 
 # ---------------------------------------------------
-
-def test_conversation():
-    service_context = ServiceContext(
-        RP_KEYJAR,
-        {
+def build_service_context() -> object:
+    _service_context = ServiceContext(
+        config={
+            "issuer": 'https://op.example.com',
             "client_preferences":
                 {
                     "application_type": "web",
@@ -109,63 +122,89 @@ def test_conversation():
                     "response_types": ["code"],
                     "scope": ["openid", "profile", "email", "address", "phone"],
                     "token_endpoint_auth_method": "client_secret_basic",
-                    },
+                },
             "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
-            "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
+            "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL),
+            'jwks': RP_JWKS,
+            'db_conf': {
+                'abstract_storage_cls':
+                    'oidcmsg.storage.extension.LabeledAbstractStorage',
+                'keyjar': {
+                    'handler': 'oidcmsg.storage.abfile.AbstractFileSystem',
+                    'fdir': 'db/{issuer}/keyjar',
+                    'key_conv': 'oidcmsg.storage.converter.QPKey',
+                    'value_conv': 'cryptojwt.serialize.item.KeyIssuer',
+                    'label': 'keyjar'
+                },
+                'default': {
+                    'handler': 'oidcmsg.storage.abfile.AbstractFileSystem',
+                    'fdir': 'db/{issuer}',
+                    'key_conv': 'oidcmsg.storage.converter.QPKey',
+                    'value_conv': 'oidcmsg.storage.converter.JSON'
+                },
+                'state': {
+                    'handler': 'oidcmsg.storage.abfile.AbstractFileSystem',
+                    'fdir': 'db/{issuer}/state',
+                    'key_conv': 'oidcmsg.storage.converter.QPKey',
+                    'value_conv': 'oidcmsg.storage.converter.JSON'
+                }
             }
-        )
+        }
+    )
 
     service_spec = DEFAULT_SERVICES.copy()
     service_spec['WebFinger'] = {'class': WebFinger}
 
-    service = init_services(service_spec,
-                             service_context=service_context)
+    _service = init_services(service_spec, service_context=_service_context)
 
-    assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
-                                   'registration', 'refresh_token', 'userinfo',
-                                   'provider_info'}
+    assert set(_service.keys()) == {'accesstoken', 'authorization', 'webfinger',
+                                    'registration', 'refresh_token', 'userinfo',
+                                    'provider_info'}
 
-    service_context.service = service
+    _service_context.service = _service
+    return _service_context
+
+
+def test_conversation():
+    try:
+        shutil.rmtree('db')
+    except FileNotFoundError:
+        pass
+
+    # Alternate who's doing what
+    service_context = build_service_context()
+    service_context_2 = build_service_context()
+
+    service = service_context.service
+    service_2 = service_context_2.service
 
     # ======================== WebFinger ========================
 
     info = service['webfinger'].get_request_parameters(
         request_args={'resource': 'foobar@example.org'})
 
-    assert info[
-               'url'] == 'https://example.org/.well-known/webfinger?rel=http' \
-                         '%3A%2F' \
-                         '%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer' \
-                         '&resource' \
-                         '=acct%3Afoobar%40example.org'
+    assert info['url'] == 'https://example.org/.well-known/webfinger?rel=http' \
+                          '%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer' \
+                          '&resource=acct%3Afoobar%40example.org'
 
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
         "links": [{
-                      "rel": "http://openid.net/specs/connect/1.0/issuer",
-                      "href": "https://example.org/op"
-                  }],
+            "rel": "http://openid.net/specs/connect/1.0/issuer",
+            "href": "https://example.org/op"
+        }],
         "expires": "2018-02-04T11:08:41Z"
     })
 
     response = service['webfinger'].parse_response(webfinger_response)
 
-    assert isinstance(response, JRD)
-    assert set(response.keys()) == {'subject', 'links', 'expires'}
-    assert response['links'] == [
-        Link(rel='http://openid.net/specs/connect/1.0/issuer',
-             href='https://example.org/op')]
-
     service['webfinger'].update_service_context(resp=response)
-    service_context.set('issuer', OP_BASEURL)
 
     # =================== Provider info discovery ====================
 
-    info = service['provider_info'].get_request_parameters()
+    info = service_context_2.service['provider_info'].get_request_parameters()
 
-    assert info[
-               'url'] == 'https://example.org/op/.well-known/openid' \
-                         '-configuration'
+    assert info['url'] == 'https://example.org/op/.well-known/openid-configuration'
 
     provider_info_response = json.dumps({
         "version": "3.0",
@@ -252,15 +291,14 @@ def test_conversation():
         "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
     })
 
-    resp = service['provider_info'].parse_response(provider_info_response)
+    resp = service_2['provider_info'].parse_response(provider_info_response)
 
-    assert isinstance(resp, ProviderConfigurationResponse)
-    service['provider_info'].update_service_context(resp)
+    with responses.RequestsMock() as rsps:
+        _jwks_url = "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(OP_BASEURL)
+        rsps.add("GET", _jwks_url, body=OP_KEYJAR.export_jwks_as_json(), status=200,
+                 adding_headers={"Content-Type": "application/json"})
 
-    _pi = service_context.get('provider_info')
-    assert _pi['issuer'] == OP_BASEURL
-    assert _pi['authorization_endpoint'] == 'https://example.org/op/authorization'
-    assert _pi['registration_endpoint'] == 'https://example.org/op/registration'
+        service_2['provider_info'].update_service_context(resp)
 
     # =================== Client registration ====================
 
@@ -297,34 +335,20 @@ def test_conversation():
         "grant_types": ["authorization_code"]
     })
 
-    response = service['registration'].parse_response(
-        op_client_registration_response)
+    response = service['registration'].parse_response(op_client_registration_response)
 
     service['registration'].update_service_context(response)
-    assert service_context.get('client_id') == 'zls2qhN1jO6A'
-    assert service_context.get('client_secret') == 'c8434f28cf9375d9a7'
-    assert set(service_context.get('registration_response').keys()) == {
-        'client_secret_expires_at', 'contacts', 'client_id',
-        'token_endpoint_auth_method', 'redirect_uris', 'response_types',
-        'client_id_issued_at', 'client_secret', 'application_type',
-        'registration_client_uri', 'registration_access_token',
-        'grant_types'}
 
     # =================== Authorization ====================
 
     STATE = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
     NONCE = 'UvudLKz287YByZdsY3AJoPAlEXQkJ0dK'
 
-    info = service['authorization'].get_request_parameters(
+    info = service_2['authorization'].get_request_parameters(
         request_args={'state': STATE, 'nonce': NONCE})
 
     p = urlparse(info['url'])
     _query = parse_qs(p.query)
-    assert set(_query.keys()) == {'state', 'nonce', 'response_type', 'scope',
-                                  'client_id', 'redirect_uri'}
-    assert _query['scope'] == ['openid profile email address phone']
-    assert _query['nonce'] == [NONCE]
-    assert _query['state'] == [STATE]
 
     op_authz_resp = {
         'state': STATE,
@@ -336,11 +360,11 @@ def test_conversation():
 
     _authz_rep = AuthorizationResponse(**op_authz_resp)
 
-    _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
-    service['authorization'].update_service_context(_resp, key=STATE)
-    _item = service['authorization'].get_item(AuthorizationResponse,
-                                              'auth_response', STATE)
-    assert _item['code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
+    _resp = service_2['authorization'].parse_response(_authz_rep.to_urlencoded())
+    service_2['authorization'].update_service_context(_resp, key=STATE)
+
+    # _item = service['authorization'].get_item(AuthorizationResponse,
+    #                                           'auth_response', STATE)
 
     # =================== Access token ====================
 
@@ -395,8 +419,8 @@ def test_conversation():
 
     service['accesstoken'].update_service_context(_resp, key=STATE)
 
-    _item = service['authorization'].get_item(AccessTokenResponse,
-                                              'token_response', STATE)
+    _item = service_2['authorization'].get_item(AccessTokenResponse,
+                                                'token_response', STATE)
 
     assert set(_item.keys()) == {'state', 'scope', 'access_token',
                                  'token_type', 'id_token',
@@ -408,19 +432,18 @@ def test_conversation():
 
     # =================== User info ====================
 
-    info = service['userinfo'].get_request_parameters(state=STATE)
+    info = service_2['userinfo'].get_request_parameters(state=STATE)
 
     assert info['url'] == 'https://example.org/op/userinfo'
     assert info['headers'] == {'Authorization': 'Bearer Z0FBQUFBQmFkdFF'}
 
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
 
-    _resp = service['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
-    service['userinfo'].update_service_context(_resp, key=STATE)
+    _resp = service_2['userinfo'].parse_response(json.dumps(op_resp), state=STATE)
+    service_2['userinfo'].update_service_context(_resp, key=STATE)
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
 
-    _item = service['authorization'].get_item(OpenIDSchema,
-                                              'user_info', STATE)
+    _item = service['authorization'].get_item(OpenIDSchema, 'user_info', STATE)
     assert _item.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}

@@ -17,9 +17,8 @@ class CCAccessToken(Service):
     request_body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context,
                          client_authn_factory=client_authn_factory, conf=conf)
 
     def update_service_context(self, resp, key='cc', **kwargs):

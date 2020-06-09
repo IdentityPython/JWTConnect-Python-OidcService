@@ -68,7 +68,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
         "pyyaml>=5.1.0",
-        'oidcmsg>=0.6.10',
+        'oidcmsg>=1.0.0',
     ],
     tests_require=[
         "responses",

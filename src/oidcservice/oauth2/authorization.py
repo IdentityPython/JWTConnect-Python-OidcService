@@ -25,10 +25,9 @@ class Authorization(Service):
     service_name = 'authorization'
     response_body_type = 'urlencoded'
 
-    def __init__(self, service_context, state_db,
-                 client_authn_factory=None, conf=None):
-        Service.__init__(self, service_context, state_db=state_db,
-                         client_authn_factory=client_authn_factory, conf=conf)
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
+                         conf=conf)
         self.pre_construct.extend([pick_redirect_uris, set_state_parameter])
         self.post_construct.append(self.store_auth_request)
 
@@ -48,7 +47,7 @@ class Authorization(Service):
 
         if 'redirect_uri' not in ar_args:
             try:
-                ar_args['redirect_uri'] = self.service_context.redirect_uris[0]
+                ar_args['redirect_uri'] = self.service_context.get('redirect_uris')[0]
             except (KeyError, AttributeError):
                 raise MissingParameter('redirect_uri')
 

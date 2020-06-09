@@ -20,8 +20,7 @@ class Response(object):
 
 
 def test_service():
-    req = Service(state_db=InMemoryStateDataBase(),
-                  service_context=ServiceContext(None),
+    req = Service(service_context=ServiceContext(None),
                   client_authn_method=None)
     assert isinstance(req, Service)
 
@@ -37,7 +36,6 @@ class TestAuthorization(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('Authorization', ['oauth2'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct(self):
@@ -45,7 +43,7 @@ class TestAuthorization(object):
         _req = self.service.construct(request_args=req_args, state='state')
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo', 'state'}
-        assert self.service.state_db.get('state')
+        assert self.service.service_context.state_db.get('state')
         _item = self.service.get_item(AuthorizationRequest, 'auth_request',
                                       'state')
         assert _item.to_dict() == {
@@ -90,17 +88,15 @@ class TestAccessTokenRequest(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(config=client_config)
-        db = InMemoryStateDataBase()
+        service_context.set('redirect_uris', ['https://example.com/cli/authz_cb'])
+        self.service = service_factory('AccessToken', ['oauth2'], service_context=service_context)
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state'
         )
         auth_response = AuthorizationResponse(code='access_code')
-        _state = State(auth_response=auth_response.to_json(),
-                       auth_request=auth_request.to_json())
-        db.set('state', _state.to_json())
-        self.service = service_factory('AccessToken', ['oauth2'], state_db=db,
-                                       service_context=service_context)
+        self.service.store_item(auth_request, 'auth_request', 'state')
+        self.service.store_item(auth_response, 'auth_response', 'state')
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'state': 'state'}
@@ -186,7 +182,6 @@ class TestProviderInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('ProviderInfoDiscovery', ['oauth2'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
         self.service.endpoint = '{}/.well-known/openid-configuration'.format(
             self._iss)
@@ -212,16 +207,13 @@ class TestRefreshAccessTokenRequest(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(config=client_config)
-        db = InMemoryStateDataBase()
+        self.service = service_factory('RefreshAccessToken', ['oauth2'],
+                                       service_context=service_context)
         auth_response = AuthorizationResponse(code='access_code')
         token_response = AccessTokenResponse(access_token='bearer_token',
                                              refresh_token='refresh')
-        _state = State(auth_response=auth_response.to_json(),
-                       token_response=token_response.to_json())
-        db.set('abcdef', _state.to_json())
-        self.service = service_factory('RefreshAccessToken', ['oauth2'],
-                                       state_db=db,
-                                       service_context=service_context)
+        self.service.store_item(auth_response, 'auth_response', 'abcdef')
+        self.service.store_item(token_response, 'token_response', 'abcdef')
         self.service.endpoint = 'https://example.com/token'
 
     def test_construct(self):
@@ -243,19 +235,15 @@ def test_access_token_srv_conf():
         'redirect_uris': ['https://example.com/cli/authz_cb']
     }
     service_context = ServiceContext(config=client_config)
+    service = service_factory('AccessToken', ['oauth2'],
+                              service_context=service_context,
+                              conf={'default_authn_method': 'client_secret_post'})
 
-    db = InMemoryStateDataBase()
     auth_request = AuthorizationRequest(
         redirect_uri='https://example.com/cli/authz_cb', state='state')
     auth_response = AuthorizationResponse(code='access_code')
-
-    _state = State(auth_request=auth_request.to_json(),
-                   auth_response=auth_response.to_json())
-    db.set('state', _state.to_json())
-
-    service = service_factory('AccessToken', ['oauth2'], state_db=db,
-                              service_context=service_context,
-                              conf={'default_authn_method': 'client_secret_post'})
+    service.store_item(auth_request, "auth_request", 'state')
+    service.store_item(auth_response, "auth_response", 'state')
 
     req_args = {
         'redirect_uri': 'https://example.com/cli/authz_cb',

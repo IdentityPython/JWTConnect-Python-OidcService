@@ -96,9 +96,7 @@ service_context = ServiceContext(
     }
 )
 
-service = build_services(service_spec, factory,
-                         state_db=InMemoryStateDataBase(),
-                         service_context=service_context)
+service = build_services(service_spec, factory, service_context=service_context)
 
 service_context.service = service
 

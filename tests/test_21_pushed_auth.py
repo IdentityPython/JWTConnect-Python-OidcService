@@ -23,7 +23,7 @@ KEYSPEC = [
 
 CLI_KEY = init_key_jar(public_path='{}/pub_client.jwks'.format(_dirname),
                        private_path='{}/priv_client.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, owner='')
+                       key_defs=KEYSPEC, issuer_id='')
 
 
 class TestPushedAuth:
@@ -53,15 +53,15 @@ class TestPushedAuth:
                                          issuer='https://www.example.org/as',
                                          config=config)
 
-        self.service = init_services(_srvs, service_context, InMemoryStateDataBase(), _cam)
+        self.service = init_services(_srvs, service_context, _cam)
 
         if 'add_ons' in config:
             do_add_ons(config['add_ons'], self.service)
 
         service_context.service = self.service
-        service_context.provider_info = {
+        service_context.set('provider_info', {
             "pushed_authorization_request_endpoint": "https://as.example.com/push"
-        }
+        })
 
     def test_authorization(self):
         auth_service = self.service["authorization"]
@@ -72,7 +72,7 @@ class TestPushedAuth:
                 "expires_in": 3600
             }
             rsps.add("GET",
-                     auth_service.service_context.provider_info[
+                     auth_service.service_context.get('provider_info')[
                          "pushed_authorization_request_endpoint"],
                      body=json.dumps(_resp), status=200)
 

@@ -41,13 +41,11 @@ def response_types_to_grant_types(response_types):
 def add_request_uri(request_args=None, service=None, **kwargs):
     _context = service.service_context
     if _context.requests_dir:
-        try:
-            if _context.provider_info[
-                    'require_request_uri_registration'] is True:
-                request_args['request_uris'] = _context.generate_request_uris(
-                    _context.requests_dir)
-        except KeyError:
-            pass
+        _pi = _context.get('provider_info')
+        if _pi:
+            _req = _pi.get('require_request_uri_registration', False)
+            if _req is True:
+                request_args['request_uris'] = _context.generate_request_uris(_context.requests_dir)
 
     return request_args, {}
 
@@ -105,10 +103,8 @@ class Registration(Service):
     request_body_type = 'json'
     http_method = 'POST'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
-                         client_authn_factory=client_authn_factory,
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
                          conf=conf)
         self.pre_construct = [self.add_client_behaviour_preference,
                               add_redirect_uris, add_request_uri,
@@ -122,7 +118,7 @@ class Registration(Service):
                 continue
 
             try:
-                request_args[prop] = self.service_context.behaviour[prop]
+                request_args[prop] = self.service_context.get('behaviour')[prop]
             except KeyError:
                 try:
                     request_args[
@@ -138,30 +134,38 @@ class Registration(Service):
         except KeyError:
             pass
 
+        # If a Client can use jwks_uri, it MUST NOT use jwks.
+        if 'jwks_uri' in request_args and 'jwks' in request_args:
+            del request_args['jwks']
+
         return request_args
 
     def update_service_context(self, resp, key='', **kwargs):
-        self.service_context.registration_response = resp
-        if "token_endpoint_auth_method" not in \
-                self.service_context.registration_response:
-            self.service_context.registration_response[
-                "token_endpoint_auth_method"] = "client_secret_basic"
+        if "token_endpoint_auth_method" not in resp:
+            resp["token_endpoint_auth_method"] = "client_secret_basic"
 
-        self.service_context.client_id = resp["client_id"]
+        self.service_context.set('registration_response', resp)
+        _client_id = resp.get('client_id')
+        if _client_id:
+            self.service_context.set('client_id', _client_id)
+            if _client_id not in self.service_context.keyjar:
+                self.service_context.keyjar.import_jwks(
+                    self.service_context.keyjar.export_jwks(True, ''),
+                    issuer_id=_client_id
+                )
+            _client_secret = resp.get('client_secret')
+            if _client_secret:
+                self.service_context.set('client_secret', _client_secret)
+                self.service_context.keyjar.add_symmetric('', _client_secret)
+                self.service_context.keyjar.add_symmetric(_client_id, _client_secret)
+                try:
+                    self.service_context.set('client_secret_expires_at',
+                                             resp["client_secret_expires_at"])
+                except KeyError:
+                    pass
 
         try:
-            self.service_context.client_secret = resp["client_secret"]
-        except KeyError:  # Not required
-            pass
-        else:
-            try:
-                self.service_context.client_secret_expires_at = resp[
-                    "client_secret_expires_at"]
-            except KeyError:
-                pass
-
-        try:
-            self.service_context.registration_access_token = resp[
-                "registration_access_token"]
+            self.service_context.set('registration_access_token', resp[
+                "registration_access_token"])
         except KeyError:
             pass

@@ -2,19 +2,21 @@
 Implements a service context. A Service context is used to keep information that are
 common to all the services by an OpenID Connect Relying Party.
 """
+import copy
 import hashlib
 import os
 
-from cryptojwt.utils import as_bytes
-from cryptojwt.jwk.rsa import import_private_rsa_key_from_file
 from cryptojwt.jwk.rsa import RSAKey
+from cryptojwt.jwk.rsa import import_private_rsa_key_from_file
 from cryptojwt.key_bundle import KeyBundle
 from cryptojwt.key_jar import build_keyjar
-from cryptojwt.key_jar import KeyJar
-
+from cryptojwt.utils import as_bytes
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
+from oidcmsg.message import Message
 from oidcmsg.oidc import RegistrationRequest
+from oidcmsg.context import OidcContext
+
 
 CLI_REG_MAP = {
     "userinfo": {
@@ -32,31 +34,53 @@ CLI_REG_MAP = {
         "alg": "request_object_encryption_alg",
         "enc": "request_object_encryption_enc"
     }
-    }
+}
 
 PROVIDER_INFO_MAP = {
     "id_token": {
         "sign": "id_token_signing_alg_values_supported",
         "alg": "id_token_encryption_alg_values_supported",
         "enc": "id_token_encryption_enc_values_supported"
-        },
+    },
     "userinfo": {
         "sign": "userinfo_signing_alg_values_supported",
         "alg": "userinfo_encryption_alg_values_supported",
         "enc": "userinfo_encryption_enc_values_supported"
-        },
+    },
     "request_object": {
         "sign": "request_object_signing_alg_values_supported",
         "alg": "request_object_encryption_alg_values_supported",
         "enc": "request_object_encryption_enc_values_supported"
-        },
+    },
     "token_enpoint_auth": {
         "sign": "token_endpoint_auth_signing_alg_values_supported"
-        }
     }
+}
+
+DEFAULT_VALUE = {
+    'client_secret': '',
+    'client_id': '',
+    'redirect_uris': [],
+    'provider_info': {},
+    'behaviour': {},
+    'callback': {},
+    'issuer': ''
+}
 
 
-class ServiceContext:
+def add_issuer(conf, issuer):
+    res = {}
+    for key, val in conf.items():
+        if key == 'abstract_storage_cls':
+            res[key] = val
+        else:
+            _val = copy.deepcopy(val)
+            _val['issuer'] = issuer
+            res[key] = _val
+    return res
+
+
+class ServiceContext(OidcContext):
     """
     This class keeps information that a client needs to be able to talk
     to a server. Some of this information comes from configuration and some
@@ -65,30 +89,39 @@ class ServiceContext:
     """
 
     def __init__(self, keyjar=None, config=None, **kwargs):
-        self.keyjar = keyjar or KeyJar()
-        self.provider_info = {}
-        self.registration_response = {}
-        self.kid = {"sig": {}, "enc": {}}
-
         if config is None:
             config = {}
         self.config = config
+
+        OidcContext.__init__(self, config, keyjar, entity_id=config.get('client_id', ''))
+
+        # For my Dev environment
+        self.state_db = None
+
+        self.add_boxes({'state': 'state_db'}, self.db_conf)
+
+        self.kid = {"sig": {}, "enc": {}}
 
         # Below so my IDE won't complain
         self.base_url = ''
         self.requests_dir = ''
         self.register_args = {}
         self.allow = {}
-        self.behaviour = {}
         self.client_preferences = {}
-        self.client_id = ''
-        self._c_secret = ''
-        self.issuer = ''
-        self.redirect_uris = []
-        self.callback = None
         self.args = {}
         self.add_on = {}
         self.httpc_params = {}
+
+        _def_value = copy.deepcopy(DEFAULT_VALUE)
+        # Dynamic information
+        for param in ['client_secret', 'client_id', 'redirect_uris', 'provider_info',
+                      'behaviour', 'callback', 'issuer']:
+            if param in config:
+                self.set(param, config[param])
+                if param == 'client_secret':
+                    self.keyjar.add_symmetric('', config[param])
+            else:
+                self.set(param, _def_value[param])
 
         try:
             self.clock_skew = config['clock_skew']
@@ -98,10 +131,7 @@ class ServiceContext:
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        for attr in ['client_id', 'issuer', 'base_url', 'requests_dir',
-                     'allow', 'client_preferences', 'behaviour',
-                     'provider_info', 'redirect_uris', 'callback', 'verify_args'
-                     ]:
+        for attr in ['base_url', 'requests_dir', 'allow', 'client_preferences', 'verify_args']:
             try:
                 setattr(self, attr, config[attr])
             except KeyError:
@@ -113,9 +143,6 @@ class ServiceContext:
             except KeyError:
                 pass
 
-        if 'client_secret' in config:
-            self.set_client_secret(config['client_secret'])
-
         if self.requests_dir:
             # make sure the path exists. If not, then make it.
             if not os.path.isdir(self.requests_dir):
@@ -125,30 +152,6 @@ class ServiceContext:
             self.import_keys(config['keys'])
         except KeyError:
             pass
-
-        if 'keydefs' in config:
-            self.keyjar = build_keyjar(config['keydefs'], keyjar=self.keyjar)
-
-    def get_client_secret(self):
-        """Return the client secret."""
-        return self._c_secret
-
-    def set_client_secret(self, val):
-        """Set client secret."""
-        if not val:
-            self._c_secret = ""
-        else:
-            self._c_secret = val
-            # client uses it for signing
-            # Server might also use it for signing which means the
-            # client uses it for verifying server signatures
-            if self.keyjar is None:
-                self.keyjar = KeyJar()
-            self.keyjar.add_symmetric("", str(val))
-
-    # since client secret is used as a symmetric key in some instances
-    # some special handling is needed for the client_secret attribute
-    client_secret = property(get_client_secret, set_client_secret)
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
@@ -185,14 +188,18 @@ class ServiceContext:
         """
         _hash = hashlib.sha256()
         try:
-            _hash.update(as_bytes(self.provider_info['issuer']))
+            _hash.update(as_bytes(self.get('provider_info')['issuer']))
         except KeyError:
-            _hash.update(as_bytes(self.issuer))
+            _hash.update(as_bytes(self.get('issuer')))
         _hash.update(as_bytes(self.base_url))
-        if not path.startswith('/'):
-            return ['{}/{}/{}'.format(self.base_url, path, _hash.hexdigest())]
 
-        return ['{}{}/{}'.format(self.base_url, path, _hash.hexdigest())]
+        if not path.startswith('/'):
+            redirs = ['{}/{}/{}'.format(self.base_url, path, _hash.hexdigest())]
+        else:
+            redirs = ['{}{}/{}'.format(self.base_url, path, _hash.hexdigest())]
+
+        self.set('redirect_uris', redirs)
+        return redirs
 
     def import_keys(self, keyspec):
         """
@@ -227,11 +234,11 @@ class ServiceContext:
         """
 
         try:
-            return self.behaviour[CLI_REG_MAP[typ]['sign']]
+            return self.get('behaviour')[CLI_REG_MAP[typ]['sign']]
         except KeyError:
             try:
-                return self.provider_info[PROVIDER_INFO_MAP[typ]['sign']]
-            except KeyError:
+                return self.get('provider_info')[PROVIDER_INFO_MAP[typ]['sign']]
+            except (KeyError, TypeError):
                 pass
 
         return None
@@ -246,13 +253,25 @@ class ServiceContext:
         res = {}
         for attr in ['enc', 'alg']:
             try:
-                _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
+                _alg = self.get('behaviour')[CLI_REG_MAP[typ][attr]]
             except KeyError:
                 try:
-                    _alg = self.provider_info[PROVIDER_INFO_MAP[typ][attr]]
+                    _alg = self.get('provider_info')[PROVIDER_INFO_MAP[typ][attr]]
                 except KeyError:
                     _alg = None
 
             res[attr] = _alg
 
         return res
+
+    def get(self, key, default=None):
+        return self.db.get(key, default)
+
+    def set(self, key, value):
+        if isinstance(value, Message):
+            self.db[key] = value.to_dict()
+        else:
+            self.db[key] = value
+
+    def __contains__(self, item):
+        return item in self.db

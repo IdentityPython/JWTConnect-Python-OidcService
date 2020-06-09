@@ -33,9 +33,9 @@ class TestRegistrationRead(object):
             }
         }
         service_context = ServiceContext(config=client_config)
-        self.reg_service = service_factory("Registration", ["oidc"], state_db=None,
+        self.reg_service = service_factory("Registration", ["oidc"],
                                            service_context=service_context)
-        self.read_service = service_factory("RegistrationRead", ["oidc"], state_db=None,
+        self.read_service = service_factory("RegistrationRead", ["oidc"],
                                             service_context=service_context)
 
     def test_construct(self):

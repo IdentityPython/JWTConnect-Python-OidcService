@@ -90,7 +90,7 @@ class ClientSecretBasic(ClientAuthnMethod):
             try:
                 passwd = request["client_secret"]
             except KeyError:
-                passwd = service.service_context.client_secret
+                passwd = service.service_context.get('client_secret')
         return passwd
 
     @staticmethod
@@ -98,7 +98,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         try:
             user = kwargs["user"]
         except KeyError:
-            user = service.service_context.client_id
+            user = service.service_context.get('client_id')
         return user
 
     def _get_authentication_token(self, request, service, **kwargs):
@@ -131,7 +131,7 @@ class ClientSecretBasic(ClientAuthnMethod):
                 'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
-                    request['client_id'] = service.service_context.client_id
+                    request['client_id'] = service.service_context.get('client_id')
                 except AttributeError:
                     pass
         else:
@@ -213,13 +213,13 @@ class ClientSecretPost(ClientSecretBasic):
             try:
                 request["client_secret"] = kwargs["client_secret"]
             except (KeyError, TypeError):
-                if _context.client_secret:
-                    request["client_secret"] = _context.client_secret
+                if _context.get('client_secret'):
+                    request["client_secret"] = _context.get('client_secret')
                 else:
                     raise AuthnFailure("Missing client secret")
 
         # Add the client_id to the request
-        request["client_id"] = _context.client_id
+        request["client_id"] = _context.get('client_id')
 
     def construct(self, request, service=None, http_args=None, **kwargs):
         """
@@ -455,9 +455,9 @@ class JWSAuthnMethod(ClientAuthnMethod):
                     'token_endpoint_auth_signing_alg']
             except (KeyError, AttributeError):
                 pass
-            audience = context.provider_info['token_endpoint']
+            audience = context.get('provider_info')['token_endpoint']
         else:
-            audience = context.provider_info['issuer']
+            audience = context.get('provider_info')['issuer']
 
         if not algorithm:
             algorithm = self.choose_algorithm(**kwargs)
@@ -480,7 +480,7 @@ class JWSAuthnMethod(ClientAuthnMethod):
 
         # construct the signed JWT with the assertions and add
         # it as value to the 'client_assertion' claim of the request
-        return assertion_jwt(_context.client_id, signing_key, audience, algorithm, **_args)
+        return assertion_jwt(_context.get('client_id'), signing_key, audience, algorithm, **_args)
 
     def modify_request(self, request, service, **kwargs):
         """
@@ -582,7 +582,7 @@ def valid_service_context(service_context, when=0):
     :param when: A time stamp against which the expiration time is to be checked
     :return: True if the client_secret is still valid
     """
-    eta = getattr(service_context, 'client_secret_expires_at', 0)
+    eta = service_context.get('client_secret_expires_at', 0)
     now = when or utc_time_sans_frac()
     if eta != 0 and eta < now:
         return False

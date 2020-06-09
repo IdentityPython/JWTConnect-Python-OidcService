@@ -17,13 +17,16 @@ def get_state_parameter(request_args, kwargs):
 def pick_redirect_uris(request_args=None, service=None, **kwargs):
     """Pick one redirect_uri base on response_mode out of a list of such."""
     _context = service.service_context
+
     if 'redirect_uri' in request_args:
-        pass
-    elif _context.callback:
+        return request_args, {}
+
+    _callback = _context.get('callback')
+    if _callback:
         try:
             _response_type = request_args['response_type']
         except KeyError:
-            _response_type = _context.behaviour['response_types'][0]
+            _response_type = _context.get('behaviour')['response_types'][0]
             request_args['response_type'] = _response_type
 
         try:
@@ -32,15 +35,14 @@ def pick_redirect_uris(request_args=None, service=None, **kwargs):
             _response_mode = ''
 
         if _response_mode == 'form_post':
-            request_args['redirect_uri'] = _context.callback[
-                'form_post']
+            request_args['redirect_uri'] = _callback['form_post']
         elif _response_type == 'code':
-            request_args['redirect_uri'] = _context.callback['code']
+            request_args['redirect_uri'] = _callback['code']
         else:
-            request_args['redirect_uri'] = _context.callback[
-                'implicit']
+            request_args['redirect_uri'] = _callback['implicit']
     else:
-        request_args['redirect_uri'] = _context.redirect_uris[0]
+        request_args['redirect_uri'] = _context.get('redirect_uris')[0]
+
     return request_args, {}
 
 

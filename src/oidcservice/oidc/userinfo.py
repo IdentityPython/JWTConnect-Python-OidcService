@@ -38,10 +38,9 @@ class UserInfo(Service):
     default_authn_method = 'bearer_header'
     http_method = 'GET'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
-                         client_authn_factory=client_authn_factory, conf=conf)
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
+                         conf=conf)
         self.pre_construct = [self.oidc_pre_construct, carry_state]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
@@ -113,20 +112,21 @@ class UserInfo(Service):
         """
         _ctx = self.service_context
         kwargs = {
-            'client_id': _ctx.client_id, 'iss': _ctx.issuer,
+            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
         }
 
-        for attr, param in UI2REG.items():
-            try:
-                kwargs[attr] = _ctx.registration_response[param]
-            except KeyError:
-                pass
+        _reg_resp = _ctx.get('registration_response')
+        if _reg_resp:
+            for attr, param in UI2REG.items():
+                try:
+                    kwargs[attr] = _reg_resp[param]
+                except KeyError:
+                    pass
 
         try:
-            kwargs['allow_missing_kid'] = self.service_context.allow[
-                'missing_kid']
+            kwargs['allow_missing_kid'] = self.service_context.allow['missing_kid']
         except KeyError:
             pass
 

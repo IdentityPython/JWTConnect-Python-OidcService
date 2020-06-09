@@ -22,10 +22,9 @@ class ProviderInfoDiscovery(Service):
     service_name = 'provider_info'
     http_method = 'GET'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
-        Service.__init__(self, service_context, state_db,
-                         client_authn_factory=client_authn_factory, conf=conf)
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
+                         conf=conf)
 
     def get_endpoint(self):
         """
@@ -34,7 +33,7 @@ class ProviderInfoDiscovery(Service):
         :return: Service endpoint
         """
         try:
-            _iss = self.service_context.issuer
+            _iss = self.service_context.get('issuer')
         except AttributeError:
             _iss = self.endpoint
 
@@ -116,12 +115,13 @@ class ProviderInfoDiscovery(Service):
         # Verify that the issuer value received is the same as the
         # url that was used as service endpoint (without the .well-known part)
         if "issuer" in resp:
-            _pcr_issuer = self._verify_issuer(resp, self.service_context.issuer)
+            _pcr_issuer = self._verify_issuer(resp,
+                                              self.service_context.get('issuer'))
         else:  # No prior knowledge
-            _pcr_issuer = self.service_context.issuer
+            _pcr_issuer = self.service_context.get('issuer')
 
-        self.service_context.issuer = _pcr_issuer
-        self.service_context.provider_info = resp
+        self.service_context.set('issuer', _pcr_issuer)
+        self.service_context.set('provider_info', resp)
 
         self._set_endpoints(resp)
 

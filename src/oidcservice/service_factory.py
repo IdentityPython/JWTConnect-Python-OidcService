@@ -33,6 +33,5 @@ def service_factory(req_name, module_dirs, **kwargs):
 if __name__ == "__main__":
     from oidcservice.state_interface import InMemoryStateDataBase
 
-    srv = service_factory('AccessToken', ['oidc'], state_db=InMemoryStateDataBase(),
-                          service_context=None)
+    srv = service_factory('AccessToken', ['oidc'], service_context=None)
     print(srv.service_name)

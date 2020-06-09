@@ -1,5 +1,4 @@
 import logging
-
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
@@ -36,11 +35,10 @@ class WebFinger(Service):
     http_method = 'GET'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
+    def __init__(self, service_context, client_authn_factory=None,
                  conf=None, rel='', **kwargs):
-        Service.__init__(self, service_context, state_db,
-                         client_authn_factory=client_authn_factory, conf=conf,
-                         **kwargs)
+        Service.__init__(self, service_context, client_authn_factory=client_authn_factory,
+                         conf=conf, **kwargs)
 
         self.rel = rel or OIC_ISSUER
 
@@ -63,7 +61,7 @@ class WebFinger(Service):
                         raise ValueError(
                             'http link not allowed ({})'.format(_href))
 
-                    self.service_context.issuer = link['href']
+                    self.service_context.set('issuer', link['href'])
                     break
         return resp
 

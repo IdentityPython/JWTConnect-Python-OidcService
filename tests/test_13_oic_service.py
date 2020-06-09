@@ -26,8 +26,6 @@ from oidcservice.oidc.registration import add_jwks_uri_or_jwks
 from oidcservice.oidc.registration import response_types_to_grant_types
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
 
 
 class Response(object):
@@ -48,11 +46,11 @@ ISS = 'https://example.com'
 
 CLI_KEY = init_key_jar(public_path='{}/pub_client.jwks'.format(_dirname),
                        private_path='{}/priv_client.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, owner='client_id', read_only=False)
+                       key_defs=KEYSPEC, issuer_id='client_id', read_only=False)
 
 ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
                        private_path='{}/priv_iss.jwks'.format(_dirname),
-                       key_defs=KEYSPEC, owner=ISS, read_only=False)
+                       key_defs=KEYSPEC, issuer_id=ISS, read_only=False)
 
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
@@ -63,7 +61,7 @@ CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(),
 
 # def test_request_factory():
 #     req = service_factory('Service', service_context=ServiceContext(None),
-#                   state_db=InMemoryStateDataBase(), client_authn_method=None)
+#                   client_authn_method=None)
 #     assert isinstance(req, Service)
 
 
@@ -75,9 +73,8 @@ class TestAuthorization(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
-        service_context.issuer = 'https://example.com'
+        service_context.set('issuer', 'https://example.com')
         self.service = service_factory('Authorization', ['oidc'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct(self):
@@ -160,7 +157,7 @@ class TestAuthorization(object):
         _resp = _jws.verify_compact(
             msg['request'],
             keys=ISS_KEY.get_signing_key(key_type='RSA',
-                                         owner='client_id'))
+                                         issuer_id='client_id'))
         assert _resp
         assert set(_resp.keys()) == {'response_type', 'client_id', 'scope',
                                      'redirect_uri', 'state', 'nonce', 'iss', 'aud', 'iat'}
@@ -171,10 +168,10 @@ class TestAuthorization(object):
 
         assert os.path.isfile(os.path.join(_dirname, 'request123456.jwt'))
 
-        self.service.service_context.registration_response = {
+        self.service.service_context.set('registration_response', {
             'redirect_uris': ['https://example.com/cb'],
             'request_uris': ['https://example.com/request123456.jwt']
-        }
+        })
         self.service.service_context.base_url = 'https://example.com/'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='reference')
@@ -253,7 +250,7 @@ class TestAuthorization(object):
         idt = JWT(ISS_KEY, iss=ISS, lifetime=3600, sign_alg='none')
         payload = {'sub': '123456789', 'aud': ['client_id']}
         _idt = idt.pack(payload)
-        self.service.service_context.behaviour["verify_args"] = {
+        self.service.service_context.get('behaviour')["verify_args"] = {
             "allow_sign_alg_none": allow_sign_alg_none
         }
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -262,6 +259,7 @@ class TestAuthorization(object):
         else:
             with pytest.raises(UnsupportedAlgorithm):
                 self.service.parse_response(resp.to_urlencoded())
+
 
 class TestAuthorizationCallback(object):
     @pytest.fixture(autouse=True)
@@ -276,7 +274,6 @@ class TestAuthorizationCallback(object):
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
         self.service = service_factory('Authorization', ['oidc'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct_code(self):
@@ -324,15 +321,15 @@ class TestAccessTokenRequest(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(CLI_KEY, config=client_config)
-        _db = InMemoryStateDataBase()
+        self.service = service_factory('AccessToken', ['oidc'], service_context=service_context)
+        # add some history
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state', response_type='code').to_json()
+        self.service.store_item(auth_request, "auth_request", 'state')
+
         auth_response = AuthorizationResponse(code='access_code').to_json()
-        _db.set('state', State(auth_response=auth_response,
-                               auth_request=auth_request).to_json())
-        self.service = service_factory('AccessToken', ['oidc'], state_db=_db,
-                                       service_context=service_context)
+        self.service.store_item(auth_response, "auth_response", 'state')
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -393,7 +390,7 @@ class TestAccessTokenRequest(object):
 
 class TestProviderInfo(object):
     @pytest.fixture(autouse=True)
-    def create_request(self):
+    def create_service(self):
         self._iss = ISS
         client_config = {
             'client_id': 'client_id', 'client_secret': 'a longesh password',
@@ -412,7 +409,6 @@ class TestProviderInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('ProviderInfoDiscovery', ['oidc'],
-                                       state_db=None,
                                        service_context=service_context)
 
     def test_construct(self):
@@ -516,10 +512,10 @@ class TestProviderInfo(object):
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.behaviour == {}
+        assert self.service.service_context.get('behaviour') == {}
         resp = self.service.post_parse_response(provider_info_response)
         self.service.update_service_context(resp)
-        assert self.service.service_context.behaviour == {
+        assert self.service.service_context.get('behaviour') == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -545,10 +541,10 @@ class TestProviderInfo(object):
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.behaviour == {}
+        assert self.service.service_context.get('behaviour') == {}
         resp = self.service.post_parse_response(provider_info_response)
         self.service.update_service_context(resp)
-        assert self.service.service_context.behaviour == {
+        assert self.service.service_context.get('behaviour') == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -577,7 +573,7 @@ def create_jws(val):
 
     idts = IdToken(**val)
 
-    return idts.to_jwt(key=ISS_KEY.get_signing_key('ec', owner=ISS),
+    return idts.to_jwt(key=ISS_KEY.get_signing_key('ec', issuer_id=ISS),
                        algorithm="ES256", lifetime=lifetime)
 
 
@@ -592,8 +588,7 @@ class TestRegistration(object):
             'base_url': 'https://example.com/cli/'
         }
         service_context = ServiceContext(config=client_config)
-        self.service = service_factory('Registration', ['oidc'], state_db=None,
-                                       service_context=service_context)
+        self.service = service_factory('Registration', ['oidc'], service_context=service_context)
 
     def test_construct(self):
         _req = self.service.construct()
@@ -609,8 +604,9 @@ class TestRegistration(object):
         assert 'post_logout_redirect_uris' in _req
 
     def test_config_with_required_request_uri(self):
-        self.service.service_context.provider_info[
-            'require_request_uri_registration'] = True
+        _pi = self.service.service_context.get('provider_info')
+        _pi['require_request_uri_registration'] = True
+        self.service.service_context.set('provider_info', _pi)
         _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5
@@ -629,14 +625,17 @@ class TestUserInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         service_context.keyjar = CLI_KEY
-        service_context.behaviour = {
+        service_context.set('behaviour', {
             'userinfo_signed_response_alg': 'RS256',
             "userinfo_encrypted_response_alg": "RSA-OAEP",
             "userinfo_encrypted_response_enc": "A256GCM"
-        }
+        })
 
-        db = InMemoryStateDataBase()
+        self.service = service_factory('UserInfo', ['oidc'], service_context=service_context)
+
+        # Add history
         auth_response = AuthorizationResponse(code='access_code').to_json()
+        self.service.store_item(auth_response, 'auth_response', 'abcde')
 
         idtval = {
             'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'diana',
@@ -649,10 +648,7 @@ class TestUserInfo(object):
         token_response = AccessTokenResponse(
             access_token='access_token', id_token=idt,
             __verified_id_token=ver_idt).to_json()
-        db.set('abcde', State(token_response=token_response,
-                              auth_response=auth_response).to_json())
-        self.service = service_factory('UserInfo', ['oidc'], state_db=db,
-                                       service_context=service_context)
+        self.service.store_item(token_response, 'token_response', 'abcde')
 
     def test_construct(self):
         _req = self.service.construct(state='abcde')
@@ -727,7 +723,7 @@ class TestUserInfo(object):
     def test_unpack_signed_response(self):
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall', iss=ISS)
-        sk = ISS_KEY.get_signing_key('rsa', owner=ISS)
+        sk = ISS_KEY.get_signing_key('rsa', issuer_id=ISS)
         alg = self.service.service_context.get_sign_alg('userinfo')
         _resp = self.service.parse_response(resp.to_jwt(sk, algorithm=alg),
                                             state='abcde', sformat='jwt')
@@ -735,16 +731,16 @@ class TestUserInfo(object):
 
     def test_unpack_encrypted_response(self):
         # Add encryption key
-        _kj = build_keyjar([{"type": "RSA", "use": ["enc"]}], owner='')
+        _kj = build_keyjar([{"type": "RSA", "use": ["enc"]}], issuer_id='')
         # Own key jar gets the private key
         self.service.service_context.keyjar.import_jwks(
-            _kj.export_jwks(private=True), issuer='client_id')
+            _kj.export_jwks(private=True), issuer_id='client_id')
         # opponent gets the public key
-        ISS_KEY.import_jwks(_kj.export_jwks(), issuer='client_id')
+        ISS_KEY.import_jwks(_kj.export_jwks(), issuer_id='client_id')
 
         resp = OpenIDSchema(sub='diana', given_name='Diana',
                             family_name='krall', iss=ISS, aud='client_id')
-        enckey = ISS_KEY.get_encrypt_key('rsa', owner='client_id')
+        enckey = ISS_KEY.get_encrypt_key('rsa', issuer_id='client_id')
         algspec = self.service.service_context.get_enc_alg_enc(
             self.service.service_name)
 
@@ -766,7 +762,6 @@ class TestCheckSession(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('CheckSession', ['oidc'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct(self):
@@ -790,7 +785,6 @@ class TestCheckID(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('CheckID', ['oidc'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct(self):
@@ -814,7 +808,6 @@ class TestEndSession(object):
         }
         service_context = ServiceContext(config=client_config)
         self.service = service_factory('EndSession', ['oidc'],
-                                       state_db=InMemoryStateDataBase(),
                                        service_context=service_context)
 
     def test_construct(self):
@@ -836,7 +829,7 @@ def test_authz_service_conf():
     }
 
     srv = service_factory(
-        'Authorization', ['oidc'], state_db=InMemoryStateDataBase(),
+        'Authorization', ['oidc'],
         service_context=ServiceContext(CLI_KEY, config=client_config),
         conf={
             'request_args': {
@@ -867,8 +860,7 @@ def test_add_jwks_uri_or_jwks_0():
         }
     }
     service_context = ServiceContext(config=client_config)
-    service = service_factory('Registration', ['oidc'], state_db=None,
-                              service_context=service_context)
+    service = service_factory('Registration', ['oidc'], service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
 
@@ -878,7 +870,7 @@ def test_add_jwks_uri_or_jwks_1():
         'client_id': 'client_id', 'client_secret': 'a longesh password',
         'redirect_uris': ['https://example.com/cli/authz_cb'],
         'jwks_uri': 'https://example.com/jwks/jwks.json',
-        'jwks': '{"keys":[]}',
+        'jwks': {"keys": []},
         'issuer': ISS,
         'client_preferences': {
             'id_token_signed_response_alg': 'RS384',
@@ -886,8 +878,7 @@ def test_add_jwks_uri_or_jwks_1():
         }
     }
     service_context = ServiceContext(config=client_config)
-    service = service_factory('Registration', ['oidc'], state_db=None,
-                              service_context=service_context)
+    service = service_factory('Registration', ['oidc'], service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
     assert set(req_args.keys()) == {'jwks_uri'}
@@ -905,8 +896,7 @@ def test_add_jwks_uri_or_jwks_2():
     }
     service_context = ServiceContext(
         config=client_config, jwks_uri='https://example.com/jwks/jwks.json')
-    service = service_factory('Registration', ['oidc'], state_db=None,
-                              service_context=service_context)
+    service = service_factory('Registration', ['oidc'], service_context=service_context)
 
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks_uri'] == 'https://example.com/jwks/jwks.json'
@@ -924,8 +914,7 @@ def test_add_jwks_uri_or_jwks_3():
         }
     }
     service_context = ServiceContext(config=client_config, jwks='{"keys":[]}')
-    service = service_factory('Registration', ['oidc'], state_db=None,
-                              service_context=service_context)
+    service = service_factory('Registration', ['oidc'], service_context=service_context)
     req_args, post_args = add_jwks_uri_or_jwks({}, service)
     assert req_args['jwks'] == '{"keys":[]}'
     assert set(req_args.keys()) == {'jwks'}

@@ -42,9 +42,9 @@ class Service(StateInterface):
     request_body_type = 'urlencoded'
     response_body_type = 'json'
 
-    def __init__(self, service_context, state_db, conf=None,
+    def __init__(self, service_context, conf=None,
                  client_authn_factory=None, **kwargs):
-        StateInterface.__init__(self, state_db)
+        StateInterface.__init__(self, service_context.state_db)
 
         if client_authn_factory is None:
             self.client_authn_factory = ca_factory
@@ -91,17 +91,20 @@ class Service(StateInterface):
             try:
                 ar_args[prop] = getattr(self.service_context, prop)
             except AttributeError:
-                try:
-                    ar_args[prop] = self.conf['request_args'][prop]
-                except KeyError:
+                val = self.service_context.get(prop)
+                if val:
+                    ar_args[prop] = val
+                else:
                     try:
-                        ar_args[prop] = self.service_context.register_args[
-                            prop]
+                        ar_args[prop] = self.conf['request_args'][prop]
                     except KeyError:
                         try:
-                            ar_args[prop] = self.default_request_args[prop]
+                            ar_args[prop] = self.service_context.register_args[prop]
                         except KeyError:
-                            pass
+                            try:
+                                ar_args[prop] = self.default_request_args[prop]
+                            except KeyError:
+                                pass
 
         return ar_args
 
@@ -247,7 +250,7 @@ class Service(StateInterface):
         if self.endpoint:
             return self.endpoint
 
-        return self.service_context.provider_info[self.endpoint_name]
+        return self.service_context.get('provider_info')[self.endpoint_name]
 
     def get_authn_header(self, request, authn_method, **kwargs):
         """
@@ -314,8 +317,8 @@ class Service(StateInterface):
         _info = {'method': method}
 
         _args = kwargs.copy()
-        if self.service_context.issuer:
-            _args['iss'] = self.service_context.issuer
+        if self.service_context.get('issuer'):
+            _args['iss'] = self.service_context.get('issuer')
 
         # Client authentication by usage of the Authorization HTTP header
         # or by modifying the request object
@@ -387,31 +390,32 @@ class Service(StateInterface):
         :return: dictionary with arguments to the verify call
         """
 
-        kwargs = {'client_id': self.service_context.client_id,
-                  'iss': self.service_context.issuer,
-                  'keyjar': self.service_context.keyjar,
-                  'verify': True}
+        kwargs = {
+            'client_id': self.service_context.get('client_id'),
+            'iss': self.service_context.get('issuer'),
+            'keyjar': self.service_context.keyjar,
+            'verify': True
+        }
 
         if self.service_name == "provider_info":
-            if self.service_context.issuer.startswith("http://"):
+            if self.service_context.get('issuer').startswith("http://"):
                 kwargs["allow_http"] = True
 
         return kwargs
 
     def _do_jwt(self, info):
-        args = {'allowed_sign_algs':
-                    self.service_context.get_sign_alg(self.service_name)}
+        args = {'allowed_sign_algs': self.service_context.get_sign_alg(self.service_name)}
         enc_algs = self.service_context.get_enc_alg_enc(self.service_name)
         args['allowed_enc_algs'] = enc_algs['alg']
         args['allowed_enc_encs'] = enc_algs['enc']
         _jwt = JWT(key_jar=self.service_context.keyjar, **args)
-        _jwt.iss = self.service_context.client_id
+        _jwt.iss = self.service_context.get('client_id')
         return _jwt.unpack(info)
 
     def _do_response(self, info, sformat, **kwargs):
         try:
             resp = self.response_cls().deserialize(
-                info, sformat, iss=self.service_context.issuer, **kwargs)
+                info, sformat, iss=self.service_context.get('issuer'), **kwargs)
         except Exception as err:
             resp = None
             if sformat == 'json':
@@ -420,7 +424,8 @@ class Service(StateInterface):
                 # then two can be.
                 try:
                     resp = self.response_cls().deserialize(
-                        info, 'jwt', iss=self.service_context.issuer, **kwargs)
+                        info, 'jwt', iss=self.service_context.get('issuer'),
+                        **kwargs)
                 except Exception:
                     pass
 
@@ -533,16 +538,13 @@ def gather_constructors(service_methods, construct):
                 construct.append(util.importer(func))
 
 
-def init_services(service_definitions, service_context, state_db,
-                  client_authn_factory=None):
+def init_services(service_definitions, service_context, client_authn_factory=None):
     """
     Initiates a set of services
 
     :param service_definitions: A dictionary containing service definitions
     :param service_context: A reference to the service context, this is the same
         for all service instances.
-    :param state_db: A reference to the state database. Shared by all the
-        services.
     :param client_authn_factory: A list of methods the services can use to
         authenticate the client to a service.
     :return: A dictionary, with service name as key and the service instance as
@@ -555,9 +557,10 @@ def init_services(service_definitions, service_context, state_db,
         except KeyError:
             kwargs = {}
 
-        kwargs.update({'service_context': service_context,
-                       'state_db': state_db,
-                       'client_authn_factory': client_authn_factory})
+        kwargs.update({
+                          'service_context': service_context,
+                          'client_authn_factory': client_authn_factory
+                      })
 
         if isinstance(service_configuration['class'], str):
             _srv = util.importer(service_configuration['class'])(**kwargs)

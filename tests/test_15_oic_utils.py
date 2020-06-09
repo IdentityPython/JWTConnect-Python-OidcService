@@ -13,7 +13,7 @@ KEYSPEC = [
 
 RECEIVER = 'https://example.org/op'
 
-keyjar = build_keyjar(KEYSPEC, owner=RECEIVER)
+KEYJAR = build_keyjar(KEYSPEC, issuer_id=RECEIVER)
 
 
 def test_request_object_encryption():
@@ -26,12 +26,13 @@ def test_request_object_encryption():
         'client_id': 'client_1',
         'client_secret': 'abcdefghijklmnop',
         }
-    service_context = ServiceContext(keyjar=keyjar, config=conf)
-    service_context.behaviour["request_object_encryption_alg"] = 'RSA1_5'
-    service_context.behaviour["request_object_encryption_enc"] = "A128CBC-HS256"
+    service_context = ServiceContext(keyjar=KEYJAR, config=conf)
+    _behav = service_context.get('behaviour')
+    _behav["request_object_encryption_alg"] = 'RSA1_5'
+    _behav["request_object_encryption_enc"] = "A128CBC-HS256"
+    service_context.set('behaviour', _behav)
 
-    _jwe = request_object_encryption(msg.to_json(), service_context,
-                                     target=RECEIVER)
+    _jwe = request_object_encryption(msg.to_json(), service_context, target=RECEIVER)
     assert _jwe
 
     _decryptor = factory(_jwe)

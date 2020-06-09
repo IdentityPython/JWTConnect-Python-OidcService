@@ -58,14 +58,13 @@ def add_redirect_uris(request_args, service=None, **kwargs):
     if "redirect_uris" not in request_args:
         # Callbacks is a dictionary with callback type 'code', 'implicit',
         # 'form_post' as keys.
-        try:
-            _cbs = _context.callbacks
-        except AttributeError:
-            request_args['redirect_uris'] = _context.redirect_uris
-        else:
+        _cbs = _context.get('callback')
+        if _cbs:
             # Filter out local additions.
             _uris = [v for k, v in _cbs.items() if not k.startswith('__')]
             request_args['redirect_uris'] = _uris
+        else:
+            request_args['redirect_uris'] = _context.get('redirect_uris')
 
     return request_args, {}
 
@@ -75,15 +74,14 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
     response_cls = oidc.ProviderConfigurationResponse
     error_msg = ResponseMessage
 
-    def __init__(self, service_context, state_db, client_authn_factory=None,
-                 conf=None):
+    def __init__(self, service_context, client_authn_factory=None, conf=None):
         provider_info_discovery.ProviderInfoDiscovery.__init__(
-            self, service_context, state_db,
-            client_authn_factory=client_authn_factory, conf=conf)
+            self, service_context, client_authn_factory=client_authn_factory,
+            conf=conf)
 
     def update_service_context(self, resp, **kwargs):
         self._update_service_context(resp)
-        self.match_preferences(resp, self.service_context.issuer)
+        self.match_preferences(resp, self.service_context.get('issuer'))
         if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
             _jwks = self.service_context.keyjar.export_jwks_as_json(
                 issuer=resp['issuer'])
@@ -105,9 +103,11 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
         """
 
         if not pcr:
-            pcr = self.service_context.provider_info
+            pcr = self.service_context.get('provider_info')
 
         regreq = oidc.RegistrationRequest
+
+        _behaviour = self.service_context.get('behaviour')
 
         for _pref, _prov in PREFERENCE2PROVIDER.items():
             try:
@@ -130,36 +130,34 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
 
             if isinstance(vals, str):
                 if vals in _pvals:
-                    self.service_context.behaviour[_pref] = vals
+                    _behaviour[_pref] = vals
             else:
                 try:
                     vtyp = regreq.c_param[_pref]
                 except KeyError:
                     # Allow non standard claims
                     if isinstance(vals, list):
-                        self.service_context.behaviour[_pref] = [
-                            v for v in vals if v in _pvals]
+                        _behaviour[_pref] = [v for v in vals if v in _pvals]
                     elif vals in _pvals:
-                        self.service_context.behaviour[_pref] = vals
+                        _behaviour[_pref] = vals
                 else:
                     if isinstance(vtyp[0], list):
-                        self.service_context.behaviour[_pref] = []
+                        _behaviour[_pref] = []
                         for val in vals:
                             if val in _pvals:
-                                self.service_context.behaviour[_pref].append(
+                                _behaviour[_pref].append(
                                     val)
                     else:
                         for val in vals:
                             if val in _pvals:
-                                self.service_context.behaviour[_pref] = val
+                                _behaviour[_pref] = val
                                 break
 
-            if _pref not in self.service_context.behaviour:
-                raise ConfigurationError(
-                    "OP couldn't match preference:%s" % _pref, pcr)
+            if _pref not in _behaviour:
+                raise ConfigurationError("OP couldn't match preference:%s" % _pref, pcr)
 
         for key, val in self.service_context.client_preferences.items():
-            if key in self.service_context.behaviour:
+            if key in _behaviour:
                 continue
 
             try:
@@ -171,8 +169,7 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
             except KeyError:
                 pass
             if key not in PREFERENCE2PROVIDER:
-                self.service_context.behaviour[key] = val
+                _behaviour[key] = val
 
-        logger.debug(
-            'service_context behaviour: {}'.format(
-                self.service_context.behaviour))
+        self.service_context.set('behaviour', _behaviour)
+        logger.debug('service_context behaviour: {}'.format(_behaviour))

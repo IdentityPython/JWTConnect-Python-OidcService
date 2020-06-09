@@ -48,15 +48,14 @@ def _eq(l1, l2):
 
 def get_service_context():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
-    service_context.client_secret = "white boarding pass"
+    # service_context.set('client_secret', "white boarding pass")
     return service_context
 
 
 def get_service():
     service_context = ServiceContext(keyjar=None, config=CLIENT_CONF)
-    service_context.client_secret = "white boarding pass"
+    # service_context.set('client_secret', "white boarding pass")
     service = service_factory('AccessToken', ['oidc'],
-                              state_db=InMemoryStateDataBase(),
                               service_context=service_context)
     return service
 
@@ -216,7 +215,8 @@ class TestBearerBody(object):
 
     def test_construct_with_request(self, services):
         authz_service = services['authorization']
-        authz_service.state_db.set('EEEE', State(iss='Issuer').to_json())
+        authz_service.service_context.state_db.set('EEEE', State(
+            iss='Issuer').to_json())
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
         response = authz_service.parse_response(resp1.to_urlencoded(),
                                                 "urlencoded")
@@ -267,9 +267,9 @@ class TestPrivateKeyJWT(object):
             key.add_kid()
 
         _service.service_context.keyjar.add_kb('', kb_rsa)
-        _service.service_context.provider_info = {
+        _service.service_context.set('provider_info', {
             'issuer': 'https://example.com/',
-            'token_endpoint': "https://example.com/token"}
+            'token_endpoint': "https://example.com/token"})
         services['accesstoken'].endpoint = "https://example.com/token"
 
         request = AccessTokenRequest()
@@ -280,12 +280,12 @@ class TestPrivateKeyJWT(object):
         cas = request["client_assertion"]
 
         _kj = KeyJar()
-        _kj.add_kb(_service.service_context.client_id, kb_rsa)
+        _kj.add_kb(_service.service_context.get('client_id'), kb_rsa)
         jso = JWT(key_jar=_kj).unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
         # assert _jwt.headers == {'alg': 'RS256'}
         assert jso['aud'] == [
-            _service.service_context.provider_info['token_endpoint']]
+            _service.service_context.get('provider_info')['token_endpoint']]
 
     def test_construct_client_assertion(self, services):
         _service = services['accesstoken']
@@ -296,7 +296,7 @@ class TestPrivateKeyJWT(object):
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
         _ca = assertion_jwt(
-            _service.service_context.client_id, kb_rsa.get('RSA'),
+            _service.service_context.get('client_id'), kb_rsa.get('RSA'),
             "https://example.com/token", 'RS256')
         http_args = pkj.construct(request, client_assertion=_ca)
         assert http_args == {}
@@ -308,9 +308,9 @@ class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, services):
         _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
-        _service_context.provider_info = {
+        _service_context.set('provider_info', {
             'issuer': 'https://example.com/',
-            'token_endpoint': "https://example.com/token"}
+            'token_endpoint': "https://example.com/token"})
 
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
@@ -322,27 +322,28 @@ class TestClientSecretJWT_TE(object):
         cas = request["client_assertion"]
 
         _kj = KeyJar()
-        _kj.add_symmetric(_service_context.client_id,
-                          _service_context.client_secret,
+        _kj.add_symmetric(_service_context.get('client_id'),
+                          _service_context.get('client_secret'),
                           ['sig'])
         jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "exp", "iat", 'jti'])
 
         _rj = JWS(alg='HS256')
         info = _rj.verify_compact(
-            cas, _kj.get_signing_key(owner=_service_context.client_id))
+            cas, _kj.get_signing_key(issuer_id=_service_context.get('client_id')))
 
         assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [_service_context.provider_info['token_endpoint']]
+        assert info['aud'] == [_service_context.get('provider_info')[
+                                   'token_endpoint']]
 
 
 class TestClientSecretJWT_UI(object):
     def test_client_secret_jwt(self, services):
         _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
-        _service_context.provider_info = {'issuer': 'https://example.com/',
-                                         'token_endpoint':
-                                             "https://example.com/token"}
+        _service_context.set('provider_info',
+                             {'issuer': 'https://example.com/',
+                              'token_endpoint': "https://example.com/token"})
 
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
@@ -354,8 +355,8 @@ class TestClientSecretJWT_UI(object):
         cas = request["client_assertion"]
 
         _kj = KeyJar()
-        _kj.add_symmetric(_service_context.client_id,
-                          _service_context.client_secret,
+        _kj.add_symmetric(_service_context.get('client_id'),
+                          _service_context.get('client_secret'),
                           usage=['sig'])
         jso = JWT(key_jar=_kj, sign_alg='HS256').unpack(cas)
         assert _eq(jso.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
@@ -363,10 +364,10 @@ class TestClientSecretJWT_UI(object):
         _rj = JWS(alg='HS256')
         info = _rj.verify_compact(
             cas,
-            _kj.get_signing_key(owner=_service_context.client_id))
+            _kj.get_signing_key(issuer_id=_service_context.get('client_id')))
 
         assert _eq(info.keys(), ["aud", "iss", "sub", "jti", "exp", "iat"])
-        assert info['aud'] == [_service_context.provider_info['issuer']]
+        assert info['aud'] == [_service_context.get('provider_info')['issuer']]
 
 
 class TestValidClientInfo(object):
@@ -376,15 +377,15 @@ class TestValidClientInfo(object):
         # Expiration time missing or 0, client_secret never expires
         # service_context.client_secret_expires_at
         assert valid_service_context(_service_context, _now)
-        _service_context.client_secret_expires_at = 0
+        _service_context.set('client_secret_expires_at', 0)
         assert valid_service_context(_service_context, _now)
         # Expired secret
-        _service_context.client_secret_expires_at = 1
+        _service_context.set('client_secret_expires_at', 1)
         assert valid_service_context(_service_context, _now) is not True
 
-        _service_context.client_secret_expires_at = 123455
+        _service_context.set('client_secret_expires_at', 123455)
         assert valid_service_context(_service_context, _now) is not True
 
         # Valid secret
-        _service_context.client_secret_expires_at = 123460
+        _service_context.set('client_secret_expires_at', 123460)
         assert valid_service_context({'client_secret_expires_at': 123460}, _now)
