@@ -70,7 +70,10 @@ def add_code_verifier(request_args, service, **kwargs):
     :param request_args: Set of request arguments
     :return: updated set of request arguments
     """
-    _item = service.get_item(Message, 'pkce', kwargs['state'])
+    _state = request_args.get('state')
+    if _state is None:
+        _state = kwargs.get('state')
+    _item = service.get_item(Message, 'pkce', _state)
     request_args.update({'code_verifier': _item['code_verifier']})
     return request_args
 
