@@ -137,8 +137,10 @@ class Service(StateInterface):
         _args = self.method_args('pre_construct', **kwargs)
         post_args = {}
         for meth in self.pre_construct:
-            request_args, _post_args = meth(request_args, service=self, **_args)
-            post_args.update(_post_args)
+            request_args, _post_args = meth(request_args, service=self, post_args=post_args,
+                                            **_args)
+            # Not necessarily independent
+            # post_args.update(_post_args)
 
         return request_args, post_args
 
