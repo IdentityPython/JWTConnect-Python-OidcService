@@ -63,7 +63,7 @@ class Authorization(authorization.Authorization):
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp.to_json(), 'auth_response', key)
 
-    def oidc_pre_construct(self, request_args=None, **kwargs):
+    def oidc_pre_construct(self, request_args=None, post_args=None, **kwargs):
         if request_args is None:
             request_args = {}
 
@@ -85,7 +85,9 @@ class Authorization(authorization.Authorization):
             if "nonce" not in request_args:
                 request_args["nonce"] = rndstr(32)
 
-        post_args = {}
+        if post_args is None:
+            post_args = {}
+
         for attr in ["request_object_signing_alg", "algorithm", 'sig_kid']:
             try:
                 post_args[attr] = kwargs[attr]

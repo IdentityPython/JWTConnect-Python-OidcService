@@ -34,7 +34,7 @@ class AccessToken(Service):
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
         self.store_item(resp, 'token_response', key)
 
-    def oauth_pre_construct(self, request_args=None, **kwargs):
+    def oauth_pre_construct(self, request_args=None, post_args=None, **kwargs):
         """
 
         :param request_args: Initial set of request arguments
@@ -59,4 +59,4 @@ class AccessToken(Service):
             _args.update(request_args)
             request_args = _args
 
-        return request_args, {}
+        return request_args, post_args
