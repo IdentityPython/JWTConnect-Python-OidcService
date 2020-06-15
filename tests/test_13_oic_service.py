@@ -149,9 +149,8 @@ class TestAuthorization(object):
         assert set(_info.keys()) == {'url', 'method'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
-        assert set(msg.to_dict()) == {'client_id', 'redirect_uri',
-                                      'response_type', 'request',
-                                      'state', 'scope', 'nonce'}
+        assert set(msg.to_dict()) == {'client_id', 'redirect_uri', 'request',
+                                      'response_type', 'state', 'scope', 'nonce'}
         _jws = jws.factory(msg['request'])
         assert _jws
         _resp = _jws.verify_compact(
