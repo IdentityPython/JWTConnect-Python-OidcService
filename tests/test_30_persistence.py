@@ -127,10 +127,8 @@ def build_service_context() -> object:
             "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL),
             'jwks': RP_JWKS,
             'db_conf': {
-                'abstract_storage_cls':
-                    'oidcmsg.storage.extension.LabeledAbstractStorage',
                 'keyjar': {
-                    'handler': 'oidcmsg.storage.abfile.AbstractFileSystem',
+                    'handler': 'oidcmsg.storage.abfile.LabeledAbstractFileSystem',
                     'fdir': 'db/{issuer}/keyjar',
                     'key_conv': 'oidcmsg.storage.converter.QPKey',
                     'value_conv': 'cryptojwt.serialize.item.KeyIssuer',

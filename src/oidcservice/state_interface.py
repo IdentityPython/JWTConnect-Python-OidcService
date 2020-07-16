@@ -53,6 +53,24 @@ class InMemoryStateDataBase:
         except KeyError:
             pass
 
+    def __setitem__(self, key, value):
+        """Assign a value to a key."""
+        self._db[key] = value
+
+    def __getitem__(self, key):
+        """Return the value bound to a key."""
+        try:
+            return self._db[key]
+        except KeyError:
+            return None
+
+    def __delitem__(self, key):
+        """Delete a key and its value."""
+        try:
+            del self._db[key]
+        except KeyError:
+            pass
+
 
 class StateInterface:
     """A more powerful interface to a state DB."""
@@ -92,7 +110,7 @@ class StateInterface:
         except AttributeError:
             _state[item_type] = item
 
-        self.state_db.set(key, _state.to_json())
+        self.state_db[key] = _state.to_json()
 
     def get_iss(self, key):
         """
@@ -216,7 +234,7 @@ class StateInterface:
         :param state: The state value
         :param xtyp: The type of value x is (e.g. nonce, ...)
         """
-        self.state_db.set(KEY_PATTERN[xtyp].format(value), state)
+        self.state_db[KEY_PATTERN[xtyp].format(value)] = state
         try:
             _val = self.state_db.get("ref{}ref".format(state))
         except KeyError:
@@ -227,7 +245,7 @@ class StateInterface:
         else:
             refs = json.loads(_val)
             refs[xtyp] = value
-        self.state_db.set("ref{}ref".format(state), json.dumps(refs))
+        self.state_db["ref{}ref".format(state)] = json.dumps(refs)
 
     def get_state_by_x(self, value, xtyp):
         """
@@ -346,7 +364,7 @@ class StateInterface:
                     'Invalid format. Leading and trailing "__" not allowed')
 
         _state = State(iss=iss)
-        self.state_db.set(key, _state.to_json())
+        self.state_db[key] = _state.to_json()
         return key
 
     def remove_state(self, state):

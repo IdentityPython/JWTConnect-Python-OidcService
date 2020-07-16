@@ -75,7 +75,7 @@ class TestPKCE256:
     def test_add_code_challenge_default_values(self):
         auth_serv = self.service["authorization"]
         _state = State(iss='Issuer')
-        auth_serv.service_context.state_db.set('state', _state.to_json())
+        auth_serv.service_context.state_db['state'] = _state.to_json()
         request_args, _ = add_code_challenge({'state': 'state'}, auth_serv)
 
         # default values are length:64 method:S256
@@ -89,7 +89,7 @@ class TestPKCE256:
     def test_authorization_and_pkce(self):
         auth_serv = self.service["authorization"]
         _state = State(iss='Issuer')
-        auth_serv.service_context.state_db.set('state', _state.to_json())
+        auth_serv.service_context.state_db['state'] = _state.to_json()
 
         request = auth_serv.construct_request({"state": 'state', "response_type": "code"})
         assert set(request.keys()) == {'client_id', 'code_challenge',

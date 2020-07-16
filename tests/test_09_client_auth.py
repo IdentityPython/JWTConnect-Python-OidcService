@@ -196,7 +196,7 @@ class TestBearerBody(object):
 
     def test_construct_with_state(self, services):
         _srv = services['authorization']
-        _srv.state_db.set('FFFFF', State(iss='Issuer').to_json())
+        _srv.state_db['FFFFF'] = State(iss='Issuer').to_json()
 
         resp = AuthorizationResponse(code="code", state="FFFFF")
         _srv.store_item(resp, 'auth_response', 'FFFFF')
@@ -215,8 +215,7 @@ class TestBearerBody(object):
 
     def test_construct_with_request(self, services):
         authz_service = services['authorization']
-        authz_service.service_context.state_db.set('EEEE', State(
-            iss='Issuer').to_json())
+        authz_service.service_context.state_db['EEEE'] = State(iss='Issuer').to_json()
         resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
         response = authz_service.parse_response(resp1.to_urlencoded(),
                                                 "urlencoded")
