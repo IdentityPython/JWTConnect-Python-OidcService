@@ -1,5 +1,5 @@
 # oidcservice
-#Implementation of OIDC/OAuth2 services
+#### Implementation of OIDC/OAuth2 services
 
 Oidcservice is the 3rd layer in the
 JWTConnect stack (cryptojwt, oidcmsg, oidcservice, oidcrp)
@@ -16,7 +16,7 @@ Each Service instance has 3 major methods:
   * parse_response
   * update_service_context
 
-###get_request_parameters
+#### get_request_parameters
 
 This method will return a dictionary with the information you need to
 do a HTTP request with your favorite HTTP client library.
