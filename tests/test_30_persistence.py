@@ -56,7 +56,7 @@ JWKS_OP = {
 
 OP_KEYJAR = KeyJar()
 OP_KEYJAR.import_jwks(JWKS_OP, '')
-OP_BASEURL = "https://example.org/op"
+OP_BASEURL = "https://example.org"
 
 RP_JWKS = {
     "keys": [{
@@ -111,7 +111,7 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 def build_service_context() -> object:
     _service_context = ServiceContext(
         config={
-            "issuer": 'https://op.example.com',
+            "issuer": OP_BASEURL,
             "client_preferences":
                 {
                     "application_type": "web",
@@ -175,19 +175,19 @@ def test_conversation():
     service_2 = service_context_2.service
 
     # ======================== WebFinger ========================
-
     info = service['webfinger'].get_request_parameters(
         request_args={'resource': 'foobar@example.org'})
 
-    assert info['url'] == 'https://example.org/.well-known/webfinger?rel=http' \
-                          '%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer' \
-                          '&resource=acct%3Afoobar%40example.org'
+    _url = ('{}/.well-known/webfinger?rel=http'
+            '%3A%2F%2Fopenid.net%2Fspecs%2Fconnect%2F1.0%2Fissuer'
+            '&resource=acct%3Afoobar%40example.org').format(OP_BASEURL)
+    assert info['url'] == _url
 
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
         "links": [{
             "rel": "http://openid.net/specs/connect/1.0/issuer",
-            "href": "https://example.org/op"
+            "href": OP_BASEURL # "https://example.org/op"
         }],
         "expires": "2018-02-04T11:08:41Z"
     })
@@ -200,7 +200,7 @@ def test_conversation():
 
     info = service_context_2.service['provider_info'].get_request_parameters()
 
-    assert info['url'] == 'https://example.org/op/.well-known/openid-configuration'
+    assert info['url'] == '{}/.well-known/openid-configuration'.format(OP_BASEURL)
 
     provider_info_response = json.dumps({
         "version": "3.0",
@@ -300,13 +300,13 @@ def test_conversation():
 
     info = service['registration'].get_request_parameters()
 
-    assert info['url'] == 'https://example.org/op/registration'
+    assert info['url'] == '{}/registration'.format(OP_BASEURL)
     _body = json.loads(info['body'])
     assert _body == {
         "application_type": "web",
         "response_types": ["code"],
         "contacts": ["ops@example.org"],
-        "jwks_uri": "https://example.com/rp/static/jwks.json",
+        "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL),
         "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
         'token_endpoint_auth_method': 'client_secret_basic',
         "grant_types": ["authorization_code"]
@@ -372,11 +372,11 @@ def test_conversation():
     info = service['accesstoken'].get_request_parameters(
         request_args=request_args)
 
-    assert info['url'] == 'https://example.org/op/token'
+    assert info['url'] == '{}/token'.format(OP_BASEURL)
     _qp = parse_qs(info['body'])
     assert _qp == {
         'grant_type': ['authorization_code'],
-        'redirect_uri': ['https://example.com/rp/authz_cb'],
+        'redirect_uri': ['{}/authz_cb'.format(RP_BASEURL)],
         'client_id': ['zls2qhN1jO6A'],
         'state': ['Oh3w3gKlvoM2ehFqlxI3HIK5'],
         'code': ['Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01']
@@ -430,7 +430,7 @@ def test_conversation():
 
     info = service_2['userinfo'].get_request_parameters(state=STATE)
 
-    assert info['url'] == 'https://example.org/op/userinfo'
+    assert info['url'] == '{}/userinfo'.format(OP_BASEURL)
     assert info['headers'] == {'Authorization': 'Bearer Z0FBQUFBQmFkdFF'}
 
     op_resp = {"sub": "1b2fc9341a16ae4e30082965d537"}
@@ -440,6 +440,5 @@ def test_conversation():
 
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
-
     _item = service['authorization'].get_item(OpenIDSchema, 'user_info', STATE)
     assert _item.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
