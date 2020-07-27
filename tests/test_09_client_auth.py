@@ -3,35 +3,25 @@ import os
 from urllib.parse import quote_plus
 
 import pytest
-
-from cryptojwt.key_bundle import KeyBundle
-from cryptojwt.key_jar import KeyJar
 from cryptojwt.jws.jws import JWS
 from cryptojwt.jwt import JWT
+from cryptojwt.key_bundle import KeyBundle
+from cryptojwt.key_jar import KeyJar
 from oidcmsg.message import Message
+from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
+                            AuthorizationRequest, AuthorizationResponse,
+                            CCAccessTokenRequest, ResourceRequest)
 
 from oidcservice import JWT_BEARER
-from oidcservice.client_auth import assertion_jwt
-from oidcservice.client_auth import BearerBody
-from oidcservice.client_auth import BearerHeader
-from oidcservice.client_auth import ClientSecretBasic
-from oidcservice.client_auth import ClientSecretJWT
-from oidcservice.client_auth import ClientSecretPost
-from oidcservice.client_auth import PrivateKeyJWT
-from oidcservice.client_auth import valid_service_context
+from oidcservice.client_auth import (BearerBody, BearerHeader,
+                                     ClientSecretBasic, ClientSecretJWT,
+                                     ClientSecretPost, PrivateKeyJWT,
+                                     assertion_jwt, valid_service_context)
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.service_factory import service_factory
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
-
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import AccessTokenResponse
-from oidcmsg.oauth2 import AuthorizationRequest
-from oidcmsg.oauth2 import AuthorizationResponse
-from oidcmsg.oauth2 import CCAccessTokenRequest
-from oidcmsg.oauth2 import ResourceRequest
+from oidcservice.service_factory import service_factory
+from oidcservice.state_interface import InMemoryStateDataBase, State
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 CLIENT_ID = "A"

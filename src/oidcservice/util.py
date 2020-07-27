@@ -1,9 +1,7 @@
 """Utilities"""
 import importlib
 import logging
-from urllib.parse import parse_qs
-from urllib.parse import urlsplit
-from urllib.parse import urlunsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 import yaml
 from oidcmsg.exception import UnSupported

@@ -3,8 +3,7 @@ import logging
 from cryptojwt.utils import b64e
 from oidcmsg.message import Message
 
-from oidcservice import CC_METHOD
-from oidcservice import unreserved
+from oidcservice import CC_METHOD, unreserved
 from oidcservice.exception import Unsupported
 from oidcservice.oauth2.utils import get_state_parameter
 

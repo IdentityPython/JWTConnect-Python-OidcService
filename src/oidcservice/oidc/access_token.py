@@ -4,8 +4,8 @@ from oidcmsg import oidc
 from oidcmsg.oidc import verified_claim_name
 from oidcmsg.time_util import time_sans_frac
 
-from oidcservice.oauth2 import access_token
 from oidcservice.exception import ParameterError
+from oidcservice.oauth2 import access_token
 from oidcservice.oidc import IDT2REG
 
 __author__ = 'Roland Hedberg'

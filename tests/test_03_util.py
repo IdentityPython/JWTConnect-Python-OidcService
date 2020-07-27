@@ -1,13 +1,10 @@
 import json
-from urllib.parse import parse_qs
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AccessTokenRequest, AuthorizationRequest
 
 from oidcservice import util
-from oidcservice.util import JSON_ENCODED
-from oidcservice.util import URL_ENCODED
+from oidcservice.util import JSON_ENCODED, URL_ENCODED
 
 __author__ = 'Roland Hedberg'
 

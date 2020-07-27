@@ -8,7 +8,6 @@ from oidcmsg.time_util import time_sans_frac
 from oidcservice.oauth2.utils import get_state_parameter
 from oidcservice.service import Service
 
-
 LOGGER = logging.getLogger(__name__)
 
 

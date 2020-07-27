@@ -6,15 +6,11 @@ from urllib.parse import quote_plus
 from cryptojwt.exception import MissingKey
 from cryptojwt.jws.utils import alg2keytype
 from oidcmsg.message import VREQUIRED
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
+from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING, AccessTokenRequest
 from oidcmsg.oidc import AuthnToken
 from oidcmsg.time_util import utc_time_sans_frac
 
-from oidcservice import DEF_SIGN_ALG
-from oidcservice import JWT_BEARER
-from oidcservice import rndstr
-from oidcservice import sanitize
+from oidcservice import DEF_SIGN_ALG, JWT_BEARER, rndstr, sanitize
 
 LOGGER = logging.getLogger(__name__)
 

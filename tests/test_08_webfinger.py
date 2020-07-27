@@ -1,12 +1,9 @@
 import json
-from urllib.parse import parse_qs
-from urllib.parse import unquote_plus
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, unquote_plus, urlsplit
 
 import pytest
 from oidcmsg.exception import MissingRequiredAttribute
-from oidcmsg.oidc import JRD
-from oidcmsg.oidc import Link
+from oidcmsg.oidc import JRD, Link
 
 from oidcservice.oidc import OIC_ISSUER
 from oidcservice.oidc.webfinger import WebFinger

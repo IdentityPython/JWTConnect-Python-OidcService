@@ -6,17 +6,15 @@ import copy
 import hashlib
 import os
 
-from cryptojwt.jwk.rsa import RSAKey
-from cryptojwt.jwk.rsa import import_private_rsa_key_from_file
+from cryptojwt.jwk.rsa import RSAKey, import_private_rsa_key_from_file
 from cryptojwt.key_bundle import KeyBundle
 from cryptojwt.key_jar import build_keyjar
 from cryptojwt.utils import as_bytes
+from oidcmsg.context import OidcContext
 # This represents a map between the local storage of algorithm choices
 # and how they are represented in a provider info response.
 from oidcmsg.message import Message
 from oidcmsg.oidc import RegistrationRequest
-from oidcmsg.context import OidcContext
-
 
 CLI_REG_MAP = {
     "userinfo": {

@@ -6,7 +6,6 @@ from oidcmsg.oauth2 import ResponseMessage
 
 from oidcservice.service import Service
 
-
 LOGGER = logging.getLogger(__name__)
 
 

@@ -1,14 +1,10 @@
 import pytest
+from oidcmsg.oauth2 import (SINGLE_OPTIONAL_INT, SINGLE_OPTIONAL_STRING,
+                            SINGLE_REQUIRED_STRING, Message)
 
-from oidcservice.service_context import ServiceContext
 from oidcservice.service import Service
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
-
-from oidcmsg.oauth2 import Message
-from oidcmsg.oauth2 import SINGLE_OPTIONAL_INT
-from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
-from oidcmsg.oauth2 import SINGLE_REQUIRED_STRING
+from oidcservice.service_context import ServiceContext
+from oidcservice.state_interface import InMemoryStateDataBase, State
 
 
 class DummyMessage(Message):

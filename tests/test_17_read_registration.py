@@ -2,11 +2,11 @@ import json
 import time
 
 import pytest
-import requests
 import responses
 from cryptojwt.utils import as_bytes
 from oidcmsg.oidc import RegistrationResponse
 
+import requests
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
 

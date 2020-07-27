@@ -2,15 +2,13 @@
 import json
 import shutil
 import time
-from urllib.parse import parse_qs
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import responses
 from cryptojwt.jwt import JWT
 from cryptojwt.key_jar import KeyJar
-from oidcmsg.oidc import AccessTokenResponse
-from oidcmsg.oidc import AuthorizationResponse
-from oidcmsg.oidc import OpenIDSchema
+from oidcmsg.oidc import (AccessTokenResponse, AuthorizationResponse,
+                          OpenIDSchema)
 
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.webfinger import WebFinger

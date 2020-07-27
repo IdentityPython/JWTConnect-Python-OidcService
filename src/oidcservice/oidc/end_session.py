@@ -1,7 +1,6 @@
 import logging
 
-from oidcmsg.oauth2 import Message
-from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oauth2 import Message, ResponseMessage
 from oidcmsg.oidc import session
 
 from oidcservice import rndstr

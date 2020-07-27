@@ -3,8 +3,8 @@ import logging
 from oidcmsg import oidc
 from oidcmsg.oauth2 import ResponseMessage
 
-from oidcservice.oauth2 import provider_info_discovery
 from oidcservice.exception import ConfigurationError
+from oidcservice.oauth2 import provider_info_discovery
 
 __author__ = 'Roland Hedberg'
 

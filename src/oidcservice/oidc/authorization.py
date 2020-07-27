@@ -1,17 +1,16 @@
 import logging
 
 from oidcmsg import oidc
-from oidcmsg.oidc import make_openid_request
-from oidcmsg.oidc import verified_claim_name
+from oidcmsg.oidc import make_openid_request, verified_claim_name
 from oidcmsg.time_util import time_sans_frac
 
 from oidcservice import rndstr
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import authorization
-from oidcservice.oidc import IDT2REG
 from oidcservice.oauth2.utils import pick_redirect_uris
-from oidcservice.oidc.utils import construct_request_uri
-from oidcservice.oidc.utils import request_object_encryption
+from oidcservice.oidc import IDT2REG
+from oidcservice.oidc.utils import (construct_request_uri,
+                                    request_object_encryption)
 
 __author__ = 'Roland Hedberg'
 

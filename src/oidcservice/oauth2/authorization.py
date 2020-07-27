@@ -6,11 +6,9 @@ from oidcmsg.exception import MissingParameter
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.time_util import time_sans_frac
 
-from oidcservice.oauth2.utils import get_state_parameter
-from oidcservice.oauth2.utils import pick_redirect_uris
-from oidcservice.oauth2.utils import set_state_parameter
+from oidcservice.oauth2.utils import (get_state_parameter, pick_redirect_uris,
+                                      set_state_parameter)
 from oidcservice.service import Service
-
 
 LOGGER = logging.getLogger(__name__)
 
