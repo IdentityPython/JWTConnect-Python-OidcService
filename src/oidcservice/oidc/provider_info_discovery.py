@@ -103,6 +103,7 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
         """
 
         if not pcr:
+            # OP capabilities here
             pcr = self.service_context.get('provider_info')
 
         regreq = oidc.RegistrationRequest
@@ -137,7 +138,10 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
                 except KeyError:
                     # Allow non standard claims
                     if isinstance(vals, list):
-                        _behaviour[_pref] = [v for v in vals if v in _pvals]
+                        # "if v in _pvals" would be adopted
+                        # a RP relying on oidcService will discard those
+                        # who not are available in op's provider discovery endpoint
+                        _behaviour[_pref] = [v for v in vals] # if v in _pvals]
                     elif vals in _pvals:
                         _behaviour[_pref] = vals
                 else:
