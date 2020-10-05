@@ -4,6 +4,7 @@ from oidcmsg import oidc
 from oidcmsg.oidc import make_openid_request
 from oidcmsg.oidc import verified_claim_name
 from oidcmsg.time_util import time_sans_frac
+from oidcmsg.time_util import utc_time_sans_frac
 
 from oidcservice import rndstr
 from oidcservice.exception import ParameterError
@@ -140,7 +141,8 @@ class Authorization(authorization.Authorization):
         fid.close()
         return _webname
 
-    def construct_request_parameter(self, req, request_method, **kwargs):
+    def construct_request_parameter(self, req, request_method, audience=None, expires_in=0,
+                                    **kwargs):
         """Construct a request parameter"""
         alg = self.get_request_object_signing_alg(**kwargs)
         kwargs["request_object_signing_alg"] = alg
@@ -151,10 +153,8 @@ class Authorization(authorization.Authorization):
         _srv_cntx = self.service_context
         kwargs['issuer'] = _srv_cntx.get('client_id')
         # set the audience
-        audience = kwargs.get("audience")
         if audience:
             kwargs["recv"] = _srv_cntx.get('provider_info')[audience]
-            del kwargs['audience']
         else:
             try:
                 kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
@@ -162,6 +162,9 @@ class Authorization(authorization.Authorization):
                 kwargs['recv'] = _srv_cntx.get('issuer')
 
         del kwargs['service']
+
+        if expires_in:
+            req['exp'] = utc_time_sans_frac() + int(expires_in)
 
         _req = make_openid_request(req, **kwargs)
 
