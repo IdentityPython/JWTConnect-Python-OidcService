@@ -8,8 +8,8 @@ from oidcmsg.time_util import time_sans_frac
 from oidcservice import rndstr
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import authorization
-from oidcservice.oidc import IDT2REG
 from oidcservice.oauth2.utils import pick_redirect_uris
+from oidcservice.oidc import IDT2REG
 from oidcservice.oidc.utils import construct_request_uri
 from oidcservice.oidc.utils import request_object_encryption
 
@@ -150,10 +150,17 @@ class Authorization(authorization.Authorization):
 
         _srv_cntx = self.service_context
         kwargs['issuer'] = _srv_cntx.get('client_id')
-        try:
-            kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
-        except KeyError:
-            kwargs['recv'] = _srv_cntx.get('issuer')
+        # set the audience
+        audience = kwargs.get("audience")
+        if audience:
+            kwargs["recv"] = _srv_cntx.get('provider_info')[audience]
+            del kwargs['audience']
+        else:
+            try:
+                kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
+            except KeyError:
+                kwargs['recv'] = _srv_cntx.get('issuer')
+
         del kwargs['service']
 
         _req = make_openid_request(req, **kwargs)
