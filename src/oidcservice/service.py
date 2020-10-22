@@ -389,11 +389,14 @@ class Service(StateInterface):
         """
 
         kwargs = {
-            'client_id': self.service_context.get('client_id'),
             'iss': self.service_context.get('issuer'),
             'keyjar': self.service_context.keyjar,
             'verify': True
         }
+
+        _client_id = self.service_context.get('client_id')
+        if _client_id:
+            kwargs['client_id'] = _client_id
 
         if self.service_name == "provider_info":
             if self.service_context.get('issuer').startswith("http://"):
