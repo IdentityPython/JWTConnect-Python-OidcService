@@ -446,11 +446,8 @@ class JWSAuthnMethod(ClientAuthnMethod):
         # audience for the signed JWT depends on which endpoint
         # we're talking to.
         if 'authn_endpoint' in kwargs and kwargs['authn_endpoint'] in ['token_endpoint']:
-            try:
-                algorithm = context.behaviour[
-                    'token_endpoint_auth_signing_alg']
-            except (KeyError, AttributeError):
-                pass
+            reg_resp = context.get("registration_response")
+            algorithm = reg_resp.get("token_endpoint_auth_signing_alg")
             audience = context.get('provider_info')['token_endpoint']
         else:
             audience = context.get('provider_info')['issuer']

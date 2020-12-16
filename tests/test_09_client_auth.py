@@ -259,12 +259,13 @@ class TestPrivateKeyJWT(object):
         _service.service_context.set('provider_info', {
             'issuer': 'https://example.com/',
             'token_endpoint': "https://example.com/token"})
+        _service.service_context.set("registration_response", {
+            'token_endpoint_auth_signing_alg': 'RS256'})
         services['accesstoken'].endpoint = "https://example.com/token"
 
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
-        http_args = pkj.construct(request, service=_service, algorithm="RS256",
-                                  authn_endpoint='token_endpoint')
+        http_args = pkj.construct(request, service=_service, authn_endpoint='token_endpoint')
         assert http_args == {}
         cas = request["client_assertion"]
 
@@ -297,15 +298,18 @@ class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, services):
         _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
+
         _service_context.set('provider_info', {
             'issuer': 'https://example.com/',
             'token_endpoint': "https://example.com/token"})
 
+        _service_context.set("registration_response", {
+            'token_endpoint_auth_signing_alg': "HS256"})
+
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, service=services['accesstoken'],
-                      algorithm="HS256", authn_endpoint='token_endpoint')
+        csj.construct(request, service=services['accesstoken'], authn_endpoint='token_endpoint')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]
