@@ -3,14 +3,12 @@ import string
 
 # Since SystemRandom is not available on all systems
 try:
-    from random import SystemRandom as rnd
+    import SystemRandom as rnd
 except ImportError:
     import random as rnd
 
-
 __author__ = 'Roland Hedberg'
 __version__ = '1.1.1'
-
 
 OIDCONF_PATTERN = "{}/.well-known/openid-configuration"
 CC_METHOD = {
@@ -31,6 +29,8 @@ HTTP_ARGS = ["headers", "redirections", "connection_type"]
 JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 SAML2_BEARER_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:saml2-bearer"
 
+BASECHR = string.ascii_letters + string.digits
+
 
 def rndstr(size=16):
     """
@@ -39,8 +39,7 @@ def rndstr(size=16):
     :param size: The length of the string
     :return: string
     """
-    _basech = string.ascii_letters + string.digits
-    return "".join([rnd.choice(_basech) for _ in range(size)])
+    return "".join([rnd.choice(BASECHR) for _ in range(size)])
 
 
 BASECH = string.ascii_letters + string.digits + '-._~'
