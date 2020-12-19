@@ -114,12 +114,10 @@ class ServiceContext(OidcContext):
         # Dynamic information
         for param in ['client_secret', 'client_id', 'redirect_uris', 'provider_info',
                       'behaviour', 'callback', 'issuer']:
-            if param in config:
-                self.set(param, config[param])
-                if param == 'client_secret':
-                    self.keyjar.add_symmetric('', config[param])
-            else:
-                self.set(param, _def_value[param])
+            _val = config.get(param, _def_value[param])
+            self.set(param, _val)
+            if param == 'client_secret':
+                self.keyjar.add_symmetric('', _val)
 
         try:
             self.clock_skew = config['clock_skew']
