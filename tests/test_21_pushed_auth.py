@@ -40,7 +40,7 @@ class TestPushedAuth:
                         ".add_pushed_authorization_support",
                     "kwargs": {
                         "body_format": "jws",
-                        "signing_algorthm": "RS256",
+                        "signing_algorithm": "RS256",
                         "http_client": None,
                         "merge_rule": "lax"
                     }
