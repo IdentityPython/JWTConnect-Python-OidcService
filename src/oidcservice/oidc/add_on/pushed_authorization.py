@@ -3,6 +3,7 @@ import logging
 from cryptojwt import JWT
 from oidcmsg.message import Message
 from oidcmsg.oauth2 import JWTSecuredAuthorizationRequest
+
 import requests
 
 logger = logging.getLogger(__name__)

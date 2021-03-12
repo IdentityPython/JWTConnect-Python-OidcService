@@ -70,6 +70,7 @@ setup(
     install_requires=[
         "pyyaml>=5.1.0",
         'oidcmsg>=1.1.0',
+        'requests'
     ],
     tests_require=[
         "responses",
