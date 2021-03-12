@@ -67,7 +67,7 @@ def add_pushed_authorization_support(services, body_format="jws", signing_algori
     _service = services["authorization"]
     _service.service_context.add_on['pushed_authorization'] = {
         "body_format": body_format,
-        "signing_algorithm": signing_algorthm,
+        "signing_algorithm": signing_algorithm,
         "http_client": http_client,
         "merge_rule": merge_rule
     }
