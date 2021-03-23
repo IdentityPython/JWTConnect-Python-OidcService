@@ -1,29 +1,23 @@
 import json
 import os
 
+import pytest
 from cryptojwt.exception import UnsupportedAlgorithm
 from cryptojwt.jws import jws
 from cryptojwt.jws.utils import left_hash
 from cryptojwt.jwt import JWT
-from cryptojwt.key_jar import build_keyjar
-from cryptojwt.key_jar import init_key_jar
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import AccessTokenResponse
-from oidcmsg.oauth2 import AuthorizationRequest
-from oidcmsg.oauth2 import AuthorizationResponse
-from oidcmsg.oauth2 import Message
-from oidcmsg.oidc import IdToken
-from oidcmsg.oidc import OpenIDSchema
-from oidcmsg.oidc import RegistrationRequest
-from oidcmsg.oidc import verified_claim_name
-from oidcmsg.oidc.session import CheckIDRequest
-from oidcmsg.oidc.session import CheckSessionRequest
-from oidcmsg.oidc.session import EndSessionRequest
-import pytest
+from cryptojwt.key_jar import build_keyjar, init_key_jar
+from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
+                            AuthorizationRequest, AuthorizationResponse,
+                            Message)
+from oidcmsg.oidc import (IdToken, OpenIDSchema, RegistrationRequest,
+                          verified_claim_name)
+from oidcmsg.oidc.session import (CheckIDRequest, CheckSessionRequest,
+                                  EndSessionRequest)
 
 from oidcservice.exception import ParameterError
-from oidcservice.oidc.registration import add_jwks_uri_or_jwks
-from oidcservice.oidc.registration import response_types_to_grant_types
+from oidcservice.oidc.registration import (add_jwks_uri_or_jwks,
+                                           response_types_to_grant_types)
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
 

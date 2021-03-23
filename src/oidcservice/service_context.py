@@ -6,8 +6,7 @@ import copy
 import hashlib
 import os
 
-from cryptojwt.jwk.rsa import RSAKey
-from cryptojwt.jwk.rsa import import_private_rsa_key_from_file
+from cryptojwt.jwk.rsa import RSAKey, import_private_rsa_key_from_file
 from cryptojwt.key_bundle import KeyBundle
 from cryptojwt.utils import as_bytes
 from oidcmsg.context import OidcContext

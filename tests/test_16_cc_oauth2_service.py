@@ -1,5 +1,5 @@
-from oidcmsg.oauth2 import AccessTokenResponse
 import pytest
+from oidcmsg.oauth2 import AccessTokenResponse
 
 from oidcservice import rndstr
 from oidcservice.service_context import ServiceContext

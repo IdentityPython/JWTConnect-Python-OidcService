@@ -1,9 +1,9 @@
 import os
 from urllib.parse import urlsplit
 
-from cryptojwt.key_jar import build_keyjar
 import pytest
 import responses
+from cryptojwt.key_jar import build_keyjar
 
 from oidcservice.service_context import ServiceContext
 
