@@ -31,37 +31,29 @@ class TestDummyService(object):
     def create_service(self):
         service_context = ServiceContext(client_id='client_id',
                                          issuer='https://www.example.org/as')
-        db = InMemoryStateDataBase()
-        db.set('state', State(iss='Issuer').to_json())
         self.service = DummyService(service_context)
 
     def test_construct(self):
+        _srv = Service(self.service.dump(exclude_attributes=["service"]))
         req_args = {'foo': 'bar'}
-        _req = self.service.construct(request_args=req_args)
+        _req = _srv.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']
 
     def test_construct_service_context(self):
+        _srv = Service(self.service.dump(exclude_attributes=["service"]))
         req_args = {'foo': 'bar', 'req_str': 'some string'}
-        _req = self.service.construct(request_args=req_args)
+        _req = _srv.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert set(_req.keys()) == {'foo', 'req_str'}
 
     def test_get_request_parameters(self):
+        _srv = Service(self.service.dump(exclude_attributes=["service"]))
         req_args = {'foo': 'bar', 'req_str': 'some string'}
-        self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(request_args=req_args)
+        _srv.endpoint = 'https://example.com/authorize'
+        _info = _srv.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method', "request"}
-        msg = DummyMessage().from_urlencoded(
-            self.service.get_urlinfo(_info['url']))
-
-    def test_request_init(self):
-        req_args = {'foo': 'bar', 'req_str': 'some string'}
-        self.service.endpoint = 'https://example.com/authorize'
-        _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method', "request"}
-        msg = DummyMessage().from_urlencoded(
-            self.service.get_urlinfo(_info['url']))
+        msg = DummyMessage().from_urlencoded(_srv.get_urlinfo(_info['url']))
         assert msg.to_dict() == {'foo': 'bar', 'req_str': 'some string'}
 
 
@@ -72,7 +64,9 @@ class TestRequest(object):
         self.service = Service(service_context, client_authn_method=None)
 
     def test_construct(self):
+        _srv = Service(self.service.dump(exclude_attributes=["service"]))
+
         req_args = {'foo': 'bar'}
-        _req = self.service.construct(request_args=req_args)
+        _req = _srv.construct(request_args=req_args)
         assert isinstance(_req, Message)
         assert list(_req.keys()) == ['foo']

@@ -49,7 +49,7 @@ def add_code_challenge(request_args, service, **kwargs):
             'PKCE Transformation method:{}'.format(_method))
 
     _item = Message(code_verifier=code_verifier, code_challenge_method=_method)
-    service.store_item(_item, 'pkce', request_args['state'])
+    service.service_context.state.store_item(_item, 'pkce', request_args['state'])
 
     request_args.update(
         {
@@ -72,7 +72,7 @@ def add_code_verifier(request_args, service, **kwargs):
     _state = request_args.get('state')
     if _state is None:
         _state = kwargs.get('state')
-    _item = service.get_item(Message, 'pkce', _state)
+    _item = service.service_context.state.get_item(Message, 'pkce', _state)
     request_args.update({'code_verifier': _item['code_verifier']})
     return request_args
 

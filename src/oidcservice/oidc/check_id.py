@@ -24,7 +24,7 @@ class CheckID(Service):
         self.pre_construct = [self.oidc_pre_construct]
 
     def oidc_pre_construct(self, request_args=None, **kwargs):
-        request_args = self.multiple_extend_request_args(
+        request_args = self.service_context.state.multiple_extend_request_args(
             request_args, kwargs['state'], ['id_token'],
             ['auth_response', 'token_response', 'refresh_token_response'])
         return request_args, {}

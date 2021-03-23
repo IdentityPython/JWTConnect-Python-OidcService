@@ -1,17 +1,24 @@
 """ The basic Service class upon which all the specific services are built. """
 import logging
+from typing import Optional
+from typing import Union
 from urllib.parse import urlparse
 
 from cryptojwt.jwt import JWT
+from oidcmsg.impexp import ImpExp
 from oidcmsg.message import Message
-from oidcmsg.oauth2 import ResponseMessage, is_error_message
+from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oauth2 import is_error_message
 
 from oidcservice import util
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
-from oidcservice.util import (JOSE_ENCODED, JSON_ENCODED, URL_ENCODED,
-                              get_http_body, get_http_url)
+from oidcservice.util import JOSE_ENCODED
+from oidcservice.util import JSON_ENCODED
+from oidcservice.util import URL_ENCODED
+from oidcservice.util import get_http_body
+from oidcservice.util import get_http_url
 
 __author__ = 'Roland Hedberg'
 
@@ -24,7 +31,7 @@ SPECIAL_ARGS = ['authn_endpoint', 'algs']
 REQUEST_INFO = 'Doing request with: URL:{}, method:{}, data:{}, https_args:{}'
 
 
-class Service(StateInterface):
+class Service(ImpExp):
     """The basic Service class."""
     msg_type = Message
     response_cls = Message
@@ -38,10 +45,20 @@ class Service(StateInterface):
     request_body_type = 'urlencoded'
     response_body_type = 'json'
 
+    parameter = {
+        'msg_type': object,
+        'response_cls': object,
+        'error_msg': object,
+        'default_authn_method': None,
+        'http_method': None,
+        'request_body_type': None,
+        'response_body_type': None,
+        'state': StateInterface
+    }
+
     def __init__(self, service_context, conf=None,
                  client_authn_factory=None, **kwargs):
-        StateInterface.__init__(self, service_context.state_db)
-
+        ImpExp.__init__(self)
         if client_authn_factory is None:
             self.client_authn_factory = ca_factory
         else:
@@ -62,6 +79,7 @@ class Service(StateInterface):
         # pull in all the modifiers
         self.pre_construct = []
         self.post_construct = []
+        self.construct_extra_headers = []
 
     def gather_request_args(self, **kwargs):
         """
@@ -84,23 +102,19 @@ class Service(StateInterface):
             if prop in ar_args:
                 continue
 
-            try:
-                ar_args[prop] = getattr(self.service_context, prop)
-            except AttributeError:
-                val = self.service_context.get(prop)
-                if val:
-                    ar_args[prop] = val
-                else:
-                    try:
-                        ar_args[prop] = self.conf['request_args'][prop]
-                    except KeyError:
-                        try:
-                            ar_args[prop] = self.service_context.register_args[prop]
-                        except KeyError:
-                            try:
-                                ar_args[prop] = self.default_request_args[prop]
-                            except KeyError:
-                                pass
+            val = self.service_context.get(prop)
+            if not val:
+                if "request_args" in self.conf:
+                    val = self.conf['request_args'].get(prop)
+                if not val:
+                    val = self.service_context.register_args.get(prop)
+                    if not val:
+                        val = self.default_request_args.get(prop)
+                        if not val:
+                            val = self.service_context.behaviour.get(prop)
+
+            if val:
+                ar_args[prop] = val
 
         return ar_args
 
@@ -163,6 +177,7 @@ class Service(StateInterface):
         :param key: The key under which the response should be stored
         :param kwargs: Extra key word arguments
         """
+        pass
 
     def construct(self, request_args=None, **kwargs):
         """
@@ -250,7 +265,10 @@ class Service(StateInterface):
 
         return self.service_context.get('provider_info')[self.endpoint_name]
 
-    def get_authn_header(self, request, authn_method, **kwargs):
+    def get_authn_header(self,
+                         request: Union[dict, Message],
+                         authn_method: Optional[str] = '',
+                         **kwargs) -> dict:
         """
         Construct an authorization specification to be sent in the
         HTTP header.
@@ -272,7 +290,7 @@ class Service(StateInterface):
 
         return headers
 
-    def get_authn_method(self):
+    def get_authn_method(self) -> str:
         """
         Find the method that the client should use to authenticate against a
         service.
@@ -280,6 +298,37 @@ class Service(StateInterface):
         :return: The authn/authz method
         """
         return self.default_authn_method
+
+    def get_headers(self,
+                    request: Union[dict, Message],
+                    http_method: str,
+                    authn_method: Optional[str] = '',
+                    **kwargs) -> dict:
+        """
+
+        :param request:
+        :param authn_method:
+        :param kwargs:
+        :return:
+        """
+        if not authn_method:
+            authn_method = self.get_authn_method()
+
+        _headers = self.get_authn_header(request,
+                                         authn_method=authn_method,
+                                         authn_endpoint=self.endpoint_name,
+                                         **kwargs)
+
+        for meth in self.construct_extra_headers:
+            _headers = meth(self.service_context,
+                            headers=_headers,
+                            request=request,
+                            authn_method=authn_method,
+                            service_endpoint=self.endpoint_name,
+                            http_method=http_method,
+                            **kwargs)
+
+        return _headers
 
     def get_request_parameters(self, request_args=None, method="",
                                request_body_type="", authn_method='', **kwargs):
@@ -311,8 +360,9 @@ class Service(StateInterface):
             request_body_type = self.request_body_type
 
         request = self.construct_request(request_args=request_args, **kwargs)
+
         LOGGER.debug("Request: %s", request)
-        _info = {'method': method}
+        _info = {'method': method, "request": request}
 
         _args = kwargs.copy()
         if self.service_context.get('issuer'):
@@ -320,9 +370,8 @@ class Service(StateInterface):
 
         # Client authentication by usage of the Authorization HTTP header
         # or by modifying the request object
-        _headers = self.get_authn_header(request, authn_method,
-                                         authn_endpoint=self.endpoint_name,
-                                         **_args)
+        _headers = self.get_headers(request, http_method=method,
+                                    authn_method=authn_method, **_args)
 
         # Find out where to send this request
         try:
@@ -559,9 +608,9 @@ def init_services(service_definitions, service_context, client_authn_factory=Non
             kwargs = {}
 
         kwargs.update({
-                          'service_context': service_context,
-                          'client_authn_factory': client_authn_factory
-                      })
+            'service_context': service_context,
+            'client_authn_factory': client_authn_factory
+        })
 
         if isinstance(service_configuration['class'], str):
             _srv = util.importer(service_configuration['class'])(**kwargs)

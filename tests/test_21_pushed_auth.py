@@ -49,7 +49,7 @@ class TestPushedAuth:
         }
         _cam = ca_factory
         _srvs = DEFAULT_SERVICES
-        service_context = ServiceContext(CLI_KEY, client_id='client_id',
+        service_context = ServiceContext(keyjar=CLI_KEY, client_id='client_id',
                                          issuer='https://www.example.org/as',
                                          config=config)
 

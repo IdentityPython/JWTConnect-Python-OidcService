@@ -1,23 +1,29 @@
 import json
 import os
 
-import pytest
 from cryptojwt.exception import UnsupportedAlgorithm
 from cryptojwt.jws import jws
 from cryptojwt.jws.utils import left_hash
 from cryptojwt.jwt import JWT
-from cryptojwt.key_jar import build_keyjar, init_key_jar
-from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
-                            AuthorizationRequest, AuthorizationResponse,
-                            Message)
-from oidcmsg.oidc import (IdToken, OpenIDSchema, RegistrationRequest,
-                          verified_claim_name)
-from oidcmsg.oidc.session import (CheckIDRequest, CheckSessionRequest,
-                                  EndSessionRequest)
+from cryptojwt.key_jar import build_keyjar
+from cryptojwt.key_jar import init_key_jar
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AuthorizationResponse
+from oidcmsg.oauth2 import Message
+from oidcmsg.oidc import IdToken
+from oidcmsg.oidc import OpenIDSchema
+from oidcmsg.oidc import RegistrationRequest
+from oidcmsg.oidc import verified_claim_name
+from oidcmsg.oidc.session import CheckIDRequest
+from oidcmsg.oidc.session import CheckSessionRequest
+from oidcmsg.oidc.session import EndSessionRequest
+import pytest
 
 from oidcservice.exception import ParameterError
-from oidcservice.oidc.registration import (add_jwks_uri_or_jwks,
-                                           response_types_to_grant_types)
+from oidcservice.oidc.registration import add_jwks_uri_or_jwks
+from oidcservice.oidc.registration import response_types_to_grant_types
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
 
@@ -66,7 +72,7 @@ class TestAuthorization(object):
             'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
-        service_context = ServiceContext(CLI_KEY, config=client_config)
+        service_context = ServiceContext(keyjar=CLI_KEY, config=client_config)
         service_context.set('issuer', 'https://example.com')
         self.service = service_factory('Authorization', ['oidc'],
                                        service_context=service_context)
@@ -119,7 +125,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.keys()) == {'response_type', 'state', 'client_id',
@@ -129,7 +135,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.keys()) == {'client_id', 'scope', 'response_type',
@@ -140,7 +146,7 @@ class TestAuthorization(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='value')
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.to_dict()) == {'client_id', 'redirect_uri', 'request',
@@ -169,7 +175,7 @@ class TestAuthorization(object):
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='reference')
 
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
 
     def test_update_service_context_no_idtoken(self):
         req_args = {'response_type': 'code', 'state': 'state'}
@@ -319,10 +325,12 @@ class TestAccessTokenRequest(object):
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state', response_type='code').to_json()
-        self.service.store_item(auth_request, "auth_request", 'state')
+
+        _stat_interface = service_context.state
+        _stat_interface.store_item(auth_request, "auth_request", 'state')
 
         auth_response = AuthorizationResponse(code='access_code').to_json()
-        self.service.store_item(auth_response, "auth_response", 'state')
+        _stat_interface.store_item(auth_response, "auth_response", 'state')
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -343,7 +351,7 @@ class TestAccessTokenRequest(object):
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state',
                                                     authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
+        assert set(_info.keys()) == {'body', 'url', 'headers', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
@@ -362,7 +370,7 @@ class TestAccessTokenRequest(object):
 
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state')
-        assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
+        assert set(_info.keys()) == {'body', 'url', 'headers', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
@@ -373,10 +381,11 @@ class TestAccessTokenRequest(object):
         }
 
     def test_id_token_nonce_match(self):
-        self.service.store_nonce2state('nonce', 'state')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_nonce2state('nonce', 'state')
         resp = AccessTokenResponse()
         resp[verified_claim_name('id_token')] = {'nonce': 'nonce'}
-        self.service.store_nonce2state('nonce2', 'state2')
+        _state_interface.store_nonce2state('nonce2', 'state2')
         with pytest.raises(ParameterError):
             self.service.update_service_context(resp, key='state2')
 
@@ -626,9 +635,10 @@ class TestUserInfo(object):
 
         self.service = service_factory('UserInfo', ['oidc'], service_context=service_context)
 
+        _state_interface = self.service.service_context.state
         # Add history
         auth_response = AuthorizationResponse(code='access_code').to_json()
-        self.service.store_item(auth_response, 'auth_response', 'abcde')
+        _state_interface.store_item(auth_response, 'auth_response', 'abcde')
 
         idtval = {
             'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'diana',
@@ -641,7 +651,7 @@ class TestUserInfo(object):
         token_response = AccessTokenResponse(
             access_token='access_token', id_token=idt,
             __verified_id_token=ver_idt).to_json()
-        self.service.store_item(token_response, 'token_response', 'abcde')
+        _state_interface.store_item(token_response, 'token_response', 'abcde')
 
     def test_construct(self):
         _req = self.service.construct(state='abcde')
@@ -758,12 +768,14 @@ class TestCheckSession(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response',
-                                'abcde')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                    'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckSessionRequest)
         assert len(_req) == 1
+        assert "id_token" in _req
+        assert _req["id_token"] == 'a.signed.jwt'
 
 
 class TestCheckID(object):
@@ -781,11 +793,14 @@ class TestCheckID(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response', 'abcde')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                    'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckIDRequest)
         assert len(_req) == 1
+        assert "id_token" in _req
+        assert _req["id_token"] == 'a.signed.jwt'
 
 
 class TestEndSession(object):
@@ -804,8 +819,8 @@ class TestEndSession(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response', 'abcde')
+        self.service.service_context.state.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                                      'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, EndSessionRequest)
         assert len(_req) == 3

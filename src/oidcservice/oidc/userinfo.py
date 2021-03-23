@@ -49,7 +49,7 @@ class UserInfo(Service):
         if "access_token" in request_args:
             pass
         else:
-            request_args = self.multiple_extend_request_args(
+            request_args = self.service_context.state.multiple_extend_request_args(
                 request_args, kwargs['state'], ['access_token'],
                 ['auth_response', 'token_response', 'refresh_token_response']
             )
@@ -57,7 +57,8 @@ class UserInfo(Service):
         return request_args, {}
 
     def post_parse_response(self, response, **kwargs):
-        _args = self.multiple_extend_request_args(
+        _state_interface = self.service_context.state
+        _args = _state_interface.multiple_extend_request_args(
             {}, kwargs['state'], ['id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
         )
@@ -100,7 +101,7 @@ class UserInfo(Service):
                         "url": spec["endpoint"]
                     }
 
-        self.store_item(response, 'user_info', kwargs['state'])
+        _state_interface.store_item(response, 'user_info', kwargs['state'])
         return response
 
     def gather_verify_arguments(self):

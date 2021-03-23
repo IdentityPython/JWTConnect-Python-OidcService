@@ -40,8 +40,8 @@ class TestAuthorization(object):
         _req = self.service.construct(request_args=req_args, state='state')
         assert isinstance(_req, AuthorizationRequest)
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo', 'state'}
-        assert self.service.service_context.state_db.get('state')
-        _item = self.service.get_item(AuthorizationRequest, 'auth_request',
+        assert self.service.service_context.state.get_state('state')
+        _item = self.service.service_context.state.get_item(AuthorizationRequest, 'auth_request',
                                       'state')
         assert _item.to_dict() == {
             'foo': 'bar', 'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -53,7 +53,7 @@ class TestAuthorization(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state')
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert msg.to_dict() == {
@@ -66,7 +66,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert msg.to_dict() == {
@@ -92,8 +92,9 @@ class TestAccessTokenRequest(object):
             state='state'
         )
         auth_response = AuthorizationResponse(code='access_code')
-        self.service.store_item(auth_request, 'auth_request', 'state')
-        self.service.store_item(auth_response, 'auth_response', 'state')
+        _state = self.service.service_context.state
+        _state.store_item(auth_request, 'auth_request', 'state')
+        _state.store_item(auth_response, 'auth_response', 'state')
 
     def test_construct(self):
         req_args = {'foo': 'bar', 'state': 'state'}
@@ -125,7 +126,7 @@ class TestAccessTokenRequest(object):
         _info = self.service.get_request_parameters(
             request_args=req_args, state='state',
             authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'headers', 'body', 'url', 'method'}
+        assert set(_info.keys()) == {'headers', 'body', 'url', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         assert 'Authorization' in _info['headers']
         msg = AccessTokenRequest().from_urlencoded(
@@ -146,7 +147,7 @@ class TestAccessTokenRequest(object):
 
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state')
-        assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
+        assert set(_info.keys()) == {'body', 'url', 'headers', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
@@ -209,8 +210,9 @@ class TestRefreshAccessTokenRequest(object):
         auth_response = AuthorizationResponse(code='access_code')
         token_response = AccessTokenResponse(access_token='bearer_token',
                                              refresh_token='refresh')
-        self.service.store_item(auth_response, 'auth_response', 'abcdef')
-        self.service.store_item(token_response, 'token_response', 'abcdef')
+        _state = self.service.service_context.state
+        _state.store_item(auth_response, 'auth_response', 'abcdef')
+        _state.store_item(token_response, 'token_response', 'abcdef')
         self.service.endpoint = 'https://example.com/token'
 
     def test_construct(self):
@@ -222,7 +224,7 @@ class TestRefreshAccessTokenRequest(object):
 
     def test_get_request_parameters(self):
         _info = self.service.get_request_parameters(state='abcdef')
-        assert set(_info.keys()) == {'url', 'body', 'headers', 'method'}
+        assert set(_info.keys()) == {'url', 'body', 'headers', 'method', 'request'}
 
 
 def test_access_token_srv_conf():
@@ -239,8 +241,9 @@ def test_access_token_srv_conf():
     auth_request = AuthorizationRequest(
         redirect_uri='https://example.com/cli/authz_cb', state='state')
     auth_response = AuthorizationResponse(code='access_code')
-    service.store_item(auth_request, "auth_request", 'state')
-    service.store_item(auth_response, "auth_response", 'state')
+    _state = service.service_context.state
+    _state.store_item(auth_request, "auth_request", 'state')
+    _state.store_item(auth_response, "auth_response", 'state')
 
     req_args = {
         'redirect_uri': 'https://example.com/cli/authz_cb',

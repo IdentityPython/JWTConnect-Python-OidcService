@@ -52,14 +52,14 @@ def get_service():
 
 @pytest.fixture
 def services():
-    db = InMemoryStateDataBase()
-    auth_request = AuthorizationRequest(redirect_uri="http://example.com",
-                                        state='ABCDE').to_json()
-    auth_response = AuthorizationResponse(access_token="token",
-                                        state='ABCDE').to_json()
-    db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
-                          auth_response=auth_response).to_json())
-    return init_services(DEFAULT_SERVICES, get_service_context(), db)
+    # auth_request = AuthorizationRequest(redirect_uri="http://example.com",
+    #                                     state='ABCDE').to_json()
+    # auth_response = AuthorizationResponse(access_token="token",
+    #                                     state='ABCDE').to_json()
+    services = init_services(DEFAULT_SERVICES, get_service_context())
+    # db.set('ABCDE', State(iss='Issuer', auth_request=auth_request,
+    #                       auth_response=auth_response).to_json())
+    return services
 
 
 def test_quote():
@@ -147,11 +147,12 @@ class TestBearerHeader(object):
 
     def test_construct_with_token(self, services):
         authz_service = services['authorization']
-        _state = authz_service.create_state('Issuer')
+        srv_cntx = authz_service.service_context
+        _state = srv_cntx.state.create_state('Issuer')
         req = AuthorizationRequest(state=_state, response_type='code',
                                    redirect_uri='https://example.com',
                                    scope=['openid'])
-        authz_service.store_item(req, 'auth_request', _state)
+        srv_cntx.state.store_item(req, 'auth_request', _state)
 
         # Add a state and bind a code to it
         resp1 = AuthorizationResponse(code="auth_grant", state=_state)
@@ -186,40 +187,43 @@ class TestBearerBody(object):
 
     def test_construct_with_state(self, services):
         _srv = services['authorization']
-        _srv.state_db['FFFFF'] = State(iss='Issuer').to_json()
+        _cntx = _srv.service_context
+        _key = _cntx.state.create_state(iss='Issuer')
 
-        resp = AuthorizationResponse(code="code", state="FFFFF")
-        _srv.store_item(resp, 'auth_response', 'FFFFF')
+        resp = AuthorizationResponse(code="code", state=_key)
+        _cntx.state.store_item(resp, 'auth_response', _key)
 
         atr = AccessTokenResponse(access_token="2YotnFZFEjr1zCsicMWpAA",
                                   token_type="example",
                                   refresh_token="tGzv3JOkF0XG5Qx2TlKWIA",
                                   example_parameter="example_value",
                                   scope=["inner", "outer"])
-        _srv.store_item(atr, 'token_response', 'FFFFF')
+        _cntx.state.store_item(atr, 'token_response', _key)
 
         request = ResourceRequest()
-        http_args = BearerBody().construct(request, service=_srv, key="FFFFF")
+        http_args = BearerBody().construct(request, service=_srv, key=_key)
         assert request["access_token"] == "2YotnFZFEjr1zCsicMWpAA"
         assert http_args is None
 
     def test_construct_with_request(self, services):
         authz_service = services['authorization']
-        authz_service.service_context.state_db['EEEE'] = State(iss='Issuer').to_json()
-        resp1 = AuthorizationResponse(code="auth_grant", state="EEEE")
+        _cntx = authz_service.service_context
+
+        _key = _cntx.state.create_state(iss='Issuer')
+        resp1 = AuthorizationResponse(code="auth_grant", state=_key)
         response = authz_service.parse_response(resp1.to_urlencoded(),
                                                 "urlencoded")
-        authz_service.update_service_context(response, key='EEEE')
+        authz_service.update_service_context(response, key=_key)
 
         resp2 = AccessTokenResponse(access_token="token1",
                                     token_type="Bearer", expires_in=0,
-                                    state="EEEE")
+                                    state=_key)
         response = services['accesstoken'].parse_response(
             resp2.to_urlencoded(), "urlencoded")
-        services['accesstoken'].update_service_context(response, key='EEEE')
+        services['accesstoken'].update_service_context(response, key=_key)
 
         request = ResourceRequest()
-        BearerBody().construct(request, service=authz_service, key="EEEE")
+        BearerBody().construct(request, service=authz_service, key=_key)
 
         assert "access_token" in request
         assert request["access_token"] == "token1"

@@ -24,4 +24,4 @@ class CCAccessToken(Service):
     def update_service_context(self, resp, key='cc', **kwargs):
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp, 'token_response', key)
+        self.service_context.state.store_item(resp, 'token_response', key)

@@ -32,12 +32,12 @@ class Authorization(Service):
     def update_service_context(self, resp, key='', **kwargs):
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp, 'auth_response', key)
+        self.service_context.state.store_item(resp, 'auth_response', key)
 
     def store_auth_request(self, request_args=None, **kwargs):
         """Store the authorization request in the state DB."""
         _key = get_state_parameter(request_args, kwargs)
-        self.store_item(request_args, 'auth_request', _key)
+        self.service_context.state.store_item(request_args, 'auth_request', _key)
         return request_args
 
     def gather_request_args(self, **kwargs):
