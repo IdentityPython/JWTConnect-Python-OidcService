@@ -20,7 +20,7 @@ class RegistrationRead(Service):
 
     def get_endpoint(self):
         try:
-            return self.service_context.get('registration_response')["registration_client_uri"]
+            return self.service_context.registration_response["registration_client_uri"]
         except KeyError:
             return ''
 
@@ -39,7 +39,7 @@ class RegistrationRead(Service):
         if authn_method == "client_secret_basic":
             LOGGER.debug("Client authn method: %s", authn_method)
             headers["Authorization"] = "Bearer {}".format(
-                self.service_context.get('registration_response')[
+                self.service_context.registration_response[
                     "registration_access_token"]
             )
 

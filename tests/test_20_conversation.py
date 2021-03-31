@@ -155,7 +155,7 @@ def test_conversation():
              href='https://example.org/op')]
 
     service['webfinger'].update_service_context(resp=response)
-    service_context.set('issuer', OP_BASEURL)
+    service_context.issuer= OP_BASEURL
 
     # =================== Provider info discovery ====================
 
@@ -255,7 +255,7 @@ def test_conversation():
     assert isinstance(resp, ProviderConfigurationResponse)
     service['provider_info'].update_service_context(resp)
 
-    _pi = service_context.get('provider_info')
+    _pi = service_context.provider_info
     assert _pi['issuer'] == OP_BASEURL
     assert _pi['authorization_endpoint'] == 'https://example.org/op/authorization'
     assert _pi['registration_endpoint'] == 'https://example.org/op/registration'
@@ -299,9 +299,9 @@ def test_conversation():
         op_client_registration_response)
 
     service['registration'].update_service_context(response)
-    assert service_context.get('client_id') == 'zls2qhN1jO6A'
-    assert service_context.get('client_secret') == 'c8434f28cf9375d9a7'
-    assert set(service_context.get('registration_response').keys()) == {
+    assert service_context.client_id == 'zls2qhN1jO6A'
+    assert service_context.client_secret == 'c8434f28cf9375d9a7'
+    assert set(service_context.registration_response.keys()) == {
         'client_secret_expires_at', 'contacts', 'client_id',
         'token_endpoint_auth_method', 'redirect_uris', 'response_types',
         'client_id_issued_at', 'client_secret', 'application_type',
@@ -346,7 +346,7 @@ def test_conversation():
 
     request_args = {
         'state': STATE,
-        'redirect_uri': service_context.get('redirect_uris')[0]
+        'redirect_uri': service_context.redirect_uris[0]
     }
 
     info = service['accesstoken'].get_request_parameters(
@@ -385,7 +385,7 @@ def test_conversation():
         "id_token": _jws
     }
 
-    service_context.set('issuer', OP_BASEURL)
+    service_context.issuer= OP_BASEURL
     _resp = service['accesstoken'].parse_response(json.dumps(_resp),
                                                   state=STATE)
 

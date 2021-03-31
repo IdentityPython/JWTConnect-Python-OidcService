@@ -36,12 +36,14 @@ class AccessToken(access_token.AccessToken):
         # Default is RS256
 
         kwargs = {
-            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
-            'keyjar': _ctx.keyjar, 'verify': True,
+            'client_id': _ctx.client_id,
+            'iss': _ctx.issuer,
+            'keyjar': _ctx.keyjar,
+            'verify': True,
             'skew': _ctx.clock_skew,
         }
 
-        _reg_resp = _ctx.get('registration_response')
+        _reg_resp = _ctx.registration_response
         if _reg_resp:
             for attr, param in IDT2REG.items():
                 try:
@@ -54,7 +56,7 @@ class AccessToken(access_token.AccessToken):
         except KeyError:
             pass
 
-        _verify_args = _ctx.get('behaviour').get("verify_args")
+        _verify_args = _ctx.behaviour.get("verify_args")
         if _verify_args:
             if _verify_args:
                 kwargs.update(_verify_args)
@@ -84,7 +86,6 @@ class AccessToken(access_token.AccessToken):
 
     def get_authn_method(self):
         try:
-            return self.service_context.get('behaviour')[
-                'token_endpoint_auth_method']
+            return self.service_context.behaviour['token_endpoint_auth_method']
         except KeyError:
             return self.default_authn_method

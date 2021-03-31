@@ -72,7 +72,7 @@ def verify_alg_support(service_context, alg, usage, typ):
     :return: True or False
     """
 
-    supported = service_context.get('provider_info')[
+    supported = service_context.provider_info[
         "{}_{}_values_supported".format(usage, typ)]
 
     if alg in supported:
@@ -93,7 +93,7 @@ class TestClientInfo(object):
         self.service_context = ServiceContext(config=config)
 
     def test_registration_userinfo_sign_enc_algs(self):
-        self.service_context.set('behaviour', {
+        self.service_context.behaviour= {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -101,14 +101,14 @@ class TestClientInfo(object):
             "jwks_uri": "https://client.example.org/my_public_keys.jwks",
             "userinfo_encrypted_response_alg": "RSA1_5",
             "userinfo_encrypted_response_enc": "A128CBC-HS256"
-        })
+        }
 
         assert self.service_context.get_sign_alg('userinfo') is None
         assert self.service_context.get_enc_alg_enc('userinfo') == {
             'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
 
     def test_registration_request_object_sign_enc_algs(self):
-        self.service_context.set('behaviour', {
+        self.service_context.behaviour= {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -117,7 +117,7 @@ class TestClientInfo(object):
             "userinfo_encrypted_response_alg": "RSA1_5",
             "userinfo_encrypted_response_enc": "A128CBC-HS256",
             "request_object_signing_alg": "RS384"
-        })
+        }
 
         res = self.service_context.get_enc_alg_enc('userinfo')
         # 'sign':'RS256' is an added default
@@ -126,7 +126,7 @@ class TestClientInfo(object):
         assert res == 'RS384'
 
     def test_registration_id_token_sign_enc_algs(self):
-        self.service_context.set('behaviour', {
+        self.service_context.behaviour= {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -138,7 +138,7 @@ class TestClientInfo(object):
             'id_token_encrypted_response_alg': 'ECDH-ES',
             'id_token_encrypted_response_enc': "A128GCM",
             'id_token_signed_response_alg': "ES384",
-        })
+        }
 
         res = self.service_context.get_enc_alg_enc('userinfo')
         # 'sign':'RS256' is an added default
@@ -149,7 +149,7 @@ class TestClientInfo(object):
         assert res == {'alg': 'ECDH-ES', 'enc': 'A128GCM'}
 
     def test_verify_alg_support(self):
-        self.service_context.set('provider_info', {
+        self.service_context.provider_info= {
             "version": "3.0",
             "issuer": "https://server.example.com",
             "authorization_endpoint":
@@ -200,7 +200,7 @@ class TestClientInfo(object):
                 "http://server.example.com/connect/service_documentation.html",
             "ui_locales_supported": ["en-US", "en-GB", "en-CA", "fr-FR",
                                      "fr-CA"]
-        })
+        }
 
         assert verify_alg_support(self.service_context, 'RS256', 'id_token',
                                   'signing_alg')
@@ -215,7 +215,7 @@ class TestClientInfo(object):
                                   'token_endpoint_auth', 'signing_alg')
 
     def test_verify_requests_uri(self):
-        self.service_context.set('provider_info', {'issuer': 'https://example.com/'})
+        self.service_context.provider_info= {'issuer': 'https://example.com/'}
         url_list = self.service_context.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         p = sp.path.split('/')
@@ -224,7 +224,7 @@ class TestClientInfo(object):
         assert len(p) == 3
 
         # different for different OPs
-        self.service_context.set('provider_info', {'issuer': 'https://op.example.org/'})
+        self.service_context.provider_info= {'issuer': 'https://op.example.org/'}
         url_list = self.service_context.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         np = sp.path.split('/')

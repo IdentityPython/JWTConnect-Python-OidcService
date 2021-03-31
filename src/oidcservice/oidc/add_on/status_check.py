@@ -9,7 +9,7 @@ def get_session_status_page(service_context, looked_for_state):
     :param looked_for_state: Expecting state to be ? (changed/unchanged)
     """
     _msg = open(service_context.add_on['status_check']['template_file']).read()
-    _csi = service_context.get('provider_info')['check_session_iframe']
+    _csi = service_context.provider_info['check_session_iframe']
     _mod_msg = _msg.replace("{check_session_iframe}", _csi)
     if looked_for_state == "changed":
         _mod_msg = _mod_msg.replace(

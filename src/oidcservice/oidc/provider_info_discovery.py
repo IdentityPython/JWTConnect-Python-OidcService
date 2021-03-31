@@ -58,13 +58,13 @@ def add_redirect_uris(request_args, service=None, **kwargs):
     if "redirect_uris" not in request_args:
         # Callbacks is a dictionary with callback type 'code', 'implicit',
         # 'form_post' as keys.
-        _cbs = _context.get('callback')
+        _cbs = _context.callback
         if _cbs:
             # Filter out local additions.
             _uris = [v for k, v in _cbs.items() if not k.startswith('__')]
             request_args['redirect_uris'] = _uris
         else:
-            request_args['redirect_uris'] = _context.get('redirect_uris')
+            request_args['redirect_uris'] = _context.redirect_uris
 
     return request_args, {}
 
@@ -81,7 +81,7 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
 
     def update_service_context(self, resp, **kwargs):
         self._update_service_context(resp)
-        self.match_preferences(resp, self.service_context.get('issuer'))
+        self.match_preferences(resp, self.service_context.issuer)
         if 'pre_load_keys' in self.conf and self.conf['pre_load_keys']:
             _jwks = self.service_context.keyjar.export_jwks_as_json(
                 issuer=resp['issuer'])
@@ -103,11 +103,11 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
         """
 
         if not pcr:
-            pcr = self.service_context.get('provider_info')
+            pcr = self.service_context.provider_info
 
         regreq = oidc.RegistrationRequest
 
-        _behaviour = self.service_context.get('behaviour')
+        _behaviour = self.service_context.behaviour
 
         for _pref, _prov in PREFERENCE2PROVIDER.items():
             try:
@@ -171,5 +171,5 @@ class ProviderInfoDiscovery(provider_info_discovery.ProviderInfoDiscovery):
             if key not in PREFERENCE2PROVIDER:
                 _behaviour[key] = val
 
-        self.service_context.set('behaviour', _behaviour)
+        self.service_context.behaviour= _behaviour
         logger.debug('service_context behaviour: {}'.format(_behaviour))

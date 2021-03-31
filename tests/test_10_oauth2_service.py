@@ -1,12 +1,13 @@
+from oidcmsg.oauth2 import AccessTokenRequest
+from oidcmsg.oauth2 import AccessTokenResponse
+from oidcmsg.oauth2 import AuthorizationRequest
+from oidcmsg.oauth2 import AuthorizationResponse
+from oidcmsg.oauth2 import Message
 import pytest
-from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
-                            AuthorizationRequest, AuthorizationResponse,
-                            Message)
 
 from oidcservice.service import Service
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
-from oidcservice.state_interface import InMemoryStateDataBase, State
 
 
 class Response(object):
@@ -42,7 +43,7 @@ class TestAuthorization(object):
         assert set(_req.keys()) == {'client_id', 'redirect_uri', 'foo', 'state'}
         assert self.service.service_context.state.get_state('state')
         _item = self.service.service_context.state.get_item(AuthorizationRequest, 'auth_request',
-                                      'state')
+                                                            'state')
         assert _item.to_dict() == {
             'foo': 'bar', 'redirect_uri': 'https://example.com/cli/authz_cb',
             'state': 'state', 'client_id': 'client_id'
@@ -63,7 +64,7 @@ class TestAuthorization(object):
         }
 
     def test_request_init(self):
-        req_args = {'response_type': 'code', 'state': 'state'}
+        req_args = {'response_type': 'code', 'state': "state"}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
         assert set(_info.keys()) == {'url', 'method', 'request'}
@@ -75,6 +76,22 @@ class TestAuthorization(object):
             'response_type': 'code', 'state': 'state'
         }
 
+    def test_response(self):
+        _state = "today"
+        req_args = {'response_type': 'code', 'state': _state}
+        self.service.endpoint = 'https://example.com/authorize'
+        _info = self.service.get_request_parameters(request_args=req_args)
+        assert set(_info.keys()) == {'url', 'method', 'request'}
+        msg = AuthorizationRequest().from_urlencoded(
+            self.service.get_urlinfo(_info['url']))
+        self.service.service_context.state.store_item(msg, "auth_request", _state)
+
+        resp1 = AuthorizationResponse(code="auth_grant", state=_state)
+        response = self.service.parse_response(
+            resp1.to_urlencoded(), "urlencoded", state=_state)
+        self.service.update_service_context(response, key=_state)
+        assert self.service.service_context.state.get_state(_state)
+
 
 class TestAccessTokenRequest(object):
     @pytest.fixture(autouse=True)
@@ -85,7 +102,7 @@ class TestAccessTokenRequest(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(config=client_config)
-        service_context.set('redirect_uris', ['https://example.com/cli/authz_cb'])
+        service_context.redirect_uris= ['https://example.com/cli/authz_cb']
         self.service = service_factory('AccessToken', ['oauth2'], service_context=service_context)
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
@@ -238,12 +255,14 @@ def test_access_token_srv_conf():
                               service_context=service_context,
                               conf={'default_authn_method': 'client_secret_post'})
 
+    _state_val = service_context.state.create_state(service_context.issuer)
     auth_request = AuthorizationRequest(
-        redirect_uri='https://example.com/cli/authz_cb', state='state')
+        redirect_uri='https://example.com/cli/authz_cb', state=_state_val)
+    _state_interface = service.service_context.state
+    _state_interface.store_item(auth_request, "auth_request", _state_val)
+
     auth_response = AuthorizationResponse(code='access_code')
-    _state = service.service_context.state
-    _state.store_item(auth_request, "auth_request", 'state')
-    _state.store_item(auth_response, "auth_response", 'state')
+    _state_interface.store_item(auth_response, "auth_response", _state_val)
 
     req_args = {
         'redirect_uri': 'https://example.com/cli/authz_cb',
@@ -251,7 +270,7 @@ def test_access_token_srv_conf():
     }
     service.endpoint = 'https://example.com/authorize'
     _info = service.get_request_parameters(request_args=req_args,
-                                           state='state')
+                                           state=_state_val)
 
     assert _info
     msg = AccessTokenRequest().from_urlencoded(service.get_urlinfo(

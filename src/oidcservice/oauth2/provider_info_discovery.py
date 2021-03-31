@@ -32,7 +32,7 @@ class ProviderInfoDiscovery(Service):
         :return: Service endpoint
         """
         try:
-            _iss = self.service_context.get('issuer')
+            _iss = self.service_context.issuer
         except AttributeError:
             _iss = self.endpoint
 
@@ -115,12 +115,12 @@ class ProviderInfoDiscovery(Service):
         # url that was used as service endpoint (without the .well-known part)
         if "issuer" in resp:
             _pcr_issuer = self._verify_issuer(resp,
-                                              self.service_context.get('issuer'))
+                                              self.service_context.issuer)
         else:  # No prior knowledge
-            _pcr_issuer = self.service_context.get('issuer')
+            _pcr_issuer = self.service_context.issuer
 
-        self.service_context.set('issuer', _pcr_issuer)
-        self.service_context.set('provider_info', resp)
+        self.service_context.issuer= _pcr_issuer
+        self.service_context.provider_info= resp
 
         self._set_endpoints(resp)
 

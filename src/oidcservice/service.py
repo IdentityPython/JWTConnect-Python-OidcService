@@ -1,19 +1,25 @@
 """ The basic Service class upon which all the specific services are built. """
 import logging
-from typing import Optional, Union
+from typing import Optional
+from typing import Union
 from urllib.parse import urlparse
 
 from cryptojwt.jwt import JWT
+from cryptojwt.utils import qualified_name
 from oidcmsg.impexp import ImpExp
+from oidcmsg.item import DLDict
 from oidcmsg.message import Message
-from oidcmsg.oauth2 import ResponseMessage, is_error_message
+from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oauth2 import is_error_message
 
 from oidcservice import util
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import ResponseError
-from oidcservice.state_interface import StateInterface
-from oidcservice.util import (JOSE_ENCODED, JSON_ENCODED, URL_ENCODED,
-                              get_http_body, get_http_url)
+from oidcservice.util import JOSE_ENCODED
+from oidcservice.util import JSON_ENCODED
+from oidcservice.util import URL_ENCODED
+from oidcservice.util import get_http_body
+from oidcservice.util import get_http_url
 
 __author__ = 'Roland Hedberg'
 
@@ -47,9 +53,10 @@ class Service(ImpExp):
         'default_authn_method': None,
         'http_method': None,
         'request_body_type': None,
-        'response_body_type': None,
-        'state': StateInterface
+        'response_body_type': None
     }
+
+    init_args = ["service_context"]
 
     def __init__(self, service_context, conf=None,
                  client_authn_factory=None, **kwargs):
@@ -258,7 +265,7 @@ class Service(ImpExp):
         if self.endpoint:
             return self.endpoint
 
-        return self.service_context.get('provider_info')[self.endpoint_name]
+        return self.service_context.provider_info[self.endpoint_name]
 
     def get_authn_header(self,
                          request: Union[dict, Message],
@@ -360,8 +367,8 @@ class Service(ImpExp):
         _info = {'method': method, "request": request}
 
         _args = kwargs.copy()
-        if self.service_context.get('issuer'):
-            _args['iss'] = self.service_context.get('issuer')
+        if self.service_context.issuer:
+            _args['iss'] = self.service_context.issuer
 
         # Client authentication by usage of the Authorization HTTP header
         # or by modifying the request object
@@ -433,17 +440,17 @@ class Service(ImpExp):
         """
 
         kwargs = {
-            'iss': self.service_context.get('issuer'),
+            'iss': self.service_context.issuer,
             'keyjar': self.service_context.keyjar,
             'verify': True
         }
 
-        _client_id = self.service_context.get('client_id')
+        _client_id = self.service_context.client_id
         if _client_id:
             kwargs['client_id'] = _client_id
 
         if self.service_name == "provider_info":
-            if self.service_context.get('issuer').startswith("http://"):
+            if self.service_context.issuer.startswith("http://"):
                 kwargs["allow_http"] = True
 
         return kwargs
@@ -454,13 +461,13 @@ class Service(ImpExp):
         args['allowed_enc_algs'] = enc_algs['alg']
         args['allowed_enc_encs'] = enc_algs['enc']
         _jwt = JWT(key_jar=self.service_context.keyjar, **args)
-        _jwt.iss = self.service_context.get('client_id')
+        _jwt.iss = self.service_context.client_id
         return _jwt.unpack(info)
 
     def _do_response(self, info, sformat, **kwargs):
         try:
             resp = self.response_cls().deserialize(
-                info, sformat, iss=self.service_context.get('issuer'), **kwargs)
+                info, sformat, iss=self.service_context.issuer, **kwargs)
         except Exception as err:
             resp = None
             if sformat == 'json':
@@ -469,8 +476,7 @@ class Service(ImpExp):
                 # then two can be.
                 try:
                     resp = self.response_cls().deserialize(
-                        info, 'jwt', iss=self.service_context.get('issuer'),
-                        **kwargs)
+                        info, 'jwt', iss=self.service_context.issuer, **kwargs)
                 except Exception:
                     pass
 
@@ -595,7 +601,7 @@ def init_services(service_definitions, service_context, client_authn_factory=Non
     :return: A dictionary, with service name as key and the service instance as
         value.
     """
-    service = {}
+    service = DLDict()
     for service_name, service_configuration in service_definitions.items():
         try:
             kwargs = service_configuration['kwargs']
@@ -608,8 +614,10 @@ def init_services(service_definitions, service_context, client_authn_factory=Non
         })
 
         if isinstance(service_configuration['class'], str):
+            _value_cls = service_configuration['class']
             _srv = util.importer(service_configuration['class'])(**kwargs)
         else:
+            _value_cls = qualified_name(service_configuration['class'])
             _srv = service_configuration['class'](**kwargs)
 
         if 'post_functions' in service_configuration:
@@ -617,9 +625,6 @@ def init_services(service_definitions, service_context, client_authn_factory=Non
         if 'pre_functions' in service_configuration:
             gather_constructors(service_configuration['pre_functions'], _srv.pre_construct)
 
-        try:
-            service[_srv.service_name] = _srv
-        except AttributeError:
-            raise ValueError("Could not load '{}'".format(service_name))
+        service[_srv.service_name] = _srv
 
     return service

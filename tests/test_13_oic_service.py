@@ -14,6 +14,7 @@ from oidcmsg.oidc import (IdToken, OpenIDSchema, RegistrationRequest,
                           verified_claim_name)
 from oidcmsg.oidc.session import (CheckIDRequest, CheckSessionRequest,
                                   EndSessionRequest)
+import responses
 
 from oidcservice.exception import ParameterError
 from oidcservice.oidc.registration import (add_jwks_uri_or_jwks,
@@ -49,8 +50,7 @@ ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
 
-CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(),
-                            ISS)
+CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(), ISS)
 
 
 # def test_request_factory():
@@ -67,7 +67,7 @@ class TestAuthorization(object):
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
         service_context = ServiceContext(keyjar=CLI_KEY, config=client_config)
-        service_context.set('issuer', 'https://example.com')
+        service_context.issuer= 'https://example.com'
         self.service = service_factory('Authorization', ['oidc'],
                                        service_context=service_context)
 
@@ -161,10 +161,10 @@ class TestAuthorization(object):
 
         assert os.path.isfile(os.path.join(_dirname, 'request123456.jwt'))
 
-        self.service.service_context.set('registration_response', {
+        self.service.service_context.registration_response= {
             'redirect_uris': ['https://example.com/cb'],
             'request_uris': ['https://example.com/request123456.jwt']
-        })
+        }
         self.service.service_context.base_url = 'https://example.com/'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='reference')
@@ -243,7 +243,7 @@ class TestAuthorization(object):
         idt = JWT(ISS_KEY, iss=ISS, lifetime=3600, sign_alg='none')
         payload = {'sub': '123456789', 'aud': ['client_id']}
         _idt = idt.pack(payload)
-        self.service.service_context.get('behaviour')["verify_args"] = {
+        self.service.service_context.behaviour["verify_args"] = {
             "allow_sign_alg_none": allow_sign_alg_none
         }
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -500,18 +500,24 @@ class TestProviderInfo(object):
                 "A128GCM", "A192GCM", "A256GCM"],
             "acr_values_supported": ["PASSWORD"],
             "issuer": OP_BASEURL,
-            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
-                OP_BASEURL),
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(OP_BASEURL),
             "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
             "token_endpoint": "{}/token".format(OP_BASEURL),
             "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.get('behaviour') == {}
+        assert self.service.service_context.behaviour == {}
         resp = self.service.post_parse_response(provider_info_response)
-        self.service.update_service_context(resp)
-        assert self.service.service_context.get('behaviour') == {
+
+        iss_jwks = ISS_KEY.export_jwks_as_json(issuer_id=ISS)
+        with responses.RequestsMock() as rsps:
+            rsps.add("GET", resp["jwks_uri"],
+                     body=iss_jwks, status=200)
+
+            self.service.update_service_context(resp)
+
+        assert self.service.service_context.behaviour == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -529,18 +535,24 @@ class TestProviderInfo(object):
                 "client_secret_post", "client_secret_basic",
                 "client_secret_jwt", "private_key_jwt"],
             "issuer": OP_BASEURL,
-            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
-                OP_BASEURL),
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(OP_BASEURL),
             "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
             "token_endpoint": "{}/token".format(OP_BASEURL),
             "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.get('behaviour') == {}
+        assert self.service.service_context.behaviour == {}
         resp = self.service.post_parse_response(provider_info_response)
-        self.service.update_service_context(resp)
-        assert self.service.service_context.get('behaviour') == {
+
+        iss_jwks = ISS_KEY.export_jwks_as_json(issuer_id=ISS)
+        with responses.RequestsMock() as rsps:
+            rsps.add("GET", resp["jwks_uri"],
+                     body=iss_jwks, status=200)
+
+            self.service.update_service_context(resp)
+
+        assert self.service.service_context.behaviour == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -600,9 +612,9 @@ class TestRegistration(object):
         assert 'post_logout_redirect_uris' in _req
 
     def test_config_with_required_request_uri(self):
-        _pi = self.service.service_context.get('provider_info')
+        _pi = self.service.service_context.provider_info
         _pi['require_request_uri_registration'] = True
-        self.service.service_context.set('provider_info', _pi)
+        self.service.service_context.provider_info= _pi
         _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5
@@ -621,11 +633,11 @@ class TestUserInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         service_context.keyjar = CLI_KEY
-        service_context.set('behaviour', {
+        service_context.behaviour= {
             'userinfo_signed_response_alg': 'RS256',
             "userinfo_encrypted_response_alg": "RSA-OAEP",
             "userinfo_encrypted_response_enc": "A256GCM"
-        })
+        }
 
         self.service = service_factory('UserInfo', ['oidc'], service_context=service_context)
 

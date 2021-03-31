@@ -39,7 +39,7 @@ class Authorization(authorization.Authorization):
                 _state = ''
 
         request_args['state'] = self.service_context.state.create_state(
-            self.service_context.get('issuer'), _state)
+            self.service_context.issuer, _state)
         return request_args, {}
 
     def update_service_context(self, resp, key='', **kwargs):
@@ -69,12 +69,12 @@ class Authorization(authorization.Authorization):
         try:
             _rt = request_args["response_type"]
         except KeyError:
-            _rt = self.service_context.get('behaviour')['response_types'][0]
+            _rt = self.service_context.behaviour['response_types'][0]
             request_args["response_type"] = _rt
 
         # For OIDC 'openid' is required in scope
         if 'scope' not in request_args:
-            request_args['scope'] = self.service_context.get('behaviour').get("scope", ["openid"])
+            request_args['scope'] = self.service_context.behaviour.get("scope", ["openid"])
         elif 'openid' not in request_args['scope']:
             request_args['scope'].append('openid')
 
@@ -116,7 +116,7 @@ class Authorization(authorization.Authorization):
 
         if not alg:
             try:
-                alg = self.service_context.get('behaviour')["request_object_signing_alg"]
+                alg = self.service_context.behaviour["request_object_signing_alg"]
             except KeyError:  # Use default
                 alg = "RS256"
         return alg
@@ -129,7 +129,7 @@ class Authorization(authorization.Authorization):
         :return: The URL the OP should use to access the file
         """
         try:
-            _webname = self.service_context.get('registration_response')['request_uris'][0]
+            _webname = self.service_context.registration_response['request_uris'][0]
             filename = self.service_context.filename_from_webname(_webname)
         except KeyError:
             filename, _webname = construct_request_uri(**kwargs)
@@ -151,14 +151,15 @@ class Authorization(authorization.Authorization):
         _srv_cntx = self.service_context
 
         # This is the issuer of the JWT, that is me !
-        if kwargs.get('issuer') is None:
-            kwargs['issuer'] = _srv_cntx.get('client_id')
+        _issuer = kwargs.get("issuer")
+        if _issuer is None:
+            kwargs['issuer'] = _srv_cntx.client_id
 
-        if kwargs.get('recv') is None:
+        if kwargs.get("recv") is None:
             try:
-                kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
+                kwargs['recv'] = _srv_cntx.provider_info['issuer']
             except KeyError:
-                kwargs['recv'] = _srv_cntx.get('issuer')
+                kwargs['recv'] = _srv_cntx.issuer
 
         del kwargs['service']
 
@@ -213,16 +214,16 @@ class Authorization(authorization.Authorization):
         """
         _ctx = self.service_context
         kwargs = {
-            'iss': _ctx.get('issuer'),
+            'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
         }
 
-        _client_id = _ctx.get('client_id')
+        _client_id = _ctx.client_id
         if _client_id:
             kwargs['client_id'] = _client_id
 
-        _reg_res = _ctx.get('registration_response')
+        _reg_res = _ctx.registration_response
         if _reg_res:
             for attr, param in IDT2REG.items():
                 try:
@@ -235,7 +236,7 @@ class Authorization(authorization.Authorization):
         except KeyError:
             pass
 
-        _verify_args = _ctx.get('behaviour').get("verify_args")
+        _verify_args = _ctx.behaviour.get("verify_args")
         if _verify_args:
             kwargs.update(_verify_args)
 

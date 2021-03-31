@@ -6,8 +6,9 @@ from oidcmsg.exception import MissingParameter
 from oidcmsg.oauth2 import ResponseMessage
 from oidcmsg.time_util import time_sans_frac
 
-from oidcservice.oauth2.utils import (get_state_parameter, pick_redirect_uris,
-                                      set_state_parameter)
+from oidcservice.oauth2.utils import get_state_parameter
+from oidcservice.oauth2.utils import pick_redirect_uris
+from oidcservice.oauth2.utils import set_state_parameter
 from oidcservice.service import Service
 
 LOGGER = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class Authorization(Service):
 
         if 'redirect_uri' not in ar_args:
             try:
-                ar_args['redirect_uri'] = self.service_context.get('redirect_uris')[0]
+                ar_args['redirect_uri'] = self.service_context.redirect_uris[0]
             except (KeyError, AttributeError):
                 raise MissingParameter('redirect_uri')
 
@@ -68,8 +69,8 @@ class Authorization(Service):
                 pass
             else:
                 if _key:
-                    item = self.get_item(oauth2.AuthorizationRequest,
-                                         'auth_request', _key)
+                    item = self.service_context.state.get_item(oauth2.AuthorizationRequest,
+                                                               'auth_request', _key)
                     try:
                         response["scope"] = item["scope"]
                     except KeyError:

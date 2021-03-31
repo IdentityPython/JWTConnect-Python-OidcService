@@ -85,26 +85,29 @@ class ServiceContext(OidcContext):
     """
     parameter = OidcContext.parameter.copy()
     parameter.update({
-        "config": None,
-        "kid": None,
-        "base_url": None,
-        "requests_dir": None,
-        "register_args": None,
-        "allow": None,
-        "client_preferences": None,
-        "args": None,
         "add_on": None,
-        "httpc_params": None,
-        'client_secret': None,
-        'client_id': None,
-        'redirect_uris': None,
-        'provider_info': None,
+        "allow": None,
+        "args": None,
+        "base_url": None,
         'behaviour': None,
         'callback': None,
-        'issuer': None,
+        'client_id': None,
+        "client_preferences": None,
+        'client_secret': None,
+        "client_secret_expires_at": 0,
         'clock_skew': None,
-        'verify_args': None,
-        'state': StateInterface
+        "config": None,
+        "httpc_params": None,
+        'issuer': None,
+        "kid": None,
+        "post_logout_redirect_uris": [],
+        'provider_info': None,
+        'redirect_uris': None,
+        "requests_dir": None,
+        "register_args": None,
+        'registration_response': None,
+        'state': StateInterface,
+        'verify_args': None
     })
 
     def __init__(self, base_url="", keyjar=None, config=None, state=None, **kwargs):
@@ -119,8 +122,6 @@ class ServiceContext(OidcContext):
 
         self.base_url = base_url
         # Below so my IDE won't complain
-        self.requests_dir = ''
-        self.register_args = {}
         self.allow = {}
         self.client_preferences = {}
         self.args = {}
@@ -129,9 +130,14 @@ class ServiceContext(OidcContext):
         self.issuer = ""
         self.client_id = ""
         self.client_secret = ""
+        self.client_secret_expires_at = 0
         self.behaviour = {}
         self.provider_info = {}
+        self.post_logout_redirect_uris = []
         self.redirect_uris = []
+        self.register_args = {}
+        self.registration_response = {}
+        self.requests_dir = ''
 
         _def_value = copy.deepcopy(DEFAULT_VALUE)
         # Dynamic information
@@ -210,9 +216,9 @@ class ServiceContext(OidcContext):
         """
         _hash = hashlib.sha256()
         try:
-            _hash.update(as_bytes(self.get('provider_info')['issuer']))
+            _hash.update(as_bytes(self.provider_info['issuer']))
         except KeyError:
-            _hash.update(as_bytes(self.get('issuer')))
+            _hash.update(as_bytes(self.issuer))
         _hash.update(as_bytes(self.base_url))
 
         if not path.startswith('/'):
@@ -256,10 +262,10 @@ class ServiceContext(OidcContext):
         """
 
         try:
-            return self.get('behaviour')[CLI_REG_MAP[typ]['sign']]
+            return self.behaviour[CLI_REG_MAP[typ]['sign']]
         except KeyError:
             try:
-                return self.get('provider_info')[PROVIDER_INFO_MAP[typ]['sign']]
+                return self.provider_info[PROVIDER_INFO_MAP[typ]['sign']]
             except (KeyError, TypeError):
                 pass
 
@@ -275,10 +281,10 @@ class ServiceContext(OidcContext):
         res = {}
         for attr in ['enc', 'alg']:
             try:
-                _alg = self.get('behaviour')[CLI_REG_MAP[typ][attr]]
+                _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
             except KeyError:
                 try:
-                    _alg = self.get('provider_info')[PROVIDER_INFO_MAP[typ][attr]]
+                    _alg = self.provider_info[PROVIDER_INFO_MAP[typ][attr]]
                 except KeyError:
                     _alg = None
 

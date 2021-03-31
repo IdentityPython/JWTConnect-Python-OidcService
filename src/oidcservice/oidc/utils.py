@@ -20,7 +20,7 @@ def request_object_encryption(msg, service_context, **kwargs):
         encalg = kwargs["request_object_encryption_alg"]
     except KeyError:
         try:
-            encalg = service_context.get('behaviour')[
+            encalg = service_context.behaviour[
                 "request_object_encryption_alg"]
         except KeyError:
             return msg
@@ -32,8 +32,7 @@ def request_object_encryption(msg, service_context, **kwargs):
         encenc = kwargs["request_object_encryption_enc"]
     except KeyError:
         try:
-            encenc = service_context.get('behaviour')[
-                "request_object_encryption_enc"]
+            encenc = service_context.behaviour["request_object_encryption_enc"]
         except KeyError:
             raise MissingRequiredAttribute(
                 "No request_object_encryption_enc specified")

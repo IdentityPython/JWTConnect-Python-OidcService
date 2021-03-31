@@ -1,3 +1,4 @@
+import json
 import os
 from urllib.parse import urlsplit
 
@@ -76,7 +77,7 @@ def verify_alg_support(service_context, alg, usage, typ):
     :return: True or False
     """
 
-    supported = service_context.get('provider_info')[
+    supported = service_context.provider_info[
         "{}_{}_values_supported".format(usage, typ)]
 
     if alg in supported:
@@ -114,7 +115,7 @@ class TestClientInfo(object):
         assert srvcntx.get_enc_alg_enc('userinfo') == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
 
     def test_registration_request_object_sign_enc_algs(self):
-        self.service_context.set('behaviour', {
+        self.service_context.behaviour= {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -123,7 +124,7 @@ class TestClientInfo(object):
             "userinfo_encrypted_response_alg": "RSA1_5",
             "userinfo_encrypted_response_enc": "A128CBC-HS256",
             "request_object_signing_alg": "RS384"
-        })
+        }
 
         srvcntx = ServiceContext().load(
             self.service_context.dump(exclude_attributes=["service_context"]))
@@ -133,7 +134,7 @@ class TestClientInfo(object):
         assert srvcntx.get_sign_alg('request_object') == 'RS384'
 
     def test_registration_id_token_sign_enc_algs(self):
-        self.service_context.set('behaviour', {
+        self.service_context.behaviour= {
             "application_type": "web",
             "redirect_uris": ["https://client.example.org/callback",
                               "https://client.example.org/callback2"],
@@ -145,7 +146,7 @@ class TestClientInfo(object):
             'id_token_encrypted_response_alg': 'ECDH-ES',
             'id_token_encrypted_response_enc': "A128GCM",
             'id_token_signed_response_alg': "ES384",
-        })
+        }
 
         srvcntx = ServiceContext().load(
             self.service_context.dump(exclude_attributes=["service_context"]))
@@ -156,7 +157,7 @@ class TestClientInfo(object):
         assert srvcntx.get_enc_alg_enc('id_token') == {'alg': 'ECDH-ES', 'enc': 'A128GCM'}
 
     def test_verify_alg_support(self):
-        self.service_context.set('provider_info', {
+        self.service_context.provider_info= {
             "version": "3.0",
             "issuer": "https://server.example.com",
             "authorization_endpoint":
@@ -207,7 +208,7 @@ class TestClientInfo(object):
                 "http://server.example.com/connect/service_documentation.html",
             "ui_locales_supported": ["en-US", "en-GB", "en-CA", "fr-FR",
                                      "fr-CA"]
-        })
+        }
 
         srvcntx = ServiceContext().load(
             self.service_context.dump(exclude_attributes=["service_context"]))
@@ -220,7 +221,7 @@ class TestClientInfo(object):
         assert verify_alg_support(srvcntx, 'ES256', 'token_endpoint_auth', 'signing_alg')
 
     def test_verify_requests_uri(self):
-        self.service_context.set('provider_info', {'issuer': 'https://example.com/'})
+        self.service_context.provider_info= {'issuer': 'https://example.com/'}
         url_list = self.service_context.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         p = sp.path.split('/')
@@ -232,7 +233,7 @@ class TestClientInfo(object):
             self.service_context.dump(exclude_attributes=["service_context"]))
 
         # different for different OPs
-        srvcntx.set('provider_info', {'issuer': 'https://op.example.org/'})
+        srvcntx.provider_info= {'issuer': 'https://op.example.org/'}
         url_list = srvcntx.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         np = sp.path.split('/')
@@ -255,6 +256,25 @@ class TestClientInfo(object):
 
         srvcntx = ServiceContext().load(
             self.service_context.dump(exclude_attributes=["service_context"]))
+
+        # Now there should be 2, the second a RSA key for signing
+        assert len(srvcntx.keyjar.get_issuer_keys('')) == 2
+
+    def test_import_keys_file_json(self):
+        # Should only be one and that a symmetric key (client_secret) usable
+        # for signing and encryption
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
+
+        file_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), 'salesforce.key'))
+
+        keyspec = {'file': {'rsa': [file_path]}}
+        self.service_context.import_keys(keyspec)
+
+        _sc_state = self.service_context.dump(exclude_attributes=["service_context"])
+        _jsc_state = json.dumps(_sc_state)
+        _o_state = json.loads(_jsc_state)
+        srvcntx = ServiceContext().load(_o_state)
 
         # Now there should be 2, the second a RSA key for signing
         assert len(srvcntx.keyjar.get_issuer_keys('')) == 2
