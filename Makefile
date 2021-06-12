@@ -5,7 +5,7 @@ SPHINXBUILD   = sphinx-build
 SPHINXABUILD  = sphinx-autobuild
 BUILDDIR      = doc/_build
 DOCDIR        = doc/
-OIDCDIR        = src/oidcmsg
+OIDCDIR        = src/oidcservice
 TESTDIR       = tests
 
 help:
@@ -40,10 +40,10 @@ test:
 .PHONY: test
 
 isort:
-	@pipenv run isort --recursive $(OIDCDIR) $(TESTDIR)
+	@pipenv run isort $(OIDCDIR) $(TESTDIR)
 
 check-isort:
-	@pipenv run isort --recursive --diff --check-only $(OIDCDIR) $(TESTDIR)
+	@pipenv run isort --diff --check-only $(OIDCDIR) $(TESTDIR)
 .PHONY: isort check-isort
 
 check-pylama:

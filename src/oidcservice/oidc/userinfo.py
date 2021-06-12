@@ -7,7 +7,6 @@ from oidcmsg.message import Message
 from oidcservice.oauth2.utils import get_state_parameter
 from oidcservice.service import Service
 
-
 logger = logging.getLogger(__name__)
 
 UI2REG = {

@@ -23,19 +23,19 @@ from setuptools.command.test import test as TestCommand
 __author__ = 'Roland Hedberg'
 
 
-class PyTest(TestCommand):
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        self.test_args = []
-        self.test_suite = True
-
-    def run_tests(self):
-        # import here, cause outside the eggs aren't loaded
-        import pytest
-
-        errno = pytest.main(self.test_args)
-        sys.exit(errno)
-
+# class PyTest(TestCommand):
+#     def finalize_options(self):
+#         TestCommand.finalize_options(self)
+#         self.test_args = []
+#         self.test_suite = True
+#
+#     def run_tests(self):
+#         # import here, cause outside the eggs aren't loaded
+#         import pytest
+#
+#         errno = pytest.main(self.test_args)
+#         sys.exit(errno)
+#
 
 # Python 2.7 and later ship with importlib and argparse
 if sys.version_info[0] == 2 and sys.version_info[1] == 6:
@@ -62,19 +62,20 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: Apache Software License",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     install_requires=[
         "pyyaml>=5.1.0",
         'oidcmsg>=1.1.0',
+        'requests'
     ],
     tests_require=[
         "responses",
         "testfixtures",
         "pytest-localserver"
     ],
-    zip_safe=False,
-    cmdclass={'test': PyTest},
+    zip_safe=False
 )

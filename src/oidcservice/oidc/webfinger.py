@@ -1,15 +1,12 @@
 import logging
-from urllib.parse import urlsplit
-from urllib.parse import urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from oidcmsg import oidc
 from oidcmsg.exception import MissingRequiredAttribute
-from oidcmsg.oauth2 import Message
-from oidcmsg.oauth2 import ResponseMessage
+from oidcmsg.oauth2 import Message, ResponseMessage
 from oidcmsg.oidc import JRD
 
-from oidcservice.oidc import OIC_ISSUER
-from oidcservice.oidc import WF_URL
+from oidcservice.oidc import OIC_ISSUER, WF_URL
 from oidcservice.service import Service
 
 __author__ = 'Roland Hedberg'

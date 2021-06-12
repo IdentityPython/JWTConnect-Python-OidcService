@@ -1,9 +1,10 @@
 import logging
 
-import requests
 from cryptojwt import JWT
 from oidcmsg.message import Message
 from oidcmsg.oauth2 import JWTSecuredAuthorizationRequest
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,14 @@ def push_authorization(request_args, service, **kwargs):
     return request_args
 
 
-def add_pushed_authorization_support(services, body_format="jws", signing_algorthm="RS256",
+def add_pushed_authorization_support(services, body_format="jws", signing_algorithm="RS256",
                                      http_client=None, merge_rule="strict"):
     """
     Add the necessary pieces to make pushed authorization happen.
 
+    :param merge_rule:
+    :param http_client:
+    :param signing_algorithm:
     :param services: A dictionary with all the services the client has access to.
     :param body_format: jws or urlencoded
     """
@@ -64,7 +68,7 @@ def add_pushed_authorization_support(services, body_format="jws", signing_algort
     _service = services["authorization"]
     _service.service_context.add_on['pushed_authorization'] = {
         "body_format": body_format,
-        "signing_algorithm": signing_algorthm,
+        "signing_algorithm": signing_algorithm,
         "http_client": http_client,
         "merge_rule": merge_rule
     }

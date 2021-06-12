@@ -2,20 +2,16 @@ import os
 
 import pytest
 from cryptojwt.key_jar import init_key_jar
-from oidcmsg.message import Message
-from oidcmsg.message import SINGLE_REQUIRED_STRING
+from oidcmsg.message import SINGLE_REQUIRED_STRING, Message
 from oidcmsg.oauth2 import AuthorizationResponse
 
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.oauth2 import DEFAULT_SERVICES
 from oidcservice.oidc.add_on import do_add_ons
-from oidcservice.oidc.add_on.pkce import add_code_challenge
-from oidcservice.oidc.add_on.pkce import add_code_verifier
-from oidcservice.service import Service
-from oidcservice.service import init_services
+from oidcservice.oidc.add_on.pkce import add_code_challenge, add_code_verifier
+from oidcservice.service import Service, init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
+from oidcservice.state_interface import InMemoryStateDataBase, State
 
 
 class DummyMessage(Message):

@@ -4,18 +4,14 @@ from urllib.parse import urlparse
 
 from cryptojwt.jwt import JWT
 from oidcmsg.message import Message
-from oidcmsg.oauth2 import ResponseMessage
-from oidcmsg.oauth2 import is_error_message
+from oidcmsg.oauth2 import ResponseMessage, is_error_message
 
 from oidcservice import util
 from oidcservice.client_auth import factory as ca_factory
 from oidcservice.exception import ResponseError
 from oidcservice.state_interface import StateInterface
-from oidcservice.util import JOSE_ENCODED
-from oidcservice.util import JSON_ENCODED
-from oidcservice.util import URL_ENCODED
-from oidcservice.util import get_http_body
-from oidcservice.util import get_http_url
+from oidcservice.util import (JOSE_ENCODED, JSON_ENCODED, URL_ENCODED,
+                              get_http_body, get_http_url)
 
 __author__ = 'Roland Hedberg'
 
@@ -393,11 +389,14 @@ class Service(StateInterface):
         """
 
         kwargs = {
-            'client_id': self.service_context.get('client_id'),
             'iss': self.service_context.get('issuer'),
             'keyjar': self.service_context.keyjar,
             'verify': True
         }
+
+        _client_id = self.service_context.get('client_id')
+        if _client_id:
+            kwargs['client_id'] = _client_id
 
         if self.service_name == "provider_info":
             if self.service_context.get('issuer').startswith("http://"):

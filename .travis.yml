@@ -1,0 +1,34 @@
+sudo: false
+language: python
+python:
+- 3.6
+- 3.7
+- 3.8
+- pypy3
+addons:
+  apt:
+    packages:
+    -
+install:
+- pip install codecov
+- pip install tox
+- pip install isort
+- pip install tox-travis
+- pip install responses
+script:
+- codecov --version
+- tox
+- isort --check src tests
+after_success:
+- codecov
+notifications:
+  email: false
+deploy:
+  provider: pypi
+  on:
+    tags: true
+  distributions: bdist_wheel
+  skip_existing: true
+  user: __token__
+  password:
+    secure: AH3jGGXVjV/oOlg4cOnsN7pURlZ7JMcd3Prr69Q++rxfsrmFpxCPtQLpO0LUNPisfyctoImpY64auNMHh20AHdlnvXQu8k/YFZCVcyK6N2d66wgJbO9AOT21N6IkFGyW11K3lYIHzURv9RsTEhzSkOhKmPUack5UhSJ+yAUTZXpt6iZqXBvmxMNzNiCLQdUmTMj4HxxkUVPabpef8PLqyDXvAxJxOCss+QcJVZuWFs85Niw0scTkU4SWz2lhOxeqQNg8s+CEgje2KaIoRy2kETywK53G3RFkSp5ytIJPp8RQK039laeal5yjMsWP4KlbDhHrywyNN7yS69FwPuLC41ppde5G054WcuJTm60Y2uckGu6L3oTBMHsAtSfZuEym/qfDngxYADA+xrATJQF5XSrCz13IiBnoz8Y9zI7t9s66PZSBHg99L85jM45M2kJYCDKxNPffJ/JzCnAMTP0yiBMEQ/UfguMDfJMw+6oSPzGcZHuQVzjLO5mUni71X528Psd/iEYCyN+Vi1QbvDZjbNo/oOLtvegOcnu/H1tGWkH4uEXsg2giqkld2hrZi6K3KfcpPtltuP66Z6ohMqcLegqGUNr8mPMP2I58p7if/6xLEu1e7MNZuoV459bnWepoNMMug2NLq/WIPCiGLNCyV4tdbzqcZQLNwjc5ruFLoz8=

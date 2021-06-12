@@ -1,7 +1,7 @@
 import pytest
 
-from oidcservice.service_factory import service_factory
 from oidcservice.service_context import ServiceContext
+from oidcservice.service_factory import service_factory
 from oidcservice.state_interface import InMemoryStateDataBase
 
 KEYDEF = [{"type": "EC", "crv": "P-256", "use": ["sig"]}]

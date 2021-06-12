@@ -1,18 +1,16 @@
 import logging
 
 from oidcmsg import oidc
-from oidcmsg.oidc import make_openid_request
-from oidcmsg.oidc import verified_claim_name
-from oidcmsg.time_util import time_sans_frac
-from oidcmsg.time_util import utc_time_sans_frac
+from oidcmsg.oidc import make_openid_request, verified_claim_name
+from oidcmsg.time_util import time_sans_frac, utc_time_sans_frac
 
 from oidcservice import rndstr
 from oidcservice.exception import ParameterError
 from oidcservice.oauth2 import authorization
 from oidcservice.oauth2.utils import pick_redirect_uris
 from oidcservice.oidc import IDT2REG
-from oidcservice.oidc.utils import construct_request_uri
-from oidcservice.oidc.utils import request_object_encryption
+from oidcservice.oidc.utils import (construct_request_uri,
+                                    request_object_encryption)
 
 __author__ = 'Roland Hedberg'
 
@@ -151,11 +149,12 @@ class Authorization(authorization.Authorization):
             kwargs["keys"] = self.service_context.keyjar
 
         _srv_cntx = self.service_context
-        kwargs['issuer'] = _srv_cntx.get('client_id')
-        # set the audience
-        if audience:
-            kwargs["recv"] = _srv_cntx.get('provider_info')[audience]
-        else:
+
+        # This is the issuer of the JWT, that is me !
+        if kwargs.get('issuer') is None:
+            kwargs['issuer'] = _srv_cntx.get('client_id')
+
+        if kwargs.get('recv') is None:
             try:
                 kwargs['recv'] = _srv_cntx.get('provider_info')['issuer']
             except KeyError:
@@ -214,10 +213,14 @@ class Authorization(authorization.Authorization):
         """
         _ctx = self.service_context
         kwargs = {
-            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
+            'iss': _ctx.get('issuer'),
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
         }
+
+        _client_id = _ctx.get('client_id')
+        if _client_id:
+            kwargs['client_id'] = _client_id
 
         if 'registration_response' in _ctx:
             _reg_res = _ctx.get('registration_response')

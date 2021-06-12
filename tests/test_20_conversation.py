@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
 import json
-
 import time
-from urllib.parse import parse_qs
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from cryptojwt.jwt import JWT
 from cryptojwt.key_jar import KeyJar
+from oidcmsg.oidc import (JRD, AccessTokenResponse, AuthorizationResponse,
+                          Link, OpenIDSchema, ProviderConfigurationResponse,
+                          RegistrationResponse)
 
-from oidcmsg.oidc import AccessTokenResponse, Link
-from oidcmsg.oidc import AuthorizationResponse
-from oidcmsg.oidc import JRD
-from oidcmsg.oidc import OpenIDSchema
-from oidcmsg.oidc import ProviderConfigurationResponse
-from oidcmsg.oidc import RegistrationResponse
+from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.webfinger import WebFinger
-
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.state_interface import InMemoryStateDataBase
 
 # ================== SETUP ===========================

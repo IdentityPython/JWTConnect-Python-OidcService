@@ -3,35 +3,25 @@ import os
 from urllib.parse import quote_plus
 
 import pytest
-
-from cryptojwt.key_bundle import KeyBundle
-from cryptojwt.key_jar import KeyJar
 from cryptojwt.jws.jws import JWS
 from cryptojwt.jwt import JWT
+from cryptojwt.key_bundle import KeyBundle
+from cryptojwt.key_jar import KeyJar
 from oidcmsg.message import Message
+from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
+                            AuthorizationRequest, AuthorizationResponse,
+                            CCAccessTokenRequest, ResourceRequest)
 
 from oidcservice import JWT_BEARER
-from oidcservice.client_auth import assertion_jwt
-from oidcservice.client_auth import BearerBody
-from oidcservice.client_auth import BearerHeader
-from oidcservice.client_auth import ClientSecretBasic
-from oidcservice.client_auth import ClientSecretJWT
-from oidcservice.client_auth import ClientSecretPost
-from oidcservice.client_auth import PrivateKeyJWT
-from oidcservice.client_auth import valid_service_context
+from oidcservice.client_auth import (BearerBody, BearerHeader,
+                                     ClientSecretBasic, ClientSecretJWT,
+                                     ClientSecretPost, PrivateKeyJWT,
+                                     assertion_jwt, valid_service_context)
 from oidcservice.oidc import DEFAULT_SERVICES
-from oidcservice.service_factory import service_factory
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
-
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import AccessTokenResponse
-from oidcmsg.oauth2 import AuthorizationRequest
-from oidcmsg.oauth2 import AuthorizationResponse
-from oidcmsg.oauth2 import CCAccessTokenRequest
-from oidcmsg.oauth2 import ResourceRequest
+from oidcservice.service_factory import service_factory
+from oidcservice.state_interface import InMemoryStateDataBase, State
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 CLIENT_ID = "A"
@@ -269,12 +259,13 @@ class TestPrivateKeyJWT(object):
         _service.service_context.set('provider_info', {
             'issuer': 'https://example.com/',
             'token_endpoint': "https://example.com/token"})
+        _service.service_context.set("registration_response", {
+            'token_endpoint_auth_signing_alg': 'RS256'})
         services['accesstoken'].endpoint = "https://example.com/token"
 
         request = AccessTokenRequest()
         pkj = PrivateKeyJWT()
-        http_args = pkj.construct(request, service=_service, algorithm="RS256",
-                                  authn_endpoint='token_endpoint')
+        http_args = pkj.construct(request, service=_service, authn_endpoint='token_endpoint')
         assert http_args == {}
         cas = request["client_assertion"]
 
@@ -307,15 +298,18 @@ class TestClientSecretJWT_TE(object):
     def test_client_secret_jwt(self, services):
         _service_context = services['accesstoken'].service_context
         _service_context.token_endpoint = "https://example.com/token"
+
         _service_context.set('provider_info', {
             'issuer': 'https://example.com/',
             'token_endpoint': "https://example.com/token"})
 
+        _service_context.set("registration_response", {
+            'token_endpoint_auth_signing_alg': "HS256"})
+
         csj = ClientSecretJWT()
         request = AccessTokenRequest()
 
-        csj.construct(request, service=services['accesstoken'],
-                      algorithm="HS256", authn_endpoint='token_endpoint')
+        csj.construct(request, service=services['accesstoken'], authn_endpoint='token_endpoint')
         assert request["client_assertion_type"] == JWT_BEARER
         assert "client_assertion" in request
         cas = request["client_assertion"]

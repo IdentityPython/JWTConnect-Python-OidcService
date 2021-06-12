@@ -1,9 +1,8 @@
 """A database interface for storing state information."""
 import json
 
-from oidcmsg.message import Message
-from oidcmsg.message import SINGLE_OPTIONAL_JSON
-from oidcmsg.message import SINGLE_REQUIRED_STRING
+from oidcmsg.message import (SINGLE_OPTIONAL_JSON, SINGLE_REQUIRED_STRING,
+                             Message)
 from oidcmsg.oidc import verified_claim_name
 
 from oidcservice import rndstr

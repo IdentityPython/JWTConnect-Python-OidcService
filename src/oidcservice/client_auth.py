@@ -4,17 +4,14 @@ import logging
 from urllib.parse import quote_plus
 
 from cryptojwt.exception import MissingKey
+from cryptojwt.jws.jws import SIGNER_ALGS
 from cryptojwt.jws.utils import alg2keytype
 from oidcmsg.message import VREQUIRED
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING
+from oidcmsg.oauth2 import SINGLE_OPTIONAL_STRING, AccessTokenRequest
 from oidcmsg.oidc import AuthnToken
 from oidcmsg.time_util import utc_time_sans_frac
 
-from oidcservice import DEF_SIGN_ALG
-from oidcservice import JWT_BEARER
-from oidcservice import rndstr
-from oidcservice import sanitize
+from oidcservice import DEF_SIGN_ALG, JWT_BEARER, rndstr, sanitize
 
 LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +125,7 @@ class ClientSecretBasic(ClientAuthnMethod):
         :param service: A :py:class:`oidcservice.service.Service` instance
         """
         if isinstance(request, AccessTokenRequest) and request[
-                'grant_type'] == 'authorization_code':
+            'grant_type'] == 'authorization_code':
             if 'client_id' not in request:
                 try:
                     request['client_id'] = service.service_context.get('client_id')
@@ -315,6 +312,7 @@ class BearerHeader(ClientAuthnMethod):
 
 class BearerBody(ClientAuthnMethod):
     """The bearer body authentication method."""
+
     def modify_request(self, request, service, **kwargs):
         """
         Modify the request if necessary.
@@ -450,11 +448,24 @@ class JWSAuthnMethod(ClientAuthnMethod):
         # audience for the signed JWT depends on which endpoint
         # we're talking to.
         if 'authn_endpoint' in kwargs and kwargs['authn_endpoint'] in ['token_endpoint']:
-            try:
-                algorithm = context.behaviour[
-                    'token_endpoint_auth_signing_alg']
-            except (KeyError, AttributeError):
-                pass
+            reg_resp = context.get("registration_response")
+            if reg_resp:
+                algorithm = reg_resp.get("token_endpoint_auth_signing_alg")
+            else:
+                algorithm = context.client_preferences.get("token_endpoint_auth_signing_alg")
+                if algorithm is None:
+                    _pi = context.get("provider_info")
+                    try:
+                        algs = _pi["token_endpoint_auth_signing_alg_values_supported"]
+                    except KeyError:
+                        algorithm = "RS256"  # default
+                    else:
+                        for alg in algs:  # pick the first one I support and have keys for
+                            if alg in SIGNER_ALGS and self.get_signing_key_from_keyjar(alg,
+                                                                                       context):
+                                algorithm = alg
+                                break
+
             audience = context.get('provider_info')['token_endpoint']
         else:
             audience = context.get('provider_info')['issuer']

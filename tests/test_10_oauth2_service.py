@@ -1,15 +1,12 @@
 import pytest
-from oidcmsg.oauth2 import AccessTokenRequest
-from oidcmsg.oauth2 import AccessTokenResponse
-from oidcmsg.oauth2 import AuthorizationRequest
-from oidcmsg.oauth2 import AuthorizationResponse
-from oidcmsg.oauth2 import Message
+from oidcmsg.oauth2 import (AccessTokenRequest, AccessTokenResponse,
+                            AuthorizationRequest, AuthorizationResponse,
+                            Message)
 
 from oidcservice.service import Service
 from oidcservice.service_context import ServiceContext
 from oidcservice.service_factory import service_factory
-from oidcservice.state_interface import InMemoryStateDataBase
-from oidcservice.state_interface import State
+from oidcservice.state_interface import InMemoryStateDataBase, State
 
 
 class Response(object):

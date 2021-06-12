@@ -2,7 +2,6 @@
 import logging
 
 from cryptojwt.key_jar import KeyJar
-
 from oidcmsg import oauth2
 from oidcmsg.oauth2 import ResponseMessage
 
