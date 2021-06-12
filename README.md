@@ -1,3 +1,8 @@
+# Archived !!
+
+The functionality in this package has been included in the IdentityPython/JWTConnect-Python-OidcRP package.
+This package is therefor redundant and has been archived.
+
 # oidcservice
 #### Implementation of OIDC/OAuth2 services
 
