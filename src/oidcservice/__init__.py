@@ -8,7 +8,7 @@ except ImportError:
     import random as rnd
 
 __author__ = 'Roland Hedberg'
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 
 OIDCONF_PATTERN = "{}/.well-known/openid-configuration"
 CC_METHOD = {

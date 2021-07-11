@@ -49,7 +49,7 @@ class UserInfo(Service):
         if "access_token" in request_args:
             pass
         else:
-            request_args = self.multiple_extend_request_args(
+            request_args = self.service_context.state.multiple_extend_request_args(
                 request_args, kwargs['state'], ['access_token'],
                 ['auth_response', 'token_response', 'refresh_token_response']
             )
@@ -57,7 +57,8 @@ class UserInfo(Service):
         return request_args, {}
 
     def post_parse_response(self, response, **kwargs):
-        _args = self.multiple_extend_request_args(
+        _state_interface = self.service_context.state
+        _args = _state_interface.multiple_extend_request_args(
             {}, kwargs['state'], ['id_token'],
             ['auth_response', 'token_response', 'refresh_token_response']
         )
@@ -96,11 +97,13 @@ class UserInfo(Service):
                     _info = {
                         "headers": self.get_authn_header(
                             {}, self.default_authn_method,
-                            authn_endpoint=self.endpoint_name),
+                            authn_endpoint=self.endpoint_name,
+                            key=kwargs["state"]
+                        ),
                         "url": spec["endpoint"]
                     }
 
-        self.store_item(response, 'user_info', kwargs['state'])
+        _state_interface.store_item(response, 'user_info', kwargs['state'])
         return response
 
     def gather_verify_arguments(self):
@@ -111,12 +114,13 @@ class UserInfo(Service):
         """
         _ctx = self.service_context
         kwargs = {
-            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
+            'client_id': _ctx.client_id,
+            'iss': _ctx.issuer,
             'keyjar': _ctx.keyjar, 'verify': True,
             'skew': _ctx.clock_skew
         }
 
-        _reg_resp = _ctx.get('registration_response')
+        _reg_resp = _ctx.registration_response
         if _reg_resp:
             for attr, param in UI2REG.items():
                 try:

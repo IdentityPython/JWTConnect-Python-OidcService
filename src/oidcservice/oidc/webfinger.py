@@ -58,7 +58,7 @@ class WebFinger(Service):
                         raise ValueError(
                             'http link not allowed ({})'.format(_href))
 
-                    self.service_context.set('issuer', link['href'])
+                    self.service_context.issuer = link['href']
                     break
         return resp
 

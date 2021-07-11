@@ -1,6 +1,7 @@
 """A database interface for storing state information."""
 import json
 
+from oidcmsg.impexp import ImpExp
 from oidcmsg.message import (SINGLE_OPTIONAL_JSON, SINGLE_REQUIRED_STRING,
                              Message)
 from oidcmsg.oidc import verified_claim_name
@@ -71,10 +72,16 @@ class InMemoryStateDataBase:
             pass
 
 
-class StateInterface:
+class StateInterface(ImpExp):
     """A more powerful interface to a state DB."""
-    def __init__(self, state_db):
-        self.state_db = state_db
+
+    parameter = {
+        "_db": None
+    }
+
+    def __init__(self):
+        ImpExp.__init__(self)
+        self._db = {}
 
     def get_state(self, key):
         """
@@ -83,7 +90,7 @@ class StateInterface:
         :param key: Key into the state database
         :return: A :py:class:´oidcservice.state_interface.State` instance
         """
-        _data = self.state_db.get(key)
+        _data = self._db.get(key)
         if not _data:
             raise KeyError(key)
 
@@ -109,7 +116,7 @@ class StateInterface:
         except AttributeError:
             _state[item_type] = item
 
-        self.state_db[key] = _state.to_json()
+        self._db[key] = _state.to_json()
 
     def get_iss(self, key):
         """
@@ -233,9 +240,9 @@ class StateInterface:
         :param state: The state value
         :param xtyp: The type of value x is (e.g. nonce, ...)
         """
-        self.state_db[KEY_PATTERN[xtyp].format(value)] = state
+        self._db[KEY_PATTERN[xtyp].format(value)] = state
         try:
-            _val = self.state_db.get("ref{}ref".format(state))
+            _val = self._db.get("ref{}ref".format(state))
         except KeyError:
             _val = None
 
@@ -244,7 +251,7 @@ class StateInterface:
         else:
             refs = json.loads(_val)
             refs[xtyp] = value
-        self.state_db["ref{}ref".format(state)] = json.dumps(refs)
+        self._db["ref{}ref".format(state)] = json.dumps(refs)
 
     def get_state_by_x(self, value, xtyp):
         """
@@ -255,7 +262,7 @@ class StateInterface:
         :param value: The value
         :return: The state value
         """
-        _state = self.state_db.get(KEY_PATTERN[xtyp].format(value))
+        _state = self._db.get(KEY_PATTERN[xtyp].format(value))
         if _state:
             return _state
 
@@ -363,7 +370,7 @@ class StateInterface:
                     'Invalid format. Leading and trailing "__" not allowed')
 
         _state = State(iss=iss)
-        self.state_db[key] = _state.to_json()
+        self._db[key] = _state.to_json()
         return key
 
     def remove_state(self, state):
@@ -372,8 +379,8 @@ class StateInterface:
 
         :param state: Key to the state
         """
-        self.state_db.delete(state)
-        refs = json.loads(self.state_db.get("ref{}ref".format(state)))
+        del self._db[state]
+        refs = json.loads(self._db_db.get("ref{}ref".format(state)))
         if refs:
             for xtyp, _val in refs.items():
-                self.state_db.delete(KEY_PATTERN[xtyp].format(_val))
+                del self._db[KEY_PATTERN[xtyp].format(_val)]

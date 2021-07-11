@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from oidcmsg import oidc
 from oidcmsg.oidc import verified_claim_name
@@ -18,8 +19,10 @@ class AccessToken(access_token.AccessToken):
     response_cls = oidc.AccessTokenResponse
     error_msg = oidc.ResponseMessage
 
-    def __init__(self, service_context, client_authn_factory=None,
-                 conf=None):
+    def __init__(self,
+                 service_context,
+                 client_authn_factory=None,
+                 conf: Optional[dict]=None):
         access_token.AccessToken.__init__(self, service_context,
                                           client_authn_factory=client_authn_factory, conf=conf)
 
@@ -33,13 +36,15 @@ class AccessToken(access_token.AccessToken):
         # Default is RS256
 
         kwargs = {
-            'client_id': _ctx.get('client_id'), 'iss': _ctx.get('issuer'),
-            'keyjar': _ctx.keyjar, 'verify': True,
+            'client_id': _ctx.client_id,
+            'iss': _ctx.issuer,
+            'keyjar': _ctx.keyjar,
+            'verify': True,
             'skew': _ctx.clock_skew,
         }
 
-        if 'registration_response' in _ctx:
-            _reg_resp = _ctx.get('registration_response')
+        _reg_resp = _ctx.registration_response
+        if _reg_resp:
             for attr, param in IDT2REG.items():
                 try:
                     kwargs[attr] = _reg_resp[param]
@@ -51,36 +56,36 @@ class AccessToken(access_token.AccessToken):
         except KeyError:
             pass
 
-        if 'behaviour' in _ctx:
-            _verify_args = _ctx.get('behaviour').get("verify_args")
+        _verify_args = _ctx.behaviour.get("verify_args")
+        if _verify_args:
             if _verify_args:
                 kwargs.update(_verify_args)
 
         return kwargs
 
     def update_service_context(self, resp, key='', **kwargs):
+        _state_interface = self.service_context.state
         try:
             _idt = resp[verified_claim_name('id_token')]
         except KeyError:
             pass
         else:
             try:
-                if self.get_state_by_nonce(_idt['nonce']) != key:
+                if _state_interface.get_state_by_nonce(_idt['nonce']) != key:
                     raise ParameterError('Someone has messed with "nonce"')
             except KeyError:
                 raise ValueError('Invalid nonce value')
 
-            self.store_sub2state(_idt['sub'], key)
+            _state_interface.store_sub2state(_idt['sub'], key)
 
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(
                 resp['expires_in'])
 
-        self.store_item(resp, 'token_response', key)
+        _state_interface.store_item(resp, 'token_response', key)
 
     def get_authn_method(self):
         try:
-            return self.service_context.get('behaviour')[
-                'token_endpoint_auth_method']
+            return self.service_context.behaviour['token_endpoint_auth_method']
         except KeyError:
             return self.default_authn_method

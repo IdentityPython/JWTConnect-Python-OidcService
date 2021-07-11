@@ -22,13 +22,15 @@ class CCRefreshAccessToken(Service):
         self.post_construct.append(self.cc_post_construct)
 
     def cc_pre_construct(self, request_args=None, **kwargs):
+        _state_id = kwargs.get("state", "cc")
         parameters = ['refresh_token']
-        _args = self.extend_request_args({}, oauth2.AccessTokenResponse,
-                                         'token_response', 'cc', parameters)
+        _state_interface = self.service_context.state
+        _args = _state_interface.extend_request_args({}, oauth2.AccessTokenResponse,
+                                                     'token_response', _state_id, parameters)
 
-        _args = self.extend_request_args(_args, oauth2.AccessTokenResponse,
-                                         'refresh_token_response', 'cc',
-                                         parameters)
+        _args = _state_interface.extend_request_args(_args, oauth2.AccessTokenResponse,
+                                                     'refresh_token_response', _state_id,
+                                                     parameters)
 
         if request_args is None:
             request_args = _args
@@ -50,4 +52,4 @@ class CCRefreshAccessToken(Service):
     def update_service_context(self, resp, key='cc', **kwargs):
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp, 'token_response', key)
+        self.service_context.state.store_item(resp, 'token_response', key)

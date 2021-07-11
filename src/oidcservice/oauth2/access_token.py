@@ -32,7 +32,7 @@ class AccessToken(Service):
     def update_service_context(self, resp, key='', **kwargs):
         if 'expires_in' in resp:
             resp['__expires_at'] = time_sans_frac() + int(resp['expires_in'])
-        self.store_item(resp, 'token_response', key)
+        self.service_context.state.store_item(resp, 'token_response', key)
 
     def oauth_pre_construct(self, request_args=None, post_args=None, **kwargs):
         """
@@ -44,11 +44,11 @@ class AccessToken(Service):
         _state = get_state_parameter(request_args, kwargs)
         parameters = list(self.msg_type.c_param.keys())
 
-        _args = self.extend_request_args({}, oauth2.AuthorizationRequest,
-                                         'auth_request', _state, parameters)
+        _args = self.service_context.state.extend_request_args({}, oauth2.AuthorizationRequest,
+                                                               'auth_request', _state, parameters)
 
-        _args = self.extend_request_args(_args, oauth2.AuthorizationResponse,
-                                         'auth_response', _state, parameters)
+        _args = self.service_context.state.extend_request_args(_args, oauth2.AuthorizationResponse,
+                                                               'auth_response', _state, parameters)
 
         if "grant_type" not in _args:
             _args["grant_type"] = "authorization_code"

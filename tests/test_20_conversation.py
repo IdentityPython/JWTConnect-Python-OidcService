@@ -6,21 +6,19 @@ from urllib.parse import parse_qs, urlparse
 from cryptojwt.jwt import JWT
 from cryptojwt.key_jar import KeyJar
 from oidcmsg.oidc import (JRD, AccessTokenResponse, AuthorizationResponse,
-                          Link, OpenIDSchema, ProviderConfigurationResponse,
-                          RegistrationResponse)
+                          Link, OpenIDSchema, ProviderConfigurationResponse)
 
 from oidcservice.oidc import DEFAULT_SERVICES
 from oidcservice.oidc.webfinger import WebFinger
 from oidcservice.service import init_services
 from oidcservice.service_context import ServiceContext
-from oidcservice.state_interface import InMemoryStateDataBase
 
 # ================== SETUP ===========================
 
 KEYSPEC = [
     {"type": "RSA", "use": ["sig"]},
     {"type": "EC", "crv": "P-256", "use": ["sig"]},
-    ]
+]
 
 JWKS_OP = {
     'keys': [{
@@ -30,13 +28,18 @@ JWKS_OP = {
         'kid': 'c19uYlBJXzVfNjNZeGVnYmxncHZwUzZTZDVwUFdxdVJLU3AxQXdwaFdfbw',
         'kty': 'RSA',
         'n': '3ZblhNL2CjRktLM9vyDn8jnA4G1B1HCpPh'
-             '-gv2AK4m9qDBZPYZGOGqzeW3vanvLTBlqnPm0GHg4rOrfMEwwLrfMcgmg1y4GD0vVU8G9HP1-oUPtKUqaKOp313tFKzFh9_OHGQ6EmhxG7gegPR9kQXduTDXqBFi81MzRplIQ8DHLM3-n2CyDW1V-dhRVh-AM0ZcJyzR_DvZ3mhG44DysPdHQOSeWnpdn1d81-PriqZfhAF9tn1ihgtjXd5swf1HTSjLd7xv1hitGf2245Xmr-V2pQFzeMukLM3JKbTYbElsB7Zm0wZx49hZMtgx35XMoO04bifdbO3yLtTA5ovXN3fQ',
+             '-gv2AK4m9qDBZPYZGOGqzeW3vanvLTBlqnPm0GHg4rOrfMEwwLrfMcgmg1y4GD0vVU8G9HP1'
+             '-oUPtKUqaKOp313tFKzFh9_OHGQ6EmhxG7gegPR9kQXduTDXqBFi81MzRplIQ8DHLM3-n2CyDW1V-dhRVh'
+             '-AM0ZcJyzR_DvZ3mhG44DysPdHQOSeWnpdn1d81'
+             '-PriqZfhAF9tn1ihgtjXd5swf1HTSjLd7xv1hitGf2245Xmr'
+             '-V2pQFzeMukLM3JKbTYbElsB7Zm0wZx49hZMtgx35XMoO04bifdbO3yLtTA5ovXN3fQ',
         'p': '88aNu59aBn0elksaVznzoVKkdbT5B4euhOIEqJoFvFbEocw9mC4k'
-             '-yozIAQSV5FEakoSPOl8lrymCoM3Q1fVHfaM9Rbb9RCRlsV1JOeVVZOE05HUdz8zOIqLBDEGM_oQqDwF_kp-4nDTZ1-dtnGdTo4Cf7QRuApzE_dwVabUCTc',
+             '-yozIAQSV5FEakoSPOl8lrymCoM3Q1fVHfaM9Rbb9RCRlsV1JOeVVZOE05HUdz8zOIqLBDEGM_oQqDwF_kp'
+             '-4nDTZ1-dtnGdTo4Cf7QRuApzE_dwVabUCTc',
         'q':
             '6LOHuM7H_0kDrMTwUEX7Aubzr792GoJ6EgTKIQY25SAFTZpYwuC3NnqlAdy8foIa3d7eGU2yICRbBG0S_ITcooDFrOa7nZ6enMUclMTxW8FwwvBXeIHo9cIsrKYtOThGplz43Cvl73MK5M58ZRmuhaNYa6Mk4PL4UokARfEiDus',
         'use': 'sig'
-        },
+    },
         {
             'crv': 'P-256',
             'd': 'N2dg0-DAROBF8owQA4-uY5s0Ab-Fep_42kEFQG4BNVQ',
@@ -45,8 +48,8 @@ JWKS_OP = {
             'use': 'sig',
             'x': 'Ls8SqX8Ti5QAKtw3rdGr5K537-tqQCIbhyebeE_2C38',
             'y': 'S-BrbPQkh8HVFLWg5Wid_5OAk4ewn5skHlHtG08ShaA'
-            }
-        ]
+        }
+    ]
 }
 
 OP_KEYJAR = KeyJar()
@@ -68,7 +71,8 @@ RP_JWKS = {
         "p":
             "_STNoJFkX9_uw8whytVmTrHP5K7vcZBIH9nuCTvj137lC48ZpR1UARx4qShxHLfK7DrufHd7TYnJkEMNUHFmdKvkaVQMY0_BsBSvCrUl10gzxsI08hg53L17E1Pe73iZp3f5nA4eB-1YB-km1Cc-Xs10OPWedJHf9brlCPDLAb8",
         "q":
-            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
+            "yz9T0rPEc0ZPjSi45gsYiQL2KJ3UsPHmLrgOHq0D4UvsB6UFtUtOWh7A1UpQdmBuHjIJz"
+            "-Iq7VH4kzlI6VxoXhwE69oxBXr4I7fBudZRvlLuIJS9M2wvsTVouj0DBYSR6ZlAQHCCou89P2P6zQCEaqu7bWXNcpyTixbbvOU1w9k"
     },
         {
             "kty": "EC", "use": "sig",
@@ -78,7 +82,7 @@ RP_JWKS = {
             "y": "EpxHNZp6ykyeLiS6r7l9ly2in1Zju7hnLk7RFraklxE",
             "d": "pepDloEcTyHnoEuqFirZ8hpt861piMDgiuvHIhhRSpM"
         }]
-    }
+}
 
 RP_KEYJAR = KeyJar()
 RP_KEYJAR.import_jwks(RP_JWKS, '')
@@ -93,8 +97,8 @@ OP_KEYJAR.import_jwks(SERVICE_PUBLIC_JWKS, RP_BASEURL)
 
 def test_conversation():
     service_context = ServiceContext(
-        RP_KEYJAR,
-        {
+        keyjar = RP_KEYJAR,
+        config = {
             "client_preferences":
                 {
                     "application_type": "web",
@@ -103,17 +107,17 @@ def test_conversation():
                     "response_types": ["code"],
                     "scope": ["openid", "profile", "email", "address", "phone"],
                     "token_endpoint_auth_method": "client_secret_basic",
-                    },
+                },
             "redirect_uris": ["{}/authz_cb".format(RP_BASEURL)],
             "jwks_uri": "{}/static/jwks.json".format(RP_BASEURL)
-            }
-        )
+        }
+    )
 
     service_spec = DEFAULT_SERVICES.copy()
     service_spec['WebFinger'] = {'class': WebFinger}
 
     service = init_services(service_spec,
-                             service_context=service_context)
+                            service_context=service_context)
 
     assert set(service.keys()) == {'accesstoken', 'authorization', 'webfinger',
                                    'registration', 'refresh_token', 'userinfo',
@@ -136,9 +140,9 @@ def test_conversation():
     webfinger_response = json.dumps({
         "subject": "acct:foobar@example.org",
         "links": [{
-                      "rel": "http://openid.net/specs/connect/1.0/issuer",
-                      "href": "https://example.org/op"
-                  }],
+            "rel": "http://openid.net/specs/connect/1.0/issuer",
+            "href": "https://example.org/op"
+        }],
         "expires": "2018-02-04T11:08:41Z"
     })
 
@@ -151,7 +155,7 @@ def test_conversation():
              href='https://example.org/op')]
 
     service['webfinger'].update_service_context(resp=response)
-    service_context.set('issuer', OP_BASEURL)
+    service_context.issuer= OP_BASEURL
 
     # =================== Provider info discovery ====================
 
@@ -251,7 +255,7 @@ def test_conversation():
     assert isinstance(resp, ProviderConfigurationResponse)
     service['provider_info'].update_service_context(resp)
 
-    _pi = service_context.get('provider_info')
+    _pi = service_context.provider_info
     assert _pi['issuer'] == OP_BASEURL
     assert _pi['authorization_endpoint'] == 'https://example.org/op/authorization'
     assert _pi['registration_endpoint'] == 'https://example.org/op/registration'
@@ -295,9 +299,9 @@ def test_conversation():
         op_client_registration_response)
 
     service['registration'].update_service_context(response)
-    assert service_context.get('client_id') == 'zls2qhN1jO6A'
-    assert service_context.get('client_secret') == 'c8434f28cf9375d9a7'
-    assert set(service_context.get('registration_response').keys()) == {
+    assert service_context.client_id == 'zls2qhN1jO6A'
+    assert service_context.client_secret == 'c8434f28cf9375d9a7'
+    assert set(service_context.registration_response.keys()) == {
         'client_secret_expires_at', 'contacts', 'client_id',
         'token_endpoint_auth_method', 'redirect_uris', 'response_types',
         'client_id_issued_at', 'client_secret', 'application_type',
@@ -308,6 +312,8 @@ def test_conversation():
 
     STATE = 'Oh3w3gKlvoM2ehFqlxI3HIK5'
     NONCE = 'UvudLKz287YByZdsY3AJoPAlEXQkJ0dK'
+
+    _state_interface = service["authorization"].service_context.state
 
     info = service['authorization'].get_request_parameters(
         request_args={'state': STATE, 'nonce': NONCE})
@@ -332,15 +338,15 @@ def test_conversation():
 
     _resp = service['authorization'].parse_response(_authz_rep.to_urlencoded())
     service['authorization'].update_service_context(_resp, key=STATE)
-    _item = service['authorization'].get_item(AuthorizationResponse,
-                                              'auth_response', STATE)
+    _item = _state_interface.get_item(AuthorizationResponse,
+                                      'auth_response', STATE)
     assert _item['code'] == 'Z0FBQUFBQmFkdFFjUVpFWE81SHU5N1N4N01'
 
     # =================== Access token ====================
 
     request_args = {
         'state': STATE,
-        'redirect_uri': service_context.get('redirect_uris')[0]
+        'redirect_uri': service_context.redirect_uris[0]
     }
 
     info = service['accesstoken'].get_request_parameters(
@@ -379,7 +385,7 @@ def test_conversation():
         "id_token": _jws
     }
 
-    service_context.set('issuer', OP_BASEURL)
+    service_context.issuer= OP_BASEURL
     _resp = service['accesstoken'].parse_response(json.dumps(_resp),
                                                   state=STATE)
 
@@ -389,8 +395,8 @@ def test_conversation():
 
     service['accesstoken'].update_service_context(_resp, key=STATE)
 
-    _item = service['authorization'].get_item(AccessTokenResponse,
-                                              'token_response', STATE)
+    _item = _state_interface.get_item(AccessTokenResponse,
+                                      'token_response', STATE)
 
     assert set(_item.keys()) == {'state', 'scope', 'access_token',
                                  'token_type', 'id_token',
@@ -415,6 +421,6 @@ def test_conversation():
     assert isinstance(_resp, OpenIDSchema)
     assert _resp.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}
 
-    _item = service['authorization'].get_item(OpenIDSchema,
-                                              'user_info', STATE)
+    _item = _state_interface.get_item(OpenIDSchema,
+                                      'user_info', STATE)
     assert _item.to_dict() == {'sub': '1b2fc9341a16ae4e30082965d537'}

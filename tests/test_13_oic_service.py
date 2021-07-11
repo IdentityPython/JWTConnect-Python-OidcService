@@ -14,6 +14,7 @@ from oidcmsg.oidc import (IdToken, OpenIDSchema, RegistrationRequest,
                           verified_claim_name)
 from oidcmsg.oidc.session import (CheckIDRequest, CheckSessionRequest,
                                   EndSessionRequest)
+import responses
 
 from oidcservice.exception import ParameterError
 from oidcservice.oidc.registration import (add_jwks_uri_or_jwks,
@@ -49,8 +50,7 @@ ISS_KEY = init_key_jar(public_path='{}/pub_iss.jwks'.format(_dirname),
 ISS_KEY.import_jwks_as_json(open('{}/pub_client.jwks'.format(_dirname)).read(),
                             'client_id')
 
-CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(),
-                            ISS)
+CLI_KEY.import_jwks_as_json(open('{}/pub_iss.jwks'.format(_dirname)).read(), ISS)
 
 
 # def test_request_factory():
@@ -66,8 +66,8 @@ class TestAuthorization(object):
             'client_id': 'client_id', 'client_secret': 'a longesh password',
             'redirect_uris': ['https://example.com/cli/authz_cb']
         }
-        service_context = ServiceContext(CLI_KEY, config=client_config)
-        service_context.set('issuer', 'https://example.com')
+        service_context = ServiceContext(keyjar=CLI_KEY, config=client_config)
+        service_context.issuer= 'https://example.com'
         self.service = service_factory('Authorization', ['oidc'],
                                        service_context=service_context)
 
@@ -119,7 +119,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.keys()) == {'response_type', 'state', 'client_id',
@@ -129,7 +129,7 @@ class TestAuthorization(object):
         req_args = {'response_type': 'code', 'state': 'state'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.keys()) == {'client_id', 'scope', 'response_type',
@@ -140,7 +140,7 @@ class TestAuthorization(object):
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='value')
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
         msg = AuthorizationRequest().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert set(msg.to_dict()) == {'client_id', 'redirect_uri', 'request',
@@ -161,15 +161,15 @@ class TestAuthorization(object):
 
         assert os.path.isfile(os.path.join(_dirname, 'request123456.jwt'))
 
-        self.service.service_context.set('registration_response', {
+        self.service.service_context.registration_response= {
             'redirect_uris': ['https://example.com/cb'],
             'request_uris': ['https://example.com/request123456.jwt']
-        })
+        }
         self.service.service_context.base_url = 'https://example.com/'
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     request_method='reference')
 
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', 'request'}
 
     def test_update_service_context_no_idtoken(self):
         req_args = {'response_type': 'code', 'state': 'state'}
@@ -243,7 +243,7 @@ class TestAuthorization(object):
         idt = JWT(ISS_KEY, iss=ISS, lifetime=3600, sign_alg='none')
         payload = {'sub': '123456789', 'aud': ['client_id']}
         _idt = idt.pack(payload)
-        self.service.service_context.get('behaviour')["verify_args"] = {
+        self.service.service_context.behaviour["verify_args"] = {
             "allow_sign_alg_none": allow_sign_alg_none
         }
         resp = AuthorizationResponse(state='state', code='code', id_token=_idt)
@@ -319,10 +319,12 @@ class TestAccessTokenRequest(object):
         auth_request = AuthorizationRequest(
             redirect_uri='https://example.com/cli/authz_cb',
             state='state', response_type='code').to_json()
-        self.service.store_item(auth_request, "auth_request", 'state')
+
+        _stat_interface = service_context.state
+        _stat_interface.store_item(auth_request, "auth_request", 'state')
 
         auth_response = AuthorizationResponse(code='access_code').to_json()
-        self.service.store_item(auth_response, "auth_response", 'state')
+        _stat_interface.store_item(auth_response, "auth_response", 'state')
 
     def test_construct(self):
         req_args = {'foo': 'bar'}
@@ -343,7 +345,7 @@ class TestAccessTokenRequest(object):
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state',
                                                     authn_method='client_secret_basic')
-        assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
+        assert set(_info.keys()) == {'body', 'url', 'headers', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
@@ -362,7 +364,7 @@ class TestAccessTokenRequest(object):
 
         _info = self.service.get_request_parameters(request_args=req_args,
                                                     state='state')
-        assert set(_info.keys()) == {'body', 'url', 'headers', 'method'}
+        assert set(_info.keys()) == {'body', 'url', 'headers', 'method', 'request'}
         assert _info['url'] == 'https://example.com/authorize'
         msg = AccessTokenRequest().from_urlencoded(
             self.service.get_urlinfo(_info['body']))
@@ -373,10 +375,11 @@ class TestAccessTokenRequest(object):
         }
 
     def test_id_token_nonce_match(self):
-        self.service.store_nonce2state('nonce', 'state')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_nonce2state('nonce', 'state')
         resp = AccessTokenResponse()
         resp[verified_claim_name('id_token')] = {'nonce': 'nonce'}
-        self.service.store_nonce2state('nonce2', 'state2')
+        _state_interface.store_nonce2state('nonce2', 'state2')
         with pytest.raises(ParameterError):
             self.service.update_service_context(resp, key='state2')
 
@@ -497,18 +500,24 @@ class TestProviderInfo(object):
                 "A128GCM", "A192GCM", "A256GCM"],
             "acr_values_supported": ["PASSWORD"],
             "issuer": OP_BASEURL,
-            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
-                OP_BASEURL),
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(OP_BASEURL),
             "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
             "token_endpoint": "{}/token".format(OP_BASEURL),
             "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.get('behaviour') == {}
+        assert self.service.service_context.behaviour == {}
         resp = self.service.post_parse_response(provider_info_response)
-        self.service.update_service_context(resp)
-        assert self.service.service_context.get('behaviour') == {
+
+        iss_jwks = ISS_KEY.export_jwks_as_json(issuer_id=ISS)
+        with responses.RequestsMock() as rsps:
+            rsps.add("GET", resp["jwks_uri"],
+                     body=iss_jwks, status=200)
+
+            self.service.update_service_context(resp)
+
+        assert self.service.service_context.behaviour == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -526,18 +535,24 @@ class TestProviderInfo(object):
                 "client_secret_post", "client_secret_basic",
                 "client_secret_jwt", "private_key_jwt"],
             "issuer": OP_BASEURL,
-            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(
-                OP_BASEURL),
+            "jwks_uri": "{}/static/jwks_tE2iLbOAqXhe8bqh.json".format(OP_BASEURL),
             "authorization_endpoint": "{}/authorization".format(OP_BASEURL),
             "token_endpoint": "{}/token".format(OP_BASEURL),
             "userinfo_endpoint": "{}/userinfo".format(OP_BASEURL),
             "registration_endpoint": "{}/registration".format(OP_BASEURL),
             "end_session_endpoint": "{}/end_session".format(OP_BASEURL)
         }
-        assert self.service.service_context.get('behaviour') == {}
+        assert self.service.service_context.behaviour == {}
         resp = self.service.post_parse_response(provider_info_response)
-        self.service.update_service_context(resp)
-        assert self.service.service_context.get('behaviour') == {
+
+        iss_jwks = ISS_KEY.export_jwks_as_json(issuer_id=ISS)
+        with responses.RequestsMock() as rsps:
+            rsps.add("GET", resp["jwks_uri"],
+                     body=iss_jwks, status=200)
+
+            self.service.update_service_context(resp)
+
+        assert self.service.service_context.behaviour == {
             'token_endpoint_auth_method': 'client_secret_basic',
             'response_types': ['code'],
             'application_type': 'web',
@@ -597,9 +612,9 @@ class TestRegistration(object):
         assert 'post_logout_redirect_uris' in _req
 
     def test_config_with_required_request_uri(self):
-        _pi = self.service.service_context.get('provider_info')
+        _pi = self.service.service_context.provider_info
         _pi['require_request_uri_registration'] = True
-        self.service.service_context.set('provider_info', _pi)
+        self.service.service_context.provider_info= _pi
         _req = self.service.construct()
         assert isinstance(_req, RegistrationRequest)
         assert len(_req) == 5
@@ -618,17 +633,18 @@ class TestUserInfo(object):
         }
         service_context = ServiceContext(config=client_config)
         service_context.keyjar = CLI_KEY
-        service_context.set('behaviour', {
+        service_context.behaviour= {
             'userinfo_signed_response_alg': 'RS256',
             "userinfo_encrypted_response_alg": "RSA-OAEP",
             "userinfo_encrypted_response_enc": "A256GCM"
-        })
+        }
 
         self.service = service_factory('UserInfo', ['oidc'], service_context=service_context)
 
+        _state_interface = self.service.service_context.state
         # Add history
         auth_response = AuthorizationResponse(code='access_code').to_json()
-        self.service.store_item(auth_response, 'auth_response', 'abcde')
+        _state_interface.store_item(auth_response, 'auth_response', 'abcde')
 
         idtval = {
             'nonce': 'KUEYfRM2VzKDaaKD', 'sub': 'diana',
@@ -641,7 +657,7 @@ class TestUserInfo(object):
         token_response = AccessTokenResponse(
             access_token='access_token', id_token=idt,
             __verified_id_token=ver_idt).to_json()
-        self.service.store_item(token_response, 'token_response', 'abcde')
+        _state_interface.store_item(token_response, 'token_response', 'abcde')
 
     def test_construct(self):
         _req = self.service.construct(state='abcde')
@@ -758,12 +774,14 @@ class TestCheckSession(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response',
-                                'abcde')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                    'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckSessionRequest)
         assert len(_req) == 1
+        assert "id_token" in _req
+        assert _req["id_token"] == 'a.signed.jwt'
 
 
 class TestCheckID(object):
@@ -781,11 +799,14 @@ class TestCheckID(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response', 'abcde')
+        _state_interface = self.service.service_context.state
+        _state_interface.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                    'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, CheckIDRequest)
         assert len(_req) == 1
+        assert "id_token" in _req
+        assert _req["id_token"] == 'a.signed.jwt'
 
 
 class TestEndSession(object):
@@ -804,8 +825,8 @@ class TestEndSession(object):
                                        service_context=service_context)
 
     def test_construct(self):
-        self.service.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
-                                'token_response', 'abcde')
+        self.service.service_context.state.store_item(json.dumps({'id_token': 'a.signed.jwt'}),
+                                                      'token_response', 'abcde')
         _req = self.service.construct(state='abcde')
         assert isinstance(_req, EndSessionRequest)
         assert len(_req) == 3

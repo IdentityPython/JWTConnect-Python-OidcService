@@ -21,12 +21,12 @@ def pick_redirect_uris(request_args=None, service=None, **kwargs):
     if 'redirect_uri' in request_args:
         return request_args, {}
 
-    _callback = _context.get('callback')
+    _callback = _context.callback
     if _callback:
         try:
             _response_type = request_args['response_type']
         except KeyError:
-            _response_type = _context.get('behaviour')['response_types'][0]
+            _response_type = _context.behaviour['response_types'][0]
             request_args['response_type'] = _response_type
 
         try:
@@ -41,7 +41,7 @@ def pick_redirect_uris(request_args=None, service=None, **kwargs):
         else:
             request_args['redirect_uri'] = _callback['implicit']
     else:
-        request_args['redirect_uri'] = _context.get('redirect_uris')[0]
+        request_args['redirect_uri'] = _context.redirect_uris[0]
 
     return request_args, {}
 

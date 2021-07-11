@@ -51,7 +51,7 @@ class TestDummyService(object):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', "request"}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
 
@@ -59,7 +59,7 @@ class TestDummyService(object):
         req_args = {'foo': 'bar', 'req_str': 'some string'}
         self.service.endpoint = 'https://example.com/authorize'
         _info = self.service.get_request_parameters(request_args=req_args)
-        assert set(_info.keys()) == {'url', 'method'}
+        assert set(_info.keys()) == {'url', 'method', "request"}
         msg = DummyMessage().from_urlencoded(
             self.service.get_urlinfo(_info['url']))
         assert msg.to_dict() == {'foo': 'bar', 'req_str': 'some string'}

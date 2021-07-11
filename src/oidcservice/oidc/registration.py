@@ -10,7 +10,6 @@ __author__ = 'Roland Hedberg'
 
 logger = logging.getLogger(__name__)
 
-
 rt2gt = {
     'code': ['authorization_code'],
     'id_token': ['implicit'],
@@ -41,7 +40,7 @@ def response_types_to_grant_types(response_types):
 def add_request_uri(request_args=None, service=None, **kwargs):
     _context = service.service_context
     if _context.requests_dir:
-        _pi = _context.get('provider_info')
+        _pi = _context.provider_info
         if _pi:
             _req = _pi.get('require_request_uri_registration', False)
             if _req is True:
@@ -61,7 +60,7 @@ def add_post_logout_redirect_uris(request_args=None, service=None, **kwargs):
     """
 
     if "post_logout_redirect_uris" not in request_args:
-        _uris = service.service_context.register_args.get('post_logout_redirect_uris')
+        _uris = service.service_context.register_args.get("post_logout_redirect_uris")
         if _uris:
             request_args["post_logout_redirect_uris"] = _uris
 
@@ -118,7 +117,7 @@ class Registration(Service):
                 continue
 
             try:
-                request_args[prop] = self.service_context.get('behaviour')[prop]
+                request_args[prop] = self.service_context.behaviour[prop]
             except KeyError:
                 try:
                     request_args[
@@ -144,28 +143,26 @@ class Registration(Service):
         if "token_endpoint_auth_method" not in resp:
             resp["token_endpoint_auth_method"] = "client_secret_basic"
 
-        self.service_context.set('registration_response', resp)
-        _client_id = resp.get('client_id')
+        self.service_context.registration_response = resp
+        _client_id = resp.get("client_id")
         if _client_id:
-            self.service_context.set('client_id', _client_id)
+            self.service_context.client_id = _client_id
             if _client_id not in self.service_context.keyjar:
                 self.service_context.keyjar.import_jwks(
                     self.service_context.keyjar.export_jwks(True, ''),
                     issuer_id=_client_id
                 )
-            _client_secret = resp.get('client_secret')
+            _client_secret = resp.get("client_secret")
             if _client_secret:
-                self.service_context.set('client_secret', _client_secret)
+                self.service_context.client_secret = _client_secret
                 self.service_context.keyjar.add_symmetric('', _client_secret)
                 self.service_context.keyjar.add_symmetric(_client_id, _client_secret)
                 try:
-                    self.service_context.set('client_secret_expires_at',
-                                             resp["client_secret_expires_at"])
+                    self.service_context.client_secret_expires_at = resp["client_secret_expires_at"]
                 except KeyError:
                     pass
 
         try:
-            self.service_context.set('registration_access_token', resp[
-                "registration_access_token"])
+            self.service_context.registration_access_token = resp["registration_access_token"]
         except KeyError:
             pass

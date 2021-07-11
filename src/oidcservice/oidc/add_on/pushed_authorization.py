@@ -35,7 +35,7 @@ def push_authorization(request_args, service, **kwargs):
 
     # Send it to the Pushed Authorization Request Endpoint
     resp = method_args["http_client"].get(
-        service.service_context.get('provider_info')["pushed_authorization_request_endpoint"],
+        service.service_context.provider_info["pushed_authorization_request_endpoint"],
         data=_body
     )
 

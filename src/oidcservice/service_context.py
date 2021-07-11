@@ -1,6 +1,6 @@
 """
 Implements a service context. A Service context is used to keep information that are
-common to all the services by an OpenID Connect Relying Party.
+common between all the services that are used by OAuth2 client or OpenID Connect Relying Party.
 """
 import copy
 import hashlib
@@ -8,13 +8,11 @@ import os
 
 from cryptojwt.jwk.rsa import RSAKey, import_private_rsa_key_from_file
 from cryptojwt.key_bundle import KeyBundle
-from cryptojwt.key_jar import build_keyjar
 from cryptojwt.utils import as_bytes
 from oidcmsg.context import OidcContext
-# This represents a map between the local storage of algorithm choices
-# and how they are represented in a provider info response.
-from oidcmsg.message import Message
 from oidcmsg.oidc import RegistrationRequest
+
+from oidcservice.state_interface import StateInterface
 
 CLI_REG_MAP = {
     "userinfo": {
@@ -66,16 +64,16 @@ DEFAULT_VALUE = {
 }
 
 
-def add_issuer(conf, issuer):
-    res = {}
-    for key, val in conf.items():
-        if key == 'abstract_storage_cls':
-            res[key] = val
-        else:
-            _val = copy.deepcopy(val)
-            _val['issuer'] = issuer
-            res[key] = _val
-    return res
+# def add_issuer(conf, issuer):
+#     res = {}
+#     for key, val in conf.items():
+#         if key == 'abstract_storage_cls':
+#             res[key] = val
+#         else:
+#             _val = copy.deepcopy(val)
+#             _val['issuer'] = issuer
+#             res[key] = _val
+#     return res
 
 
 class ServiceContext(OidcContext):
@@ -85,30 +83,61 @@ class ServiceContext(OidcContext):
     from dynamic provider info discovery or client registration.
     But information is also picked up during the conversation with a server.
     """
+    parameter = OidcContext.parameter.copy()
+    parameter.update({
+        "add_on": None,
+        "allow": None,
+        "args": None,
+        "base_url": None,
+        'behaviour': None,
+        'callback': None,
+        'client_id': None,
+        "client_preferences": None,
+        'client_secret': None,
+        "client_secret_expires_at": 0,
+        'clock_skew': None,
+        "config": None,
+        "httpc_params": None,
+        'issuer': None,
+        "kid": None,
+        "post_logout_redirect_uris": [],
+        'provider_info': None,
+        'redirect_uris': None,
+        "requests_dir": None,
+        "register_args": None,
+        'registration_response': None,
+        'state': StateInterface,
+        'verify_args': None
+    })
 
-    def __init__(self, keyjar=None, config=None, **kwargs):
+    def __init__(self, base_url="", keyjar=None, config=None, state=None, **kwargs):
         if config is None:
             config = {}
         self.config = config
 
         OidcContext.__init__(self, config, keyjar, entity_id=config.get('client_id', ''))
-
-        # For my Dev environment
-        self.state_db = None
-
-        self.add_boxes({'state': 'state_db'}, self.db_conf)
+        self.state = state or StateInterface()
 
         self.kid = {"sig": {}, "enc": {}}
 
+        self.base_url = base_url
         # Below so my IDE won't complain
-        self.base_url = ''
-        self.requests_dir = ''
-        self.register_args = {}
         self.allow = {}
         self.client_preferences = {}
         self.args = {}
         self.add_on = {}
         self.httpc_params = {}
+        self.issuer = ""
+        self.client_id = ""
+        self.client_secret = ""
+        self.client_secret_expires_at = 0
+        self.behaviour = {}
+        self.provider_info = {}
+        self.post_logout_redirect_uris = []
+        self.redirect_uris = []
+        self.register_args = {}
+        self.registration_response = {}
+        self.requests_dir = ''
 
         _def_value = copy.deepcopy(DEFAULT_VALUE)
         # Dynamic information
@@ -118,6 +147,9 @@ class ServiceContext(OidcContext):
             self.set(param, _val)
             if param == 'client_secret':
                 self.keyjar.add_symmetric('', _val)
+
+        if not self.issuer:
+            self.issuer = self.provider_info.get("issuer", "")
 
         try:
             self.clock_skew = config['clock_skew']
@@ -184,9 +216,9 @@ class ServiceContext(OidcContext):
         """
         _hash = hashlib.sha256()
         try:
-            _hash.update(as_bytes(self.get('provider_info')['issuer']))
+            _hash.update(as_bytes(self.provider_info['issuer']))
         except KeyError:
-            _hash.update(as_bytes(self.get('issuer')))
+            _hash.update(as_bytes(self.issuer))
         _hash.update(as_bytes(self.base_url))
 
         if not path.startswith('/'):
@@ -212,7 +244,7 @@ class ServiceContext(OidcContext):
                     if typ == 'rsa':
                         for fil in files:
                             _key = RSAKey(
-                                key=import_private_rsa_key_from_file(fil),
+                                priv_key=import_private_rsa_key_from_file(fil),
                                 use='sig')
                             _bundle = KeyBundle()
                             _bundle.append(_key)
@@ -230,10 +262,10 @@ class ServiceContext(OidcContext):
         """
 
         try:
-            return self.get('behaviour')[CLI_REG_MAP[typ]['sign']]
+            return self.behaviour[CLI_REG_MAP[typ]['sign']]
         except KeyError:
             try:
-                return self.get('provider_info')[PROVIDER_INFO_MAP[typ]['sign']]
+                return self.provider_info[PROVIDER_INFO_MAP[typ]['sign']]
             except (KeyError, TypeError):
                 pass
 
@@ -249,10 +281,10 @@ class ServiceContext(OidcContext):
         res = {}
         for attr in ['enc', 'alg']:
             try:
-                _alg = self.get('behaviour')[CLI_REG_MAP[typ][attr]]
+                _alg = self.behaviour[CLI_REG_MAP[typ][attr]]
             except KeyError:
                 try:
-                    _alg = self.get('provider_info')[PROVIDER_INFO_MAP[typ][attr]]
+                    _alg = self.provider_info[PROVIDER_INFO_MAP[typ][attr]]
                 except KeyError:
                     _alg = None
 
@@ -261,13 +293,7 @@ class ServiceContext(OidcContext):
         return res
 
     def get(self, key, default=None):
-        return self.db.get(key, default)
+        return getattr(self, key, default)
 
     def set(self, key, value):
-        if isinstance(value, Message):
-            self.db[key] = value.to_dict()
-        else:
-            self.db[key] = value
-
-    def __contains__(self, item):
-        return item in self.db
+        setattr(self, key, value)

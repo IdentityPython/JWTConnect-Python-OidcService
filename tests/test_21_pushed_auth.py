@@ -49,7 +49,7 @@ class TestPushedAuth:
         }
         _cam = ca_factory
         _srvs = DEFAULT_SERVICES
-        service_context = ServiceContext(CLI_KEY, client_id='client_id',
+        service_context = ServiceContext(keyjar=CLI_KEY, client_id='client_id',
                                          issuer='https://www.example.org/as',
                                          config=config)
 
@@ -59,9 +59,9 @@ class TestPushedAuth:
             do_add_ons(config['add_ons'], self.service)
 
         service_context.service = self.service
-        service_context.set('provider_info', {
+        service_context.provider_info= {
             "pushed_authorization_request_endpoint": "https://as.example.com/push"
-        })
+        }
 
     def test_authorization(self):
         auth_service = self.service["authorization"]
@@ -72,7 +72,7 @@ class TestPushedAuth:
                 "expires_in": 3600
             }
             rsps.add("GET",
-                     auth_service.service_context.get('provider_info')[
+                     auth_service.service_context.provider_info[
                          "pushed_authorization_request_endpoint"],
                      body=json.dumps(_resp), status=200)
 

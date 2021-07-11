@@ -1,3 +1,4 @@
+import json
 import os
 from urllib.parse import urlsplit
 
@@ -7,7 +8,6 @@ from cryptojwt.key_jar import build_keyjar
 
 from oidcservice.service_context import ServiceContext
 
-BASE_URL = "https://entity.example.org"
 
 def test_client_info_init():
     config = {
@@ -16,7 +16,7 @@ def test_client_info_init():
         'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
-    ci = ServiceContext(BASE_URL, config=config)
+    ci = ServiceContext(config=config)
 
     srvcnx = ServiceContext().load(ci.dump())
 
@@ -32,13 +32,17 @@ def test_client_info_init():
 def test_set_and_get_client_secret():
     service_context = ServiceContext()
     service_context.client_secret = 'longenoughsupersecret'
-    assert service_context.client_secret == 'longenoughsupersecret'
+
+    srvcnx2 = ServiceContext().load(service_context.dump())
+
+    assert srvcnx2.client_secret == 'longenoughsupersecret'
 
 
 def test_set_and_get_client_id():
-    ci = ServiceContext()
-    ci.client_id = 'myself'
-    assert ci.client_id == 'myself'
+    service_context = ServiceContext()
+    service_context.client_id = 'myself'
+    srvcnx2 = ServiceContext().load(service_context.dump())
+    assert srvcnx2.client_id == 'myself'
 
 
 def test_client_filename():
@@ -47,8 +51,9 @@ def test_client_filename():
         'client_secret': 'longenoughsupersecret', 'base_url': 'https://example.com',
         'requests_dir': 'requests'
     }
-    ci = ServiceContext(config=config)
-    fname = ci.filename_from_webname('https://example.com/rq12345')
+    service_context = ServiceContext(config=config)
+    srvcnx2 = ServiceContext().load(service_context.dump())
+    fname = srvcnx2.filename_from_webname('https://example.com/rq12345')
     assert fname == 'rq12345'
 
 
@@ -93,19 +98,21 @@ class TestClientInfo(object):
         self.service_context = ServiceContext(config=config)
 
     def test_registration_userinfo_sign_enc_algs(self):
-        self.service_context.behaviour= {
-            "application_type": "web",
-            "redirect_uris": ["https://client.example.org/callback",
-                              "https://client.example.org/callback2"],
-            "token_endpoint_auth_method": "client_secret_basic",
-            "jwks_uri": "https://client.example.org/my_public_keys.jwks",
-            "userinfo_encrypted_response_alg": "RSA1_5",
-            "userinfo_encrypted_response_enc": "A128CBC-HS256"
-        }
+        self.service_context.set(
+            'behaviour', {
+                "application_type": "web",
+                "redirect_uris": ["https://client.example.org/callback",
+                                  "https://client.example.org/callback2"],
+                "token_endpoint_auth_method": "client_secret_basic",
+                "jwks_uri": "https://client.example.org/my_public_keys.jwks",
+                "userinfo_encrypted_response_alg": "RSA1_5",
+                "userinfo_encrypted_response_enc": "A128CBC-HS256"
+            })
 
-        assert self.service_context.get_sign_alg('userinfo') is None
-        assert self.service_context.get_enc_alg_enc('userinfo') == {
-            'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
+        assert srvcntx.get_sign_alg('userinfo') is None
+        assert srvcntx.get_enc_alg_enc('userinfo') == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
 
     def test_registration_request_object_sign_enc_algs(self):
         self.service_context.behaviour= {
@@ -119,11 +126,12 @@ class TestClientInfo(object):
             "request_object_signing_alg": "RS384"
         }
 
-        res = self.service_context.get_enc_alg_enc('userinfo')
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
+        res = srvcntx.get_enc_alg_enc('userinfo')
         # 'sign':'RS256' is an added default
         assert res == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = self.service_context.get_sign_alg('request_object')
-        assert res == 'RS384'
+        assert srvcntx.get_sign_alg('request_object') == 'RS384'
 
     def test_registration_id_token_sign_enc_algs(self):
         self.service_context.behaviour= {
@@ -140,13 +148,13 @@ class TestClientInfo(object):
             'id_token_signed_response_alg': "ES384",
         }
 
-        res = self.service_context.get_enc_alg_enc('userinfo')
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
+
         # 'sign':'RS256' is an added default
-        assert res == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
-        res = self.service_context.get_sign_alg('request_object')
-        assert res == 'RS384'
-        res = self.service_context.get_enc_alg_enc('id_token')
-        assert res == {'alg': 'ECDH-ES', 'enc': 'A128GCM'}
+        assert srvcntx.get_enc_alg_enc('userinfo') == {'alg': 'RSA1_5', 'enc': 'A128CBC-HS256'}
+        assert srvcntx.get_sign_alg('request_object') == 'RS384'
+        assert srvcntx.get_enc_alg_enc('id_token') == {'alg': 'ECDH-ES', 'enc': 'A128GCM'}
 
     def test_verify_alg_support(self):
         self.service_context.provider_info= {
@@ -202,17 +210,15 @@ class TestClientInfo(object):
                                      "fr-CA"]
         }
 
-        assert verify_alg_support(self.service_context, 'RS256', 'id_token',
-                                  'signing_alg')
-        assert verify_alg_support(self.service_context,
-                                  'RS512', 'id_token', 'signing_alg') is False
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
 
-        assert verify_alg_support(self.service_context, 'RSA1_5', 'userinfo',
-                                  'encryption_alg')
+        assert verify_alg_support(srvcntx, 'RS256', 'id_token', 'signing_alg')
+        assert verify_alg_support(srvcntx, 'RS512', 'id_token', 'signing_alg') is False
+        assert verify_alg_support(srvcntx, 'RSA1_5', 'userinfo', 'encryption_alg')
 
         # token_endpoint_auth_signing_alg_values_supported
-        assert verify_alg_support(self.service_context, 'ES256',
-                                  'token_endpoint_auth', 'signing_alg')
+        assert verify_alg_support(srvcntx, 'ES256', 'token_endpoint_auth', 'signing_alg')
 
     def test_verify_requests_uri(self):
         self.service_context.provider_info= {'issuer': 'https://example.com/'}
@@ -223,9 +229,12 @@ class TestClientInfo(object):
         assert p[1] == 'leading'
         assert len(p) == 3
 
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
+
         # different for different OPs
-        self.service_context.provider_info= {'issuer': 'https://op.example.org/'}
-        url_list = self.service_context.generate_request_uris('/leading')
+        srvcntx.provider_info= {'issuer': 'https://op.example.org/'}
+        url_list = srvcntx.generate_request_uris('/leading')
         sp = urlsplit(url_list[0])
         np = sp.path.split('/')
         assert np[0] == ''
@@ -245,8 +254,30 @@ class TestClientInfo(object):
         keyspec = {'file': {'rsa': [file_path]}}
         self.service_context.import_keys(keyspec)
 
+        srvcntx = ServiceContext().load(
+            self.service_context.dump(exclude_attributes=["service_context"]))
+
         # Now there should be 2, the second a RSA key for signing
-        assert len(self.service_context.keyjar.get_issuer_keys('')) == 2
+        assert len(srvcntx.keyjar.get_issuer_keys('')) == 2
+
+    def test_import_keys_file_json(self):
+        # Should only be one and that a symmetric key (client_secret) usable
+        # for signing and encryption
+        assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
+
+        file_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), 'salesforce.key'))
+
+        keyspec = {'file': {'rsa': [file_path]}}
+        self.service_context.import_keys(keyspec)
+
+        _sc_state = self.service_context.dump(exclude_attributes=["service_context"])
+        _jsc_state = json.dumps(_sc_state)
+        _o_state = json.loads(_jsc_state)
+        srvcntx = ServiceContext().load(_o_state)
+
+        # Now there should be 2, the second a RSA key for signing
+        assert len(srvcntx.keyjar.get_issuer_keys('')) == 2
 
     def test_import_keys_url(self):
         assert len(self.service_context.keyjar.get_issuer_keys('')) == 1
@@ -264,6 +295,8 @@ class TestClientInfo(object):
             self.service_context.import_keys(keyspec)
             self.service_context.keyjar.update()
 
+            srvcntx = ServiceContext().load(
+                self.service_context.dump(exclude_attributes=["service_context"]))
+
             # Now there should be one belonging to https://example.com
-            assert len(self.service_context.keyjar.get_issuer_keys(
-                'https://foobar.com')) == 1
+            assert len(srvcntx.keyjar.get_issuer_keys('https://foobar.com')) == 1
